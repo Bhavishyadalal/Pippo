@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "com.mochyy.mochymusic.artistvideo"
+    namespace = "app.pippo.music.artistvideo"
     compileSdk = 37
 
     defaultConfig {

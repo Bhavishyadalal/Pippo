@@ -1,0 +1,9 @@
+Pippo is a modified version of Mochy Music by realidkroo and its contributors.
+Upstream: https://github.com/realidkroo/Mochy-Music
+Imported commit: eafbbe6d1c2a6590cbdfa045b42b572611bb2133
+Mochy is based on ViviMusic and Metrolist. Existing upstream acknowledgements,
+GNU GPL v3 licensing, and third-party copyright notices remain applicable.
+
+Pippo modifications by Bhavishya Dalal: application identity, package/JNI namespace,
+visible branding, owner/update configuration, and production build support.
+Pippo is independently maintained; upstream authors do not maintain this fork.

@@ -19,16 +19,17 @@ plugins {
 }
 
 extensions.configure<ApplicationExtension> {
-    namespace = "com.mochyy.mochymusic"
+    namespace = "app.pippo.music"
     compileSdk = 37
     ndkVersion = "27.0.12077973"
 
     defaultConfig {
-        applicationId = "com.mochyy.mochymusic"
+        applicationId = "app.pippo.music"
         minSdk = 24
         targetSdk = 37
-        versionCode = 73
-        versionName = "8.4.1 build#1256"
+        versionCode = 1
+        versionName = "0.1.0"
+        resValue("string", "pippo_application_id", "app.pippo.music")
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
@@ -52,14 +53,14 @@ extensions.configure<ApplicationExtension> {
         buildConfigField("String", "LIBREFM_API_KEY", "\"$libreFmKey\"")
         buildConfigField("String", "LIBREFM_SECRET", "\"$libreFmSecret\"")
 
-        // The Discord app Mochy signs in through (Developer Portal → your app → Application ID).
+        // The Discord app Pippo signs in through (Developer Portal → your app → Application ID).
         // Discord sends the login back to discord-<id>:/authorize/callback, so the manifest needs it too.
         // Without one, the Discord page says so instead of opening a login that can't come back.
         val discordClientId = localProperties.getProperty("DISCORD_CLIENT_ID")
             ?: System.getenv("DISCORD_CLIENT_ID") ?: ""
         buildConfigField("String", "DISCORD_CLIENT_ID", "\"$discordClientId\"")
         manifestPlaceholders["discordRedirectScheme"] =
-            if (discordClientId.isNotBlank()) "discord-$discordClientId" else "mochy-discord-unset"
+            if (discordClientId.isNotBlank()) "discord-$discordClientId" else "pippo-discord-unset"
 
 //add nightly build label support
         val isNightly = project.hasProperty("nightly") && project.property("nightly") == "true"
@@ -136,10 +137,22 @@ extensions.configure<ApplicationExtension> {
     // used to make `assembleRelease` unbuildable and left debug as the only variant anyone ever
     // ran — and a debug Compose build is several times slower per frame than release, so all
     // local performance impressions were being formed against the wrong binary.
-    val hasReleaseSigning = System.getenv("STORE_PASSWORD") != null &&
-        System.getenv("KEY_ALIAS") != null &&
-        System.getenv("KEY_PASSWORD") != null &&
-        file("keystore/release.keystore").exists()
+    val releaseProperties = Properties().apply {
+        val propertiesFile = rootProject.file("keystore.properties")
+        if (propertiesFile.exists()) propertiesFile.inputStream().use { load(it) }
+    }
+    val releaseStoreFile = releaseProperties.getProperty("storeFile")?.let(rootProject::file)
+        ?: System.getenv("PIPPO_KEYSTORE_PATH")?.let(rootProject::file)
+        ?: rootProject.file("pippo-release.jks")
+    val releaseStorePassword = releaseProperties.getProperty("storePassword")
+        ?: System.getenv("KEYSTORE_PASSWORD") ?: System.getenv("STORE_PASSWORD")
+    val releaseKeyAlias = releaseProperties.getProperty("keyAlias") ?: System.getenv("KEY_ALIAS")
+    val releaseKeyPassword = releaseProperties.getProperty("keyPassword") ?: System.getenv("KEY_PASSWORD")
+    val hasReleaseSigning = releaseStoreFile.isFile &&
+        !releaseStorePassword.isNullOrBlank() && !releaseKeyAlias.isNullOrBlank() && !releaseKeyPassword.isNullOrBlank()
+    if (providers.gradleProperty("pippoRequireReleaseSigning").orNull == "true" && !hasReleaseSigning) {
+        throw GradleException("Pippo production builds require a keystore and KEYSTORE_PASSWORD, KEY_ALIAS and KEY_PASSWORD. See BUILDING.md.")
+    }
 
     signingConfigs {
         create("persistentDebug") {
@@ -150,10 +163,10 @@ extensions.configure<ApplicationExtension> {
         }
         if (hasReleaseSigning) {
             create("release") {
-                storeFile = file("keystore/release.keystore")
-                storePassword = System.getenv("STORE_PASSWORD")
-                keyAlias = System.getenv("KEY_ALIAS")
-                keyPassword = System.getenv("KEY_PASSWORD")
+                storeFile = releaseStoreFile
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
             }
         }
         getByName("debug") {
@@ -184,6 +197,7 @@ extensions.configure<ApplicationExtension> {
         }
         debug {
             applicationIdSuffix = ".debug"
+            resValue("string", "pippo_application_id", "app.pippo.music.debug")
             isDebuggable = true
             signingConfig = signingConfigs.getByName("debug")
         }
@@ -200,6 +214,7 @@ extensions.configure<ApplicationExtension> {
         create("profileable") {
             initWith(getByName("release"))
             applicationIdSuffix = ".profileable"
+            resValue("string", "pippo_application_id", "app.pippo.music.profileable")
             isProfileable = true
             signingConfig = signingConfigs.getByName("debug")
             // The provider modules only publish debug/release variants; without this, resolving
@@ -212,6 +227,7 @@ extensions.configure<ApplicationExtension> {
         create("fast") {
             initWith(getByName("debug"))
             applicationIdSuffix = ".fast"
+            resValue("string", "pippo_application_id", "app.pippo.music.fast")
             isDebuggable = false
             isProfileable = true
             isMinifyEnabled = false
@@ -458,7 +474,7 @@ dependencies {
     implementation(libs.ktor.client.okhttp)
     implementation(libs.ktor.client.content.negotiation)
     implementation(libs.ktor.serialization.json)
-    // finds song streams first, with mochy's own client walk as the backup (YTPlayerUtils)
+    // finds song streams first, with pippo's own client walk as the backup (YTPlayerUtils)
     implementation(libs.innertubex)
 
     // Protobuf for message serialization (lite version for Android)

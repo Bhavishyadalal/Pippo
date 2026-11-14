@@ -88,3 +88,8 @@ app/persistent-debug.keystore
 output-metadata.json
 vcs.xml
 lint/
+
+# Private Pippo production signing inputs
+*.jks
+*.keystore
+keystore.properties
