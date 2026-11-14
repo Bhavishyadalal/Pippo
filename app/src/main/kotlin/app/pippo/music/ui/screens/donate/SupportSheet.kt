@@ -107,7 +107,7 @@ private fun SupportButtons(popup: PopupSheetState) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             DonatePillButton(
-                text = "Donate Us!",
+                text = "Support Pippo",
                 onClick = { popup.showDonateSheet() },
                 modifier = Modifier.weight(1f),
             )

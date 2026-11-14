@@ -260,6 +260,7 @@ extensions.configure<ApplicationExtension> {
     }
 
     buildFeatures {
+        resValues = true
         compose = true
         buildConfig = true
     }

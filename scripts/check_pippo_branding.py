@@ -14,6 +14,7 @@ def require(condition, message):
 gradle = (ROOT / 'app/build.gradle.kts').read_text()
 require('namespace = "app.pippo.music"' in gradle, 'Wrong Android namespace')
 require('applicationId = "app.pippo.music"' in gradle, 'Wrong production application ID')
+require('resValues = true' in gradle, 'Generated shortcut resources are disabled')
 require('pippoRequireReleaseSigning' in gradle, 'Missing production signing guard')
 
 old = re.compile(r'mochy', re.I)
@@ -27,7 +28,11 @@ for base in ('app/src', 'modules', 'providers'):
         require('com.mochyy.mochymusic' not in text, f'Old package in {path.relative_to(ROOT)}')
         # Attribution is intentionally preserved in About's upstream-credit entries.
         for number, line in enumerate(text.splitlines(), 1):
-            if old.search(line) and path.name != 'AboutSheet.kt':
+            if old.search(line) and not (path.name == 'AboutSheet.kt' and line.strip() in {
+                'name = "Roo and Mochy contributors",',
+                'subtitle = "Mochy Music · upstream source, GPL-3.0",',
+                'url = "https://github.com/realidkroo/Mochy-Music",',
+            }):
                 errors.append(f'Old brand in {path.relative_to(ROOT)}:{number}')
         if path.suffix == '.xml':
             try:
