@@ -1,5 +1,15 @@
 @file:Suppress("UnstableApiUsage")
 
+// Resolve plugin markers directly as well as through the Gradle plugin portal.
+pluginManagement {
+    repositories {
+        google()
+        mavenCentral()
+        maven("https://repo1.maven.org/maven2")
+        gradlePluginPortal()
+    }
+}
+
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
 
