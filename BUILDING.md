@@ -38,7 +38,7 @@ Optional integrations: `LASTFM_API_KEY`, `LASTFM_SECRET`, `LIBREFM_API_KEY`, `LI
 
 The selected APK variant is assembled, its Android unit tests and lint task are run, then the APK's application ID, label and signature are verified. Source checks also cover branding, launcher aliases, shortcuts and JNI names. Lint currently inherits upstream's non-blocking issue policy; consult the uploaded lint report. Artifacts and reports expire after seven days.
 
-**Android Checks** performs the development arm64 FOSS build on pushes and pull requests. GMS and universal can be selected manually. The workflow does not create a public GitHub Release. The in-app updater reads only this Pippo repository; it will have no update to offer until a compatible signed APK is published as a Release.
+**Android Checks** performs the development arm64 FOSS build only when you manually run it. Pushes and pull requests do not trigger builds. GMS and universal can be selected manually. The workflow does not create a public GitHub Release. The in-app updater reads only this Pippo repository; it will have no update to offer until a compatible signed APK is published as a Release.
 
 ## Local Android Studio build
 

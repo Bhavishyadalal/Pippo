@@ -1,10 +1,6 @@
 name: Android Checks
+# Builds are owner-triggered only; pushes and pull requests never start Actions.
 on:
-  push:
-    branches: [main]
-    paths-ignore: ['**/*.md', 'docs/**', 'fastlane/**', 'assets/**']
-  pull_request:
-    branches: [main]
   workflow_dispatch:
 permissions:
   contents: read
