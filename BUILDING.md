@@ -42,7 +42,7 @@ The selected APK variant is assembled, its Android unit tests and lint task are 
 
 ## Local Android Studio build
 
-Install JDK 21, Android SDK platform 37, NDK `27.0.12077973`, and CMake `3.22.1`. Open the repository root and let Gradle sync.
+Install JDK 21, Android SDK platform 37 (`platforms;android-37.0`), NDK `27.0.12077973`, and CMake `3.22.1`. Open the repository root and let Gradle sync.
 
 ```sh
 ./gradlew :app:assembleArm64FossDebug :app:testArm64FossDebugUnitTest

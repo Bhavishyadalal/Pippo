@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "com.music.musixmatch"
-    compileSdk = 37
+    compileSdkVersion(providers.gradleProperty("pippoCompileSdk").getOrElse("android-37.0"))
 
     defaultConfig {
         minSdk = 24

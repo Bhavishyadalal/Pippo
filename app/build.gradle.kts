@@ -20,7 +20,7 @@ plugins {
 
 extensions.configure<ApplicationExtension> {
     namespace = "app.pippo.music"
-    compileSdk = 37
+    compileSdkVersion(providers.gradleProperty("pippoCompileSdk").getOrElse("android-37.0"))
     ndkVersion = "27.0.12077973"
 
     defaultConfig {

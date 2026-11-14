@@ -59,7 +59,7 @@ Updating works the same way: install the new apk over the old one and your libra
 
 ---
 
-## Some Prview 
+## Some Prview
 
 <img width="1799" height="927" alt="Frame 289" src="https://github.com/user-attachments/assets/c4c122ed-b86c-44e4-a618-417f5287bc98" />
 <img width="1799" height="927" alt="Frame 287" src="https://github.com/user-attachments/assets/186be8ac-ff3e-4e2a-ab7e-ae80bc9da7e7" />
@@ -226,9 +226,9 @@ Mochy is an independent, unofficial project made for personal and educational us
 These are the open source apis and server we get gets its lyrics, streams and data from. They r free for everyone because of these good people, so go give them a star!
 
 - **LyricsPlus** by [Ibra Al Tabian](https://github.com/ibratabian17) ([repos](https://github.com/ibratabian17/LyricsPlus)) s
-- **Better Lyrics API** by [Boidushya](https://github.com/boidushya) ([repos](https://github.com/better-lyrics/api)) 
-- **LRCLIB** by [tranxuanthang](https://github.com/tranxuanthang) ([repos](https://github.com/tranxuanthang/lrclib) / [Website](https://lrclib.net/)) 
-- **SimpMusic Lyrics** by [maxrave-dev](https://github.com/maxrave-dev) ([repos](https://github.com/maxrave-dev/SimpMusic)) 
+- **Better Lyrics API** by [Boidushya](https://github.com/boidushya) ([repos](https://github.com/better-lyrics/api))
+- **LRCLIB** by [tranxuanthang](https://github.com/tranxuanthang) ([repos](https://github.com/tranxuanthang/lrclib) / [Website](https://lrclib.net/))
+- **SimpMusic Lyrics** by [maxrave-dev](https://github.com/maxrave-dev) ([repos](https://github.com/maxrave-dev/SimpMusic))
 
 ---
 ## Star History
@@ -244,4 +244,3 @@ These are the open source apis and server we get gets its lyrics, streams and da
 <div align="center">
   <sub>star the repo plssss apreciate it!!!!!</sub>
 </div>
-
