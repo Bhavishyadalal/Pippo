@@ -1,3 +1,27 @@
+# Pippo
+
+Pippo is Bhavishya Dalal's music-app project, starting from the complete Mochy Music source tree.
+
+## Current status
+
+This first import preserves Mochy's existing application behavior and upstream history. Pippo-specific Android branding, package identity, signing, update configuration and new features have not been implemented yet. Builds from this baseline still identify themselves as Mochy and use its existing integration settings.
+
+- **Owner:** [Bhavishyadalal](https://github.com/Bhavishyadalal)
+- **Repository:** [Bhavishyadalal/Pippo](https://github.com/Bhavishyadalal/Pippo)
+- **Upstream:** [realidkroo/Mochy-Music](https://github.com/realidkroo/Mochy-Music)
+- **Imported source commit:** `eafbbe6d1c2a6590cbdfa045b42b572611bb2133` (8.4.1 build#1256, Android version code 73)
+- **Development reference:** [Source architecture review](docs/PIPPO_SOURCE_REVIEW.md)
+
+## License and credits
+
+The imported project remains licensed under GNU GPL v3. Preserve [LICENSE](LICENSE), existing copyright notices and the upstream acknowledgements below. Mochy's authors and contributors retain credit for their work; this independent project is maintained separately.
+
+## Upstream documentation
+
+The original Mochy README follows unchanged as reference documentation. Its download, social and service links refer to the upstream project, not a published Pippo release. Build instructions apply to the imported baseline.
+
+---
+
 <img width="1799" height="927" alt="fdb" src="https://github.com/user-attachments/assets/98652d23-a7cd-4c6f-945e-96a85273f61f" />
 
 <div align="center">
