@@ -1,4 +1,4 @@
-package app.pippo.music.betterlyrics
+package com.mochyy.mochymusic.betterlyrics
 
 import org.w3c.dom.Element
 import org.w3c.dom.Node

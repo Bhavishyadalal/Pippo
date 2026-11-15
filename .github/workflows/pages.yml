@@ -1,7 +1,6 @@
 # puts the homepage and wiki in docs/ on github pages whenever they change on main
 name: Pages
 
-# Website hosting is opt-in; APK pushes should only build the Android app.
 on:
   workflow_dispatch:
 

@@ -1,7 +1,7 @@
-package app.pippo.music.applecanvas
+package com.mochyy.mochymusic.applecanvas
 
-import app.pippo.music.canvas.CanvasArtwork
-import app.pippo.music.canvas.CanvasMatch
+import com.mochyy.mochymusic.canvas.CanvasArtwork
+import com.mochyy.mochymusic.canvas.CanvasMatch
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.okhttp.OkHttp

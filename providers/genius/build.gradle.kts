@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "com.music.genius"
-    compileSdkVersion(providers.gradleProperty("pippoCompileSdk").getOrElse("android-37.0"))
+    compileSdk = 37
 
     defaultConfig {
         minSdk = 24

@@ -34,7 +34,7 @@ object LrcLib {
             }
 
             // says who's asking so the server owner can reach us instead of blocking us
-            install(UserAgent) { agent = "Pippo (+https://github.com/Bhavishyadalal/Pippo)" }
+            install(UserAgent) { agent = "Mochy (+https://github.com/realidkroo/Mochy-Music)" }
 
             expectSuccess = true
         }

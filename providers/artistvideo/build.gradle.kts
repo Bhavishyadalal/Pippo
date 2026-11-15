@@ -5,8 +5,8 @@ plugins {
 }
 
 android {
-    namespace = "app.pippo.music.artistvideo"
-    compileSdkVersion(providers.gradleProperty("pippoCompileSdk").getOrElse("android-37.0"))
+    namespace = "com.mochyy.mochymusic.artistvideo"
+    compileSdk = 37
 
     defaultConfig {
         minSdk = 24

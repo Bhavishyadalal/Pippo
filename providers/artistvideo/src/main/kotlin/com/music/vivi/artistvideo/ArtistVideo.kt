@@ -1,4 +1,4 @@
-package app.pippo.music.artistvideo
+package com.mochyy.mochymusic.artistvideo
 
 import android.view.TextureView
 import android.view.ViewGroup
