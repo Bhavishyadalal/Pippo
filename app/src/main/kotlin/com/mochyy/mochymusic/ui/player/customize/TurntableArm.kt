@@ -19,6 +19,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
@@ -119,6 +120,8 @@ fun TurntableArm(
     awayProvider: () -> Float = { 0f },
 ) {
     val connection = LocalPlayerConnection.current
+    // The time arc reads this from a retained draw callback, across connection replacements.
+    val currentConnection by rememberUpdatedState(connection)
     val generation by remember(connection) {
         connection?.uiState?.progressState?.map { it.playbackGeneration }?.distinctUntilChanged()
             ?: kotlinx.coroutines.flow.flowOf(0L)
