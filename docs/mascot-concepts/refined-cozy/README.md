@@ -1,6 +1,6 @@
 # Refined cozy Pippo mascots — selected characters 02 and 06
 
-Six AI-generated illustrations based on the owner's selected character concepts. Soft mulberry, dusty rose, warm cream and sage accents; shared crescent-and-dot details; retained character identities. Transparent PNG originals are preserved here for review and future asset preparation.
+Six AI-generated illustrations based on the owner's selected character concepts. Soft mulberry, dusty rose, warm cream and sage accents; shared coral three-bar sound-wave emblems; retained character identities. The earlier crescent-and-dot motif has been removed from all six current previews, and the warm-drink cup sleeves are muted lavender. Transparent PNG originals are preserved here for review and future asset preparation.
 
 These are artwork files only. Android resources, animation layers and random character selection have not been changed. No app builds, tests or GitHub Actions were run.
 
