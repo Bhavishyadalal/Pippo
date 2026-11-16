@@ -167,11 +167,15 @@ class DownloadExporter @Inject constructor(
         val musicFolder = context.getString(R.string.storage_export_folder_music)
         val (withAlbum, loose) = songs.partition { albumTitle(it) != null }
         val out = ArrayList<Entry>()
-        withAlbum.groupBy { it.album?.id ?: albumTitle(it)!! }.values
-            .sortedBy { albumTitle(it.first())!!.lowercase() }
-            .forEach { albumSongs ->
+        val takenNames = HashSet<String>()
+        withAlbum.groupBy { song ->
+            song.album?.id?.takeIf { it.isNotBlank() }?.let { "id:$it" }
+                ?: "title:${albumTitle(song)}\u0000artist:${song.artists.firstOrNull()?.id.orEmpty()}\u0000${song.artists.firstOrNull()?.name.orEmpty()}"
+        }.entries
+            .sortedWith(compareBy({ albumTitle(it.value.first())!!.lowercase() }, { it.key }))
+            .forEach { (_, albumSongs) ->
                 val first = albumSongs.first()
-                val name = DocumentTree.safeName(albumTitle(first)!!, first.id)
+                val name = uniqueName(takenNames, DocumentTree.safeName(albumTitle(first)!!, first.id))
                 val cover = first.album?.thumbnailUrl ?: first.song.thumbnailUrl
                 albumSongs.forEach { out += Entry(listOf(albumsFolder, name), it, cover) }
             }

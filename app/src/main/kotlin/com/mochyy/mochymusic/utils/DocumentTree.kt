@@ -7,6 +7,7 @@ import android.net.Uri
 import android.provider.DocumentsContract
 import java.io.IOException
 import java.io.OutputStream
+import java.util.UUID
 
 // characters most file systems refuse in a name, plus anything invisible
 private val BadNameChars = Regex("[\\\\/:*?\"<>|\\p{Cntrl}]")
@@ -30,19 +31,39 @@ class DocumentTree(private val resolver: ContentResolver, private val tree: Uri)
     // writes a file called [name] inside [parentId], replacing one that's already there so an export run twice stays tidy
     fun write(parentId: String, name: String, block: (OutputStream) -> Unit) {
         val children = childrenOf(parentId)
-        children.remove(name)?.let { old -> runCatching { DocumentsContract.deleteDocument(resolver, documentUri(old)) } }
+        val old = children[name]?.let(::documentUri)
+        val temporaryName = if (old == null) name else ".export-${UUID.randomUUID()}"
         // a generic type, so the provider never tacks a second extension onto the name
-        val uri = DocumentsContract.createDocument(resolver, documentUri(parentId), "application/octet-stream", name)
+        var uri = DocumentsContract.createDocument(resolver, documentUri(parentId), "application/octet-stream", temporaryName)
             ?: throw IOException("couldn't make the file $name")
+        var backup: Uri? = null
+        var promoted = false
         try {
             val stream = resolver.openOutputStream(uri, "w") ?: throw IOException("couldn't open $name")
             stream.buffered(256 * 1024).use(block)
+            if (old != null) {
+                // Only rename the original after the complete replacement has been closed.
+                // Providers without rename support fail here with the original still intact.
+                backup = DocumentsContract.renameDocument(resolver, old, ".export-backup-${UUID.randomUUID()}")
+                    ?: throw IOException("this folder cannot safely replace $name")
+                uri = DocumentsContract.renameDocument(resolver, uri, name)
+                    ?: throw IOException("couldn't finish replacing $name")
+            }
+            promoted = true
+            children[name] = DocumentsContract.getDocumentId(uri)
+            backup?.let { runCatching { DocumentsContract.deleteDocument(resolver, it) } }
         } catch (error: Throwable) {
-            // a half-written song is worse than none
-            runCatching { DocumentsContract.deleteDocument(resolver, uri) }
+            if (!promoted) {
+                runCatching { DocumentsContract.deleteDocument(resolver, uri) }
+                backup?.let {
+                    // If rollback is refused, keep the original bytes under the backup name.
+                    runCatching { DocumentsContract.renameDocument(resolver, it, name) }
+                }
+            }
+            // A provider can change document IDs on rename; list again before another write.
+            listed.remove(parentId)
             throw error
         }
-        children[name] = DocumentsContract.getDocumentId(uri)
     }
 
     private fun documentUri(id: String): Uri = DocumentsContract.buildDocumentUriUsingTree(tree, id)

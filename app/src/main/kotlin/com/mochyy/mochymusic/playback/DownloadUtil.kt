@@ -12,6 +12,7 @@ import androidx.core.content.getSystemService
 import androidx.core.net.toUri
 import androidx.media3.database.DatabaseProvider
 import androidx.media3.datasource.ResolvingDataSource
+import androidx.media3.datasource.cache.ContentMetadataMutations
 import androidx.media3.datasource.cache.SimpleCache
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.offline.Download
@@ -102,8 +103,8 @@ constructor(
 
     private val moduleDownloads = java.util.concurrent.ConcurrentHashMap<String, ModuleDownload>()
 
-    /** The YouTube format each download started in, so a resumed one can't carry on in another. */
-    private val downloadItags = java.util.concurrent.ConcurrentHashMap<String, Int>()
+    // Stored with the cached bytes, so the format guard survives process restarts.
+    private val streamIdentityKey = "custom_download_stream_identity"
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -143,9 +144,13 @@ constructor(
             val mediaId = dataSpec.key ?: error("No media id")
 
             // a tv copying a song its linked phone already has takes the phone's file, the very same song and much quicker
-            com.mochyy.mochymusic.link.PhoneFiles.streamUrl(mediaId)?.let { return@Factory dataSpec.withUri(it.toUri()) }
+            com.mochyy.mochymusic.link.PhoneFiles.streamUrl(mediaId)?.let {
+                rememberDownloadStream(mediaId, "phone:$it", dataSpec.position)
+                return@Factory dataSpec.withUri(it.toUri())
+            }
 
             moduleDownload(mediaId)?.let { found ->
+                rememberDownloadStream(mediaId, "module:${found.providerId}:${found.url}", dataSpec.position)
                 return@Factory dataSpec.buildUpon()
                     .setUri(found.url.toUri())
                     .setHttpRequestHeaders(dataSpec.httpRequestHeaders + found.headers)
@@ -172,10 +177,7 @@ constructor(
             // Picking up part way with a fresh url that gives another format would glue two files
             // together. Fail instead: the failed download is wiped (see forgetStream), so trying
             // again starts the whole song over in one format.
-            val startedItag = downloadItags.put(mediaId, format.itag)
-            if (dataSpec.position > 0 && startedItag != null && startedItag != format.itag) {
-                throw java.io.IOException("Stream format changed part way through the download of $mediaId")
-            }
+            rememberDownloadStream(mediaId, "youtube:${format.itag}", dataSpec.position)
 
             database.query {
                 upsert(
@@ -271,7 +273,6 @@ constructor(
                                     recordDownloadedLength(download)
                                     moduleDownloads.remove(download.request.id)
                                     failedProviders.remove(download.request.id)
-                                    downloadItags.remove(download.request.id)
                                     saveLyrics(download.request.id)
                                 }
                                 Download.STATE_FAILED -> {
@@ -295,9 +296,10 @@ constructor(
 
     init {
         val result = mutableMapOf<String, Download>()
-        val cursor = downloadManager.downloadIndex.getDownloads()
-        while (cursor.moveToNext()) {
-            result[cursor.download.request.id] = cursor.download
+        downloadManager.downloadIndex.getDownloads().use { cursor ->
+            while (cursor.moveToNext()) {
+                result[cursor.download.request.id] = cursor.download
+            }
         }
         downloads.value = result
 
@@ -325,11 +327,26 @@ constructor(
         }
     }
 
+    private fun rememberDownloadStream(mediaId: String, identity: String, position: Long) {
+        val previous = downloadCache.getContentMetadata(mediaId).get(streamIdentityKey, "")
+        val hasPartialBytes = position > 0L || downloadCache.getCachedSpans(mediaId).any { it.isCached }
+        if (hasPartialBytes && previous != identity) {
+            // Old downloads without an identity also need a clean retry; their bytes cannot be
+            // safely attributed to the newly resolved stream. The failed-download path clears them.
+            throw java.io.IOException("Stream changed while resuming $mediaId; retry the download from the start")
+        }
+        if (previous != identity) {
+            downloadCache.applyContentMetadataMutations(
+                mediaId,
+                ContentMetadataMutations().set(streamIdentityKey, identity),
+            )
+        }
+    }
+
     // a failed download retries with a fresh stream from the next provider down, and drops its bytes so two formats never get glued together
     private fun forgetStream(mediaId: String) {
         songUrlCache.remove(mediaId)
         songStreamHeaders.remove(mediaId)
-        downloadItags.remove(mediaId)
         moduleDownloads.remove(mediaId)?.let { failed -> failedProviders.merge(mediaId, setOf(failed.providerId)) { a, b -> a + b } }
         runCatching { downloadCache.removeResource(mediaId) }
     }
@@ -460,14 +477,18 @@ constructor(
                 val sources = marks.map { (id, mark) ->
                     if (id == AutoDownloads.LikedId) database.likedSongIdsSince(mark) else database.playlistSongIdsAfter(id, mark)
                 }
-                combine(sources) { lists -> lists.flatMap { it }.toSet() }
-                    .distinctUntilChanged()
-                    .collect { ids -> ids.forEach { startAutoDownload(context, it) } }
+                combine(
+                    combine(sources) { lists -> lists.flatMap { it }.toSet() }.distinctUntilChanged(),
+                    context.dataStore.data.map { it[OfflineModeKey] ?: false }.distinctUntilChanged(),
+                ) { ids, offline -> ids to offline }
+                    .collect { (ids, offline) ->
+                        if (!offline) ids.forEach { startAutoDownload(context, it) }
+                    }
             }
     }
 
     private suspend fun startAutoDownload(context: Context, songId: String) {
-        if (OfflineMode.isOn) return
+        if (context.dataStore.data.first()[OfflineModeKey] == true) return
         // already saved, on its way, or stopped by hand: asking again would start a finished one over
         val known = downloads.value[songId]
         if (known != null && known.state != Download.STATE_FAILED) return

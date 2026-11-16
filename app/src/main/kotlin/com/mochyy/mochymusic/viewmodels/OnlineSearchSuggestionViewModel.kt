@@ -19,6 +19,10 @@ import com.mochyy.mochymusic.utils.dataStore
 import com.mochyy.mochymusic.utils.get
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -69,9 +73,12 @@ constructor(
                         }
                     } else {
                         val parsedUrl = YouTubeUrlParser.parse(query)
+                        // A new query cancels this delay; links and empty/offline queries stay immediate.
+                        if (parsedUrl == null) delay(300L)
                         val parsedItem = if (parsedUrl != null) fetchParsedUrlItem(parsedUrl) else null
 
                         val result = if (parsedUrl != null) null else YouTube.searchSuggestions(query).getOrNull()
+                        currentCoroutineContext().ensureActive()
                         val hideExplicit = context.dataStore.get(HideExplicitKey, false)
                         val hideVideoSongs = context.dataStore.get(HideVideoSongsKey, false)
 
@@ -122,6 +129,8 @@ constructor(
             }
             println("[LINK_PARSE_DEBUG] Fetch successful: ${item?.id} (${item?.javaClass?.simpleName})")
             item
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             println("[LINK_PARSE_DEBUG] Fetch failed: ${e.message}")
             e.printStackTrace()

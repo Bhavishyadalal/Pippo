@@ -225,11 +225,11 @@ private fun CountdownCard(sleepTimer: SleepTimer, idleMillis: Long) {
 // wakes right as the next whole second ticks over, so the clock never skips or repeats a digit
 @Composable
 private fun rememberSecondTick(triggerTime: Long?): State<Long> {
-    val now = remember { mutableLongStateOf(System.currentTimeMillis()) }
+    val now = remember { mutableLongStateOf(android.os.SystemClock.elapsedRealtime()) }
     LaunchedEffect(triggerTime) {
         if (triggerTime == null) return@LaunchedEffect
         while (true) {
-            val time = System.currentTimeMillis()
+            val time = android.os.SystemClock.elapsedRealtime()
             now.longValue = time
             val left = triggerTime - time
             if (left <= 0L) break

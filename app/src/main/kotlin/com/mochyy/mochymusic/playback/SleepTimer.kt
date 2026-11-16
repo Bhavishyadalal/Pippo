@@ -2,6 +2,7 @@
 
 package com.mochyy.mochymusic.playback
 
+import android.os.SystemClock
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -18,6 +19,7 @@ class SleepTimer(
     var player: Player,
 ) : Player.Listener {
     private var sleepTimerJob: Job? = null
+    // Deadline in elapsed realtime, unaffected by changes to the phone clock.
     var triggerTime by mutableLongStateOf(-1L)
         private set
     var totalDurationMillis by mutableLongStateOf(0L)
@@ -59,14 +61,19 @@ class SleepTimer(
         isPaused = false
         val millis = seconds * 1000L
         totalDurationMillis = millis
-        triggerTime = System.currentTimeMillis() + millis
+        triggerTime = SystemClock.elapsedRealtime() + millis
         scheduleJob(millis)
     }
 
     fun pause() {
         if (triggerTime > 0L && !isPaused) {
-            val left = (triggerTime - System.currentTimeMillis()).coerceAtLeast(0L)
+            val left = (triggerTime - SystemClock.elapsedRealtime()).coerceAtLeast(0L)
             cancelJob()
+            if (left == 0L) {
+                clear()
+                player.pause()
+                return
+            }
             remainingMillisWhenPaused = left
             isPaused = true
             triggerTime = -1L
@@ -77,7 +84,7 @@ class SleepTimer(
         if (isPaused && remainingMillisWhenPaused > 0L) {
             isPaused = false
             val millis = remainingMillisWhenPaused
-            triggerTime = System.currentTimeMillis() + millis
+            triggerTime = SystemClock.elapsedRealtime() + millis
             scheduleJob(millis)
         }
     }
@@ -93,14 +100,14 @@ class SleepTimer(
                 clear()
             }
         } else if (triggerTime > 0L) {
-            val left = (triggerTime - System.currentTimeMillis()) + deltaMillis
+            val left = (triggerTime - SystemClock.elapsedRealtime()) + deltaMillis
             if (left <= 0L) {
                 clear()
                 player.pause()
             } else {
                 cancelJob()
                 totalDurationMillis = maxOf(totalDurationMillis, left)
-                triggerTime = System.currentTimeMillis() + left
+                triggerTime = SystemClock.elapsedRealtime() + left
                 scheduleJob(left)
             }
         }
@@ -117,7 +124,11 @@ class SleepTimer(
 
     private fun scheduleJob(millis: Long) {
         sleepTimerJob = scope.launch {
-            delay(millis)
+            var left = millis
+            while (left > 0L) {
+                delay(left.coerceAtMost(1_000L))
+                left = triggerTime - SystemClock.elapsedRealtime()
+            }
             player.pause()
             clear()
         }

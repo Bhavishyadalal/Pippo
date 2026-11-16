@@ -35,16 +35,54 @@ object TransferRestore {
         // the crash screen runs in its own process and must never touch an import
         if (!isMainProcess(app)) return
         val staging = stagingDir(app)
-        if (!staging.exists()) return
+        val transaction = RestoreFileTransaction(app)
+        // Recovery runs even if the previous process died after consuming staging.
+        transaction.recover(staging)
+        if (!staging.exists() || File(staging, RestoreFileTransaction.FailedMarker).exists()) return
         val ready = File(staging, ReadyMarker)
         if (!ready.exists()) {
-            // the import was closed halfway through unpacking, so there's nothing whole to use
             staging.deleteRecursively()
             return
         }
-        runCatching { swapIn(app, staging, JSONObject(ready.readText())) }
-            .onFailure { Log.e(Tag, "Couldn't finish the import", it) }
-        staging.deleteRecursively()
+        val hasMedia = File(staging, TransferArchive.MediaEntry).exists()
+        val oldSongCache = if (hasMedia) StoragePlaces.dir(app, StoredKind.SongCache) else null
+        var committed = false
+        try {
+            val note = JSONObject(ready.readText())
+            prepareFiles(app, staging, transaction)
+            transaction.install()
+            restorePrefs(app, File(staging, TransferArchive.PrefsPrefix))
+            File(staging, TransferArchive.SettingsEntry).takeIf { it.exists() }?.let { settings ->
+                val json = JSONObject(settings.readText())
+                runBlocking { app.dataStore.edit { TransferArchive.jsonIntoPreferences(json, it) } }
+            }
+            if (File(staging, TransferArchive.FilesPrefix + StoredKind.Downloads.folder).exists()) {
+                StoragePlaces.resetToPhone(app, StoredKind.Downloads)
+            }
+            markOnboardedOnThisInstall(app)
+            File(app.noBackupFilesDir, NoteName).writeText(note.toString())
+            transaction.commit()
+            committed = true
+            // The cache belongs to the replaced media index. Only discard it after commit.
+            oldSongCache?.let { runCatching { it.deleteRecursively() } }
+            check(staging.deleteRecursively()) { "Couldn't remove completed import staging" }
+            transaction.clear()
+        } catch (failure: Exception) {
+            Log.e(Tag, "Couldn't finish the import", failure)
+            if (committed || transaction.hasCommitted) {
+                // Finish retiring this journal before the UI can stage another import.
+                throw IllegalStateException("Import completed; restart the app to finish cleanup.", failure)
+            }
+            RestoreFileTransaction.markFailed(staging)
+            if (transaction.hasStarted) {
+                transaction.rollback()
+                transaction.clear()
+                // Preferences may already be cached by their APIs. End this startup rather than
+                // opening Room against restored files and imported in-memory preferences.
+                throw IllegalStateException("Import failed; previous data restored. Restart the app to continue.", failure)
+            }
+            transaction.clear() // Preparation failed before any original was changed.
+        }
     }
 
     /** stops playback and starts the app again, so the next start can swap the import in */
@@ -58,6 +96,12 @@ object TransferRestore {
 
     /** the welcome line for the first screen after an import, handed out once */
     fun takeRestoredNote(context: Context): String? {
+        val staging = stagingDir(context)
+        if (File(staging, RestoreFileTransaction.FailedMarker).exists() &&
+            runCatching { File(staging, "failure_shown").createNewFile() }.getOrDefault(false)
+        ) {
+            return "Import couldn't finish. Your previous data was kept. Please import again."
+        }
         val file = File(context.noBackupFilesDir, NoteName)
         if (!file.exists()) return null
         val note = runCatching { JSONObject(file.readText()) }.getOrNull()
@@ -71,44 +115,26 @@ object TransferRestore {
         }
     }
 
-    // files first and the library last, so a stop halfway leaves an app that still starts and can import again
-    private fun swapIn(context: Context, staging: File, ready: JSONObject) {
-        moveFiles(context, File(staging, TransferArchive.FilesPrefix))
-        // the import's downloads land on the phone, so a card that held the old ones is let go
-        if (File(context.filesDir, StoredKind.Downloads.folder).exists()) StoragePlaces.resetToPhone(context, StoredKind.Downloads)
-        File(staging, TransferArchive.MediaEntry).takeIf { it.exists() }?.let { media ->
-            // the streaming cache's index lived in the old media database, so the cache starts over with the new one
-            StoragePlaces.dir(context, StoredKind.SongCache).deleteRecursively()
-            replaceDatabase(context.getDatabasePath(TransferArchive.MediaDatabaseName), media)
+    private fun prepareFiles(context: Context, staging: File, transaction: RestoreFileTransaction) {
+        val library = File(staging, TransferArchive.LibraryEntry)
+        check(library.isFile && library.length() > 0L) { "The staged library is missing" }
+        for (item in File(staging, TransferArchive.FilesPrefix).listFiles().orEmpty()) {
+            transaction.replace(File(context.filesDir, item.name), item)
         }
-        restorePrefs(context, File(staging, TransferArchive.PrefsPrefix))
-        File(staging, TransferArchive.SettingsEntry).takeIf { it.exists() }?.let { settings ->
-            val json = JSONObject(settings.readText())
-            runBlocking { context.dataStore.edit { TransferArchive.jsonIntoPreferences(json, it) } }
-        }
-        replaceDatabase(context.getDatabasePath(InternalDatabase.DB_NAME), File(staging, TransferArchive.LibraryEntry))
-        markOnboardedOnThisInstall(context)
-        File(context.noBackupFilesDir, NoteName).writeText(ready.toString())
-    }
-
-    private fun moveFiles(context: Context, from: File) {
-        for (item in from.listFiles().orEmpty()) {
-            val target = File(context.filesDir, item.name)
-            target.deleteRecursively()
-            if (!item.renameTo(target)) {
-                item.copyRecursively(target, overwrite = true)
+        fun database(name: String, source: File) {
+            val target = context.getDatabasePath(name)
+            transaction.replace(target, source)
+            listOf("-wal", "-shm", "-journal").forEach {
+                transaction.replace(File(target.path + it), null)
             }
         }
-    }
-
-    private fun replaceDatabase(target: File, staged: File) {
-        if (!staged.exists()) return
-        target.parentFile?.mkdirs()
-        // a leftover wal from the empty database would be replayed onto the imported one and break it
-        listOf("", "-wal", "-shm", "-journal").forEach { File(target.path + it).delete() }
-        if (!staged.renameTo(target)) {
-            staged.copyTo(target, overwrite = true)
+        database(InternalDatabase.DB_NAME, library)
+        File(staging, TransferArchive.MediaEntry).takeIf { it.exists() }?.let {
+            database(TransferArchive.MediaDatabaseName, it)
         }
+        transaction.preserve(File(context.dataDir, "shared_prefs"))
+        transaction.preserve(File(context.filesDir, "datastore"))
+        transaction.preserve(context.noBackupFilesDir)
     }
 
     // merged into what's there, so anything set during onboarding that the old app never had stays
@@ -117,7 +143,7 @@ object TransferRestore {
             val fileName = TransferArchive.PrefsToCarry[file.name.removeSuffix(".json")] ?: continue
             val editor = context.getSharedPreferences(fileName, Context.MODE_PRIVATE).edit()
             TransferArchive.jsonIntoSharedPreferences(JSONObject(file.readText()), editor)
-            editor.commit()
+            check(editor.commit()) { "Couldn't restore preferences: $fileName" }
         }
     }
 

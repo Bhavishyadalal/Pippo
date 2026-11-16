@@ -71,14 +71,12 @@ import com.mochyy.mochymusic.utils.getGroupedShape
 import androidx.compose.material3.Surface
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Shape
-import com.music.innertube.utils.YouTubeUrlParser
 import com.mochyy.mochymusic.ui.menu.YouTubeAlbumMenu
 import com.mochyy.mochymusic.ui.menu.YouTubeArtistMenu
 import com.mochyy.mochymusic.ui.menu.YouTubePlaylistMenu
 import com.mochyy.mochymusic.ui.menu.YouTubeSongMenu
 import com.mochyy.mochymusic.viewmodels.OnlineSearchSuggestionViewModel
 import kotlinx.coroutines.FlowPreview
-import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.drop
 
@@ -120,14 +118,7 @@ fun OnlineSearchScreen(
     }
 
     LaunchedEffect(query) {
-        snapshotFlow { query }.collectLatest {
-            if (YouTubeUrlParser.isYouTubeUrl(it)) {
-                viewModel.query.value = it
-            } else {
-                kotlinx.coroutines.delay(300L)
-                viewModel.query.value = it
-            }
-        }
+        viewModel.query.value = query
     }
 
     LazyColumn(

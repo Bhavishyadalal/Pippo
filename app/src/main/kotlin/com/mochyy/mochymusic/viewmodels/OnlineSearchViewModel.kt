@@ -24,6 +24,9 @@ import com.mochyy.mochymusic.utils.get
 import com.mochyy.mochymusic.utils.reportException
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -92,15 +95,19 @@ constructor(
     private fun SearchSummaryPage.withoutRepeats() =
         copy(summaries = summaries.map { section -> section.copy(items = section.items.distinctBy { it.id }) })
 
+    private val loadingMore = mutableSetOf<String>()
+
     fun loadMore() {
-        val filter = filter.value?.value
+        val filter = filter.value?.value ?: return
+        val viewState = viewStateMap[filter] ?: return
+        val continuation = viewState.continuation ?: return
+        if (!loadingMore.add(filter)) return
         viewModelScope.launch {
-            if (filter == null) return@launch
-            val viewState = viewStateMap[filter] ?: return@launch
-            val continuation = viewState.continuation
-            if (continuation != null) {
+            try {
                 val searchResult =
                     YouTube.searchContinuation(continuation).getOrNull() ?: return@launch
+                currentCoroutineContext().ensureActive()
+                if (viewStateMap[filter] !== viewState) return@launch
                 val hideExplicit = context.dataStore.get(HideExplicitKey, false)
                 val hideVideoSongs = context.dataStore.get(HideVideoSongsKey, false)
                 val hideYoutubeShorts = context.dataStore.get(HideYoutubeShortsKey, true)
@@ -112,6 +119,12 @@ constructor(
                     (viewState.items + newItems).distinctBy { it.id },
                     searchResult.continuation
                 )
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                reportException(e)
+            } finally {
+                loadingMore.remove(filter)
             }
         }
     }

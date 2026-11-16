@@ -557,7 +557,7 @@ private fun SleepTimerRow(onClick: () -> Unit) {
             remainingLabel = when {
                 sleepTimer.pauseWhenSongEnd -> endsWithSongLabel
                 sleepTimer.triggerTime > 0L -> {
-                    val left = sleepTimer.triggerTime - System.currentTimeMillis()
+                    val left = sleepTimer.triggerTime - android.os.SystemClock.elapsedRealtime()
                     if (left <= 0L) "" else formatRemaining(left)
                 }
                 else -> ""
