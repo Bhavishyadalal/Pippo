@@ -205,7 +205,7 @@ internal class BedsideProgress {
 @Composable
 internal fun rememberBedsideProgress(visible: () -> Boolean): BedsideProgress {
     val connection = LocalPlayerConnection.current
-    val progress = remember { BedsideProgress() }
+    val progress = remember(connection) { BedsideProgress() }
     val showing = rememberStyleShowing()
     val currentVisible by rememberUpdatedState(visible)
     LaunchedEffect(connection) {
@@ -213,7 +213,8 @@ internal fun rememberBedsideProgress(visible: () -> Boolean): BedsideProgress {
         combine(
             ui.transportState.map { it.isPlaying }.distinctUntilChanged(),
             snapshotFlow { showing() && currentVisible() }.distinctUntilChanged(),
-        ) { playing, shown -> playing to shown }
+            ui.progressState.map { it.playbackGeneration }.distinctUntilChanged(),
+        ) { playing, shown, _ -> playing to shown }
             .collectLatest { (playing, shown) ->
                 if (!shown) return@collectLatest
                 if (!playing) {
@@ -226,7 +227,7 @@ internal fun rememberBedsideProgress(visible: () -> Boolean): BedsideProgress {
                 }
                 while (true) {
                     val player = connection.player
-                    progress.positionMs = player.currentPosition
+                    progress.positionMs = player.currentPosition.coerceAtLeast(0L)
                     progress.durationMs = player.duration.coerceAtLeast(0L)
                     delay(ProgressTickMs)
                 }

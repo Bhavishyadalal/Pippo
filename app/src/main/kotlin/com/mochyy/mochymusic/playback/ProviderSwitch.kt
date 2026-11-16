@@ -3,6 +3,9 @@
 package com.mochyy.mochymusic.playback
 
 import com.mochyy.mochymusic.module.SourceStream
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -64,19 +67,28 @@ class ProviderSwitch(private val scope: () -> CoroutineScope, private val host: 
     val state: StateFlow<ProviderSwitchState> = _state.asStateFlow()
 
     private var job: Job? = null
+    private var heldMediaId: String? = null
+    private var resumeAfterSwitch = false
 
     fun force(providerId: String) {
         val mediaId = host.currentMediaId() ?: return
         job?.cancel()
         job = scope().launch {
-            val wasPlaying = host.holdPlayback()
+            val replacingSwitch = _state.value is ProviderSwitchState.Working && heldMediaId == mediaId
+            val wasPlaying = host.holdPlayback() || (replacingSwitch && resumeAfterSwitch)
+            heldMediaId = mediaId
+            resumeAfterSwitch = wasPlaying
             _state.value = ProviderSwitchState.Working(providerId, 1, MaxTries)
             val route = withTimeoutOrNull(DeadlineMs) {
                 var found: ForcedRoute? = null
                 for (attempt in 1..MaxTries) {
                     _state.value = ProviderSwitchState.Working(providerId, attempt, MaxTries)
                     found = runCatching { host.resolve(providerId, mediaId) }
-                        .onFailure { Timber.tag(Tag).w(it, "$providerId try $attempt failed for $mediaId") }
+                        .onFailure {
+                            // Cancellation belongs to the request/deadline, not to a failed provider.
+                            if (it is CancellationException) throw it
+                            Timber.tag(Tag).w(it, "$providerId try $attempt failed for $mediaId")
+                        }
                         .getOrNull()
                     if (found != null) break
                     // a little longer between each try, so a server that's waking up gets the chance
@@ -84,6 +96,9 @@ class ProviderSwitch(private val scope: () -> CoroutineScope, private val host: 
                 }
                 found
             }
+            // Some providers finish work even after cancellation; an old request must not resume
+            // playback or overwrite the provider chosen by a newer request.
+            currentCoroutineContext().ensureActive()
             // the song changed under the switch: nothing to move any more
             if (host.currentMediaId() != mediaId) {
                 _state.value = ProviderSwitchState.Idle

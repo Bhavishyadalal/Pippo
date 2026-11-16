@@ -75,7 +75,7 @@ private fun LyricsTile(ink: BedsideInk, padding: BedsideInsets, modifier: Modifi
     val lyrics = rememberVideoLyrics()
     val look = rememberVideoLyricLook()
     val clock = remember(connection) {
-        PlaybackClock({ connection?.player }, { connection?.lyricsOffsetMs?.value?.toLong() ?: 0L })
+        PlaybackClock({ connection?.player }, { connection?.lyricsOffsetMs?.value?.toLong() ?: 0L }, { connection?.uiState?.progressState?.value?.playbackGeneration ?: 0L })
     }
     BoxWithConstraints(modifier) {
         FollowingLyrics(

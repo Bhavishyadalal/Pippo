@@ -4,6 +4,7 @@ package com.mochyy.mochymusic.ui.player
 
 import android.view.animation.AnimationUtils
 import androidx.compose.runtime.Stable
+import androidx.media3.common.C
 import androidx.media3.common.Player
 import kotlin.math.abs
 import kotlin.math.exp
@@ -25,9 +26,14 @@ private const val CarryMaxMs = 2000L
 class PlaybackClock(
     private val player: () -> Player?,
     private val offsetMs: () -> Long = { 0L },
+    private val playbackGeneration: () -> Long = { 0L },
 ) : () -> Long {
     private var frameMs = Long.MIN_VALUE
     private var smoothed = 0.0
+    private var lastPlayer: Player? = null
+    private var lastGeneration = Long.MIN_VALUE
+    private var lastItemIndex = C.INDEX_UNSET
+    private var lastMediaId: String? = null
 
     // the last position the player reported, and about when that was true
     private var reportedMs = Long.MIN_VALUE
@@ -35,17 +41,36 @@ class PlaybackClock(
 
     override fun invoke(): Long {
         // choreographer pins this to the vsync while a frame runs, so every reader in a frame sees the same time
+        val p = player()
+        if (p == null) {
+            lastPlayer = null
+            frameMs = Long.MIN_VALUE
+            smoothed = 0.0
+            return offsetMs()
+        }
+        val generation = playbackGeneration()
+        val index = p.currentMediaItemIndex
+        val mediaId = p.currentMediaItem?.mediaId
+        if (p !== lastPlayer || generation != lastGeneration || index != lastItemIndex || mediaId != lastMediaId) {
+            // A new playback can begin in the same frame, or repeat the exact same song.
+            frameMs = Long.MIN_VALUE
+            lastPlayer = p
+            lastGeneration = generation
+            lastItemIndex = index
+            lastMediaId = mediaId
+        }
         val now = AnimationUtils.currentAnimationTimeMillis()
-        if (now != frameMs) advance(now)
-        return smoothed.toLong() + offsetMs()
+        if (now != frameMs) advance(p, now)
+        val duration = p.duration
+        val position = smoothed.toLong().coerceAtLeast(0L)
+        return (if (duration > 0L) position.coerceAtMost(duration) else position) + offsetMs()
     }
 
-    private fun advance(now: Long) {
-        val p = player() ?: return
+    private fun advance(p: Player, now: Long) {
         val playing = p.isPlaying
         val speed = p.playbackParameters.speed
         val fresh = frameMs == Long.MIN_VALUE || now - frameMs !in 1..StaleMs
-        val elapsed = (now - frameMs).toDouble()
+        val elapsed = if (fresh) 0.0 else (now - frameMs).toDouble()
         frameMs = now
         val heard = carried(p.currentPosition.coerceAtLeast(0L), now, elapsed, fresh, playing, speed)
         if (fresh) {

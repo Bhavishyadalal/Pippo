@@ -14,11 +14,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
@@ -119,6 +119,10 @@ fun TurntableArm(
     awayProvider: () -> Float = { 0f },
 ) {
     val connection = LocalPlayerConnection.current
+    val generation by remember(connection) {
+        connection?.uiState?.progressState?.map { it.playbackGeneration }?.distinctUntilChanged()
+            ?: kotlinx.coroutines.flow.flowOf(0L)
+    }.collectAsState(initial = connection?.uiState?.progressState?.value?.playbackGeneration ?: 0L)
     val haptics = LocalHapticFeedback.current
     val scope = rememberCoroutineScope()
 
@@ -126,6 +130,7 @@ fun TurntableArm(
     // 0 resting, 1 held: lifts it and its shadow and brings the arc up
     val held = remember { Animatable(0f) }
     val dragging = remember { booleanArrayOf(false) }
+    val release = remember { arrayOfNulls<kotlinx.coroutines.Job>(1) }
     val scrubMs = remember { mutableLongStateOf(-1L) }
     // the arc on its own, for a few seconds when the music starts: [peek] shows it, [peekGrow]
     // draws it along the stylus's path from the song's start (the arm stays down meanwhile)
@@ -184,7 +189,6 @@ fun TurntableArm(
             color = Color.White,
         )
     }
-    val currentConnection by rememberUpdatedState(connection)
 
     // the shadow's soft edge is a blur where the platform has one; before that it's fainter instead
     val softShadow = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
@@ -195,45 +199,59 @@ fun TurntableArm(
 
     Box(
         modifier = modifier.then(
-            if (!interactive) Modifier else Modifier.pointerInput(Unit) {
+            if (!interactive) Modifier else Modifier.pointerInput(connection, active, generation) {
                 val grabPx = 26.dp.toPx()
                 awaitEachGesture {
                     val w = size.width.toFloat()
                     val pivot = Offset(w * PivotX, w * PivotY)
                     val down = awaitFirstDown(requireUnconsumed = false)
                     if (!onArm(down.position, pivot, angle.value, w, grabPx)) return@awaitEachGesture
-                    val player = currentConnection?.player ?: return@awaitEachGesture
+                    val gestureConnection = connection ?: return@awaitEachGesture
+                    if (!active) return@awaitEachGesture
+                    val player = gestureConnection.player
+                    if (gestureConnection.uiState.progressState.value.playbackGeneration != generation) return@awaitEachGesture
                     val duration = player.duration.takeIf { it > 0 } ?: return@awaitEachGesture
                     down.consume()
+                    release[0]?.cancel()
                     dragging[0] = true
-                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                    scope.launch { angle.stop() }
-                    scope.launch { held.animateTo(1f, tween(180)) }
-                    // it turns by as much as the finger does round the pivot, from wherever it was taken
-                    val grabbed = angle.value - degreesOf(down.position, pivot)
-                    var lastTick = -1L
-                    scrubMs.longValue = msFor(angle.value, duration)
+                    try {
+                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                        scope.launch { angle.stop() }
+                        scope.launch { held.animateTo(1f, tween(180)) }
+                        // it turns by as much as the finger does round the pivot
+                        val grabbed = angle.value - degreesOf(down.position, pivot)
+                        var lastTick = -1L
+                        scrubMs.longValue = msFor(angle.value, duration)
 
-                    drag(down.id) { change ->
-                        change.consume()
-                        val next = (degreesOf(change.position, pivot) + grabbed).coerceIn(StartDegrees, EndDegrees)
-                        scope.launch { angle.snapTo(next) }
-                        val ms = msFor(next, duration)
-                        scrubMs.longValue = ms
-                        // a tick every ten seconds of song, like grooves under the needle
-                        val tick = ms / 10_000L
-                        if (tick != lastTick) {
-                            if (lastTick >= 0) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            lastTick = tick
+                        val completed = drag(down.id) { change ->
+                            change.consume()
+                            val next = (degreesOf(change.position, pivot) + grabbed).coerceIn(StartDegrees, EndDegrees)
+                            scope.launch { angle.snapTo(next) }
+                            val ms = msFor(next, duration)
+                            scrubMs.longValue = ms
+                            val tick = ms / 10_000L
+                            if (tick != lastTick) {
+                                if (lastTick >= 0) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                lastTick = tick
+                            }
                         }
-                    }
-
-                    player.seekTo(scrubMs.longValue.coerceIn(0L, duration))
-                    dragging[0] = false
-                    scope.launch {
-                        delay(450)
-                        held.animateTo(0f, tween(320))
-                        if (!dragging[0]) scrubMs.longValue = -1L
+                        // A cancelled drag or a track/player swap must never seek the next song.
+                        if (completed && gestureConnection.player === player &&
+                            gestureConnection.uiState.progressState.value.playbackGeneration == generation
+                        ) {
+                            gestureConnection.seekTo(scrubMs.longValue.coerceIn(0L, duration))
+                        }
+                    } finally {
+                        dragging[0] = false
+                        scrubMs.longValue = -1L
+                        release[0] = scope.launch {
+                            launch { held.animateTo(0f, tween(320)) }
+                            val currentPlayer = gestureConnection.player
+                            angle.animateTo(
+                                angleFor(currentPlayer.currentPosition, currentPlayer.duration),
+                                spring(dampingRatio = 0.9f, stiffness = 120f),
+                            )
+                        }
                     }
                 }
             }

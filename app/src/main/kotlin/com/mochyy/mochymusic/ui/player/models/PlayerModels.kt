@@ -51,4 +51,6 @@ data class ProgressState(
     val position: Long = 0L,
     val duration: Long = 0L,
     val percentage: Float = 0f,
+    // A repeat or a replacement player is a new playback even when its song ID is unchanged.
+    val playbackGeneration: Long = 0L,
 )

@@ -247,7 +247,7 @@ fun LyricsScreen(
 
     // frame-accurate, so the sweep, the gap dots and backing vocals glide at the display's rate instead of stepping with the 66ms poller
     val positionProvider = remember(playerConnection) {
-        PlaybackClock({ playerConnection.player }, { playerConnection.lyricsOffsetMs.value.toLong() })
+        PlaybackClock({ playerConnection.player }, { playerConnection.lyricsOffsetMs.value.toLong() }, { playerConnection.uiState.progressState.value.playbackGeneration })
     }
     val sheetDragging by rememberUpdatedState(isSheetDragging)
 

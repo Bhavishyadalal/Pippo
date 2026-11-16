@@ -152,9 +152,9 @@ private fun VideoModeScreen(actions: StyleActions, modifier: Modifier) {
     val sheetShowing by remember(sheet) { derivedStateOf { sheet == null || sheet.progress > 0f } }
     val running = transport.isPlaying && sheetShowing
     val lyricClock = remember(connection) {
-        PlaybackClock({ connection.player }, { connection.lyricsOffsetMs.value.toLong() })
+        PlaybackClock({ connection.player }, { connection.lyricsOffsetMs.value.toLong() }, { connection.uiState.progressState.value.playbackGeneration })
     }
-    val seekClock = remember(connection) { PlaybackClock({ connection.player }) }
+    val seekClock = remember(connection) { PlaybackClock({ connection.player }, playbackGeneration = { connection.uiState.progressState.value.playbackGeneration }) }
     val lyrics = rememberVideoLyrics()
     val look = rememberVideoLyricLook()
     val glass = remember { GlassState() }

@@ -206,7 +206,7 @@ fun rememberLivePosition(animated: Boolean = true): LivePosition {
         val ui = connection?.uiState ?: return@LaunchedEffect
         combine(
             ui.transportState.map { it.isPlaying }.distinctUntilChanged(),
-            ui.progressState.map { it.position }.distinctUntilChanged(),
+            ui.progressState.map { it.playbackGeneration to it.position }.distinctUntilChanged(),
             snapshotFlow { showing() },
         ) { playing, _, shown -> playing to shown }
             .collectLatest { (playing, shown) ->
@@ -218,7 +218,7 @@ fun rememberLivePosition(animated: Boolean = true): LivePosition {
     }
     return remember(connection) {
         // the player's own position only moves every 10 ms or so, which judders at 120 hz; this one moves on the frame's time
-        val clock = com.mochyy.mochymusic.ui.player.PlaybackClock({ connection?.player })
+        val clock = com.mochyy.mochymusic.ui.player.PlaybackClock({ connection?.player }, playbackGeneration = { connection?.uiState?.progressState?.value?.playbackGeneration ?: 0L })
         LivePosition(read = clock, tick = { tick.longValue })
     }
 }

@@ -15,6 +15,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -33,6 +34,8 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.key
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableFloatState
 import androidx.compose.runtime.Stable
@@ -74,6 +77,8 @@ import com.mochyy.mochymusic.ui.utils.rubberBand
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -97,11 +102,37 @@ fun PlayerProgressSlider(
     endTimeModifier: Modifier = Modifier,
 ) {
     val playerConnection = LocalPlayerConnection.current ?: return
+    val generation by remember(playerConnection) {
+        playerConnection.uiState.progressState.map { it.playbackGeneration }.distinctUntilChanged()
+    }.collectAsState(initial = playerConnection.uiState.progressState.value.playbackGeneration)
+    // Each occurrence owns its previews and animations, including repeat-one and player swaps.
+    key(playerConnection, generation) {
+        PlaybackProgressContent(
+            playerConnection, generation, modifier, active,
+            onSeekBarPlaced, onEndTimePlaced, seekBarModifier, endTimeModifier,
+        )
+    }
+}
+
+private class SeekGestureOwner(var active: Boolean = true)
+
+@Composable
+private fun PlaybackProgressContent(
+    playerConnection: com.mochyy.mochymusic.playback.PlayerConnection,
+    generation: Long,
+    modifier: Modifier,
+    active: Boolean,
+    onSeekBarPlaced: ((androidx.compose.ui.layout.LayoutCoordinates) -> Unit)?,
+    onEndTimePlaced: ((androidx.compose.ui.layout.LayoutCoordinates) -> Unit)?,
+    seekBarModifier: Modifier,
+    endTimeModifier: Modifier,
+) {
     val endTimestamp by com.mochyy.mochymusic.utils.rememberEnumPreference(
         com.mochyy.mochymusic.constants.PlayerEndTimestampKey,
         com.mochyy.mochymusic.constants.PlayerEndTimestamp.END_TIME,
     )
     val progressFlow = playerConnection.uiState.progressState
+    val playbackPlayer = remember { playerConnection.player }
     // only the bar and the time texts read the position, so a tick redraws them and not the whole slider
     val progress = remember { mutableStateOf(progressFlow.value) }
     var sliderPosition by remember { mutableStateOf<Long?>(null) }
@@ -115,9 +146,18 @@ fun PlayerProgressSlider(
         val start = Snapshot.withoutReadObservation { sliderPosition ?: pendingSeek ?: progress.value.position }
         SliderState(valueRange = 0f..rangeEnd).also { it.value = start.toFloat() }
     }
-    LaunchedEffect(active, sliderState) {
+    val gestureOwner = remember(active, sliderState) { SeekGestureOwner() }
+    DisposableEffect(gestureOwner) {
+        onDispose {
+            gestureOwner.active = false
+            sliderPosition = null
+            pendingSeek = null
+        }
+    }
+    LaunchedEffect(active, sliderState, progressFlow) {
         if (!active) return@LaunchedEffect
         progressFlow.collect { latest ->
+            if (latest.playbackGeneration != generation) return@collect
             progress.value = latest
             pendingSeek?.let { if (abs(latest.position - it) < SeekLandedMs) pendingSeek = null }
             if (sliderPosition == null) sliderState.value = (pendingSeek ?: latest.position).toFloat()
@@ -128,19 +168,27 @@ fun PlayerProgressSlider(
         if (pendingSeek == null) return@LaunchedEffect
         delay(SeekGiveUpMs)
         pendingSeek = null
+        if (sliderPosition == null) sliderState.value = progress.value.position.toFloat()
     }
     sliderState.onValueChange = { raw ->
-        val position = raw.toLong()
-        sliderPosition = position
-        sliderState.value = position.toFloat()
+        if (gestureOwner.active && active && durationKnown && playerConnection.player === playbackPlayer &&
+            progressFlow.value.playbackGeneration == generation) {
+            val position = raw.toLong().coerceIn(0L, progress.value.duration)
+            pendingSeek = null
+            sliderPosition = position
+            sliderState.value = position.toFloat()
+        }
     }
     sliderState.onValueChangeFinished = {
-        sliderPosition?.let { target ->
-            playerConnection.player.seekTo(target)
-            pendingSeek = target
+        if (gestureOwner.active && active && playerConnection.player === playbackPlayer &&
+            progressFlow.value.playbackGeneration == generation) {
+            sliderPosition?.let { target ->
+                playerConnection.seekTo(target)
+                pendingSeek = target
+            }
+            sliderPosition = null
+            sliderState.value = (pendingSeek ?: progress.value.position).toFloat()
         }
-        sliderPosition = null
-        sliderState.value = (pendingSeek ?: progress.value.position).toFloat()
     }
     val transport = playerConnection.uiState.transportState.collectAsState()
     val transportState = transport.value
@@ -188,7 +236,7 @@ fun PlayerProgressSlider(
     }
 
     // the fill glides to wherever it's sent (a tap, a seek, a new song) and moves with the music every frame
-    val clock = remember(playerConnection) { PlaybackClock({ playerConnection.player }) }
+    val clock = remember(playerConnection) { PlaybackClock({ playerConnection.player }, playbackGeneration = { progressFlow.value.playbackGeneration }) }
     val fill = remember { SeekFill() }
     LaunchedEffect(active, fill, clock) {
         if (!active) return@LaunchedEffect
@@ -202,6 +250,14 @@ fun PlayerProgressSlider(
     }
 
     val trackInteractionSource = remember { MutableInteractionSource() }
+    LaunchedEffect(trackInteractionSource, sliderState) {
+        trackInteractionSource.interactions.collect { interaction ->
+            if (interaction is DragInteraction.Cancel) {
+                sliderPosition = null
+                sliderState.value = (pendingSeek ?: progress.value.position).toFloat()
+            }
+        }
+    }
     val draggedState = trackInteractionSource.collectIsDraggedAsState()
     val isTrackDragged by draggedState
     val isTrackPressed by trackInteractionSource.collectIsPressedAsState()
@@ -225,6 +281,7 @@ fun PlayerProgressSlider(
     ) {
         Slider(
             state = sliderState,
+            enabled = active && durationKnown,
             interactionSource = trackInteractionSource,
             thumb = { Spacer(modifier = Modifier.size(0.dp)) },
             track = {
