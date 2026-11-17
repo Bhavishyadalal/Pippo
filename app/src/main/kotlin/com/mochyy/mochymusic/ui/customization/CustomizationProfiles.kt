@@ -15,7 +15,7 @@ object CustomizationProfiles {
     private val booleans = listOf(UiContrastKey, UiNavSwipeKey, UiPressEffectsKey, UiHapticsKey, UiLoadingMotionKey,
         PureBlackKey, DisableBlurKey, EnableProgressiveBlurKey, ElementBlurKey, EnableElementBlurAnimatorKey,
         DiscRotatingAnimationKey, CanvasThumbnailAnimationKey, HideSettingsDescriptionsKey, MiniPlayerOutlineKey,
-        PureBlackMiniPlayerKey, HideAudioQualityBadgeKey, EnableHighRefreshRateKey,
+        PureBlackMiniPlayerKey, HideAudioQualityBadgeKey,
         PlayerSwipeDownAnywhereKey, PlayerSwipeUpFollowsKey, PlayerStatusBarKey, PlayerNavBarKey)
     private val floats = mapOf(UiTextScaleKey to (.85f..1.25f), AnimationSpeedKey to (.5f..2f),
         ThumbnailCornerRadiusKey to (0f..45f), BlurStrengthPxKey to (0f..1500f))
