@@ -32,114 +32,30 @@ object LookFont {
 // read through a state, so text set in it follows a look's font turning on or off
 val InterFontFamily: FontFamily get() = LookFont.family ?: Inter
 
-private val GlobalFontWeight = FontWeight.SemiBold
-private val GlobalLetterSpacing = (-0.05).em
-
-/** the app's text styles in [font], rebuilt when a look's font comes or goes */
-fun appTypography(font: FontFamily) = Typography(
-    displayLarge = TextStyle(
+/** Headings are compact; paragraphs and small labels keep normal reading space. */
+fun appTypography(font: FontFamily): Typography {
+    fun style(size: Int, height: Int, weight: FontWeight, tracking: Float) = TextStyle(
         fontFamily = font,
-        fontWeight = GlobalFontWeight,
-        fontSize = 57.sp,
-        lineHeight = 64.sp,
-        letterSpacing = GlobalLetterSpacing
-    ),
-    displayMedium = TextStyle(
-        fontFamily = font,
-        fontWeight = GlobalFontWeight,
-        fontSize = 45.sp,
-        lineHeight = 52.sp,
-        letterSpacing = GlobalLetterSpacing
-    ),
-    displaySmall = TextStyle(
-        fontFamily = font,
-        fontWeight = GlobalFontWeight,
-        fontSize = 36.sp,
-        lineHeight = 44.sp,
-        letterSpacing = GlobalLetterSpacing
-    ),
-    headlineLarge = TextStyle(
-        fontFamily = font,
-        fontWeight = GlobalFontWeight,
-        fontSize = 32.sp,
-        lineHeight = 40.sp,
-        letterSpacing = GlobalLetterSpacing
-    ),
-    headlineMedium = TextStyle(
-        fontFamily = font,
-        fontWeight = GlobalFontWeight,
-        fontSize = 28.sp,
-        lineHeight = 36.sp,
-        letterSpacing = GlobalLetterSpacing
-    ),
-    headlineSmall = TextStyle(
-        fontFamily = font,
-        fontWeight = GlobalFontWeight,
-        fontSize = 24.sp,
-        lineHeight = 32.sp,
-        letterSpacing = GlobalLetterSpacing
-    ),
-    titleLarge = TextStyle(
-        fontFamily = font,
-        fontWeight = GlobalFontWeight,
-        fontSize = 22.sp,
-        lineHeight = 28.sp,
-        letterSpacing = GlobalLetterSpacing
-    ),
-    titleMedium = TextStyle(
-        fontFamily = font,
-        fontWeight = GlobalFontWeight,
-        fontSize = 16.sp,
-        lineHeight = 24.sp,
-        letterSpacing = GlobalLetterSpacing
-    ),
-    titleSmall = TextStyle(
-        fontFamily = font,
-        fontWeight = GlobalFontWeight,
-        fontSize = 14.sp,
-        lineHeight = 20.sp,
-        letterSpacing = GlobalLetterSpacing
-    ),
-    bodyLarge = TextStyle(
-        fontFamily = font,
-        fontWeight = GlobalFontWeight,
-        fontSize = 16.sp,
-        lineHeight = 24.sp,
-        letterSpacing = GlobalLetterSpacing
-    ),
-    bodyMedium = TextStyle(
-        fontFamily = font,
-        fontWeight = GlobalFontWeight,
-        fontSize = 14.sp,
-        lineHeight = 20.sp,
-        letterSpacing = GlobalLetterSpacing
-    ),
-    bodySmall = TextStyle(
-        fontFamily = font,
-        fontWeight = GlobalFontWeight,
-        fontSize = 12.sp,
-        lineHeight = 16.sp,
-        letterSpacing = GlobalLetterSpacing
-    ),
-    labelLarge = TextStyle(
-        fontFamily = font,
-        fontWeight = GlobalFontWeight,
-        fontSize = 14.sp,
-        lineHeight = 20.sp,
-        letterSpacing = GlobalLetterSpacing
-    ),
-    labelMedium = TextStyle(
-        fontFamily = font,
-        fontWeight = GlobalFontWeight,
-        fontSize = 12.sp,
-        lineHeight = 16.sp,
-        letterSpacing = GlobalLetterSpacing
-    ),
-    labelSmall = TextStyle(
-        fontFamily = font,
-        fontWeight = GlobalFontWeight,
-        fontSize = 11.sp,
-        lineHeight = 16.sp,
-        letterSpacing = GlobalLetterSpacing
+        fontSize = size.sp,
+        lineHeight = height.sp,
+        fontWeight = weight,
+        letterSpacing = tracking.em,
     )
-)
+    return Typography(
+        displayLarge = style(57, 64, FontWeight.Bold, -.035f),
+        displayMedium = style(45, 52, FontWeight.Bold, -.035f),
+        displaySmall = style(36, 44, FontWeight.Bold, -.03f),
+        headlineLarge = style(32, 40, FontWeight.Bold, -.025f),
+        headlineMedium = style(28, 36, FontWeight.Bold, -.025f),
+        headlineSmall = style(24, 32, FontWeight.SemiBold, -.02f),
+        titleLarge = style(22, 28, FontWeight.SemiBold, -.02f),
+        titleMedium = style(16, 24, FontWeight.SemiBold, -.01f),
+        titleSmall = style(14, 20, FontWeight.SemiBold, -.005f),
+        bodyLarge = style(16, 24, FontWeight.Normal, 0f),
+        bodyMedium = style(14, 20, FontWeight.Normal, 0f),
+        bodySmall = style(12, 18, FontWeight.Normal, .005f),
+        labelLarge = style(14, 20, FontWeight.Medium, 0f),
+        labelMedium = style(12, 18, FontWeight.Medium, .005f),
+        labelSmall = style(11, 16, FontWeight.Medium, .01f),
+    )
+}

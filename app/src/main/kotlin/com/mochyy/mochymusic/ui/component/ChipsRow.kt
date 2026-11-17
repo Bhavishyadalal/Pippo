@@ -2,10 +2,14 @@
 
 package com.mochyy.mochymusic.ui.component
 
+import com.mochyy.mochymusic.ui.theme.PippoColors
+import com.mochyy.mochymusic.ui.theme.PippoCorners
+import com.mochyy.mochymusic.ui.theme.PippoSize
+import androidx.compose.foundation.layout.heightIn
+
 import android.annotation.SuppressLint
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -77,20 +81,14 @@ fun <E> ChipsRow(
         chips.forEach { (value, label) ->
             val isSelected = currentValue == value
 
-            val cornerRadius by animateDpAsState(
-                targetValue = if (isSelected) 20.dp else 8.dp,
-                animationSpec = spring(
-                    dampingRatio = Spring.DampingRatioMediumBouncy,
-                    stiffness = Spring.StiffnessMedium
-                ),
-                label = "corner_radius"
-            )
-
             FilterChip(
                 label = { Text(label) },
                 selected = isSelected,
                 colors = FilterChipDefaults.filterChipColors(
                     containerColor = containerColor,
+                    selectedContainerColor = PippoColors.Accent,
+                    selectedLabelColor = PippoColors.OnAccent,
+                    selectedLeadingIconColor = PippoColors.OnAccent,
                 ),
                 onClick = { onValueUpdate(value) },
                 leadingIcon = if (isSelected) {
@@ -104,9 +102,9 @@ fun <E> ChipsRow(
                 } else {
                     null
                 },
-                shape = RoundedCornerShape(cornerRadius),
+                shape = RoundedCornerShape(PippoCorners.Card),
                 border = null,
-                modifier = Modifier.animateContentSize(
+                modifier = Modifier.heightIn(min = PippoSize.TouchTarget).animateContentSize(
                     animationSpec = spring(
                         dampingRatio = Spring.DampingRatioMediumBouncy,
                         stiffness = Spring.StiffnessMedium

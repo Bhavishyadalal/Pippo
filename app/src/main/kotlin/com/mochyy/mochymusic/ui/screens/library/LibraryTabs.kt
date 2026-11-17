@@ -5,6 +5,12 @@
 
 package com.mochyy.mochymusic.ui.screens.library
 
+import com.mochyy.mochymusic.ui.theme.PippoColors
+import com.mochyy.mochymusic.ui.theme.PippoSize
+import com.mochyy.mochymusic.ui.theme.PippoMotion
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.selected
+
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -53,9 +59,9 @@ enum class LibraryTab(val labelRes: Int, val shelf: LibraryShelfKind? = null) {
     Imported(R.string.library_tab_imported),
 }
 
-private val ChipTrack = Color(0xFF161618)
-private val Chip = Color(0xFF232326)
-private val ChipSelected = Color(0xFF3D3D41)
+private val ChipTrack = PippoColors.Surface
+private val Chip = PippoColors.SurfaceRaised
+private val ChipSelected = PippoColors.Accent
 
 private val ChipTrackPadding = 3.dp
 private val ChipGap = 4.dp
@@ -125,7 +131,7 @@ fun LibraryTabChips(
 private fun LibraryTabChip(tab: LibraryTab, isSelected: Boolean, onSelect: (LibraryTab) -> Unit) {
     val background by animateColorAsState(
         targetValue = if (isSelected) ChipSelected else Chip,
-        animationSpec = tween(220),
+        animationSpec = tween(PippoMotion.StateChange),
         label = "libraryTabChip",
     )
     Box(
@@ -139,12 +145,13 @@ private fun LibraryTabChip(tab: LibraryTab, isSelected: Boolean, onSelect: (Libr
                 indication = RemoteFocus,
                 onClick = { onSelect(tab) },
             )
-            .heightIn(min = 28.dp)
+            .heightIn(min = PippoSize.TouchTarget)
+            .semantics { selected = isSelected }
             .padding(horizontal = 14.dp, vertical = 5.dp),
     ) {
         Text(
             text = stringResource(tab.labelRes),
-            color = if (isSelected) SearchColors.Primary else SearchColors.Primary.copy(alpha = 0.72f),
+            color = if (isSelected) PippoColors.OnAccent else SearchColors.Secondary,
             fontSize = 13.sp,
             fontWeight = FontWeight.SemiBold,
         )

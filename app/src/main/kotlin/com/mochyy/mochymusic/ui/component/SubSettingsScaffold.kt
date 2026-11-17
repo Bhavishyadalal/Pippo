@@ -2,6 +2,10 @@
 
 package com.mochyy.mochymusic.ui.component
 
+import com.mochyy.mochymusic.ui.theme.PippoColors
+import com.mochyy.mochymusic.ui.theme.PippoSize
+import com.mochyy.mochymusic.ui.theme.PippoSpacing
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.CubicBezierEasing
@@ -72,8 +76,8 @@ import kotlin.math.PI
 import kotlin.math.sin
 import com.mochyy.mochymusic.ui.utils.stableStatusBars
 
-private val PagePadding = 20.dp
-private val BackButtonSize = 40.dp
+private val PagePadding = PippoSpacing.Page
+private val BackButtonSize = PippoSize.TouchTarget
 
 private val HeaderTopPadding = 16.dp
 
@@ -83,7 +87,7 @@ private val ExpandedTitleTop = HeaderTopPadding + BackButtonSize + 12.dp
 
 private val CollapsedTitleX = BackButtonSize + 14.dp
 
-private val ExpandedHeaderHeight = 118.dp
+private val ExpandedHeaderHeight = 132.dp
 
 private const val CollapsedTitleScale = 0.62f
 
@@ -91,7 +95,7 @@ private const val TitleMorphMaxBlurPx = 26f
 
 private val OverlayEasing = CubicBezierEasing(0.22f, 1f, 0.36f, 1f)
 
-private val SearchBarHeight = 52.dp
+private val SearchBarHeight = PippoSize.Field
 
 @Composable
 fun SubSettingsScaffold(
@@ -216,7 +220,7 @@ fun SubSettingsScaffold(
                     .padding(top = HeaderTopPadding)
                     .size(BackButtonSize)
                     .clip(CircleShape)
-                    .background(Color(0xFF2C2C2E))
+                    .background(PippoColors.SurfaceRaised)
                     .clickable(onClick = onBack),
                 contentAlignment = Alignment.Center
             ) {
@@ -315,7 +319,7 @@ fun SubSettingsScaffold(
                         shape = RoundedCornerShape(lerpDp(26.dp, BackButtonSize / 2, collapse.value))
                         clip = true
                     }
-                    .background(Color(0xFF2C2C2E))
+                    .background(PippoColors.SurfaceRaised)
             ) {
                 Box(
                     modifier = Modifier
@@ -378,9 +382,9 @@ fun SubSettingsSearchBar(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(52.dp)
-            .clip(androidx.compose.foundation.shape.RoundedCornerShape(26.dp))
-            .background(Color(0xFF1C1C1E))
+            .height(PippoSize.Field)
+            .clip(androidx.compose.foundation.shape.RoundedCornerShape(PippoSize.Field / 2))
+            .background(PippoColors.Surface)
             .padding(horizontal = 20.dp),
         contentAlignment = Alignment.CenterStart
     ) {

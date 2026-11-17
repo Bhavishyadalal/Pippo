@@ -415,9 +415,7 @@ fun CommunityPlaylistCard(
             ) {
                 Text(
                     text = item.playlist.title,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontSize = 32.sp,
-                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.headlineLarge,
                     color = Color.White,
                     maxLines = 1,
                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
@@ -1185,23 +1183,7 @@ fun HomeScreen(
         forgottenFavoritesLazyGridState.scrollToItem(0)
     }
 
-    val baseTypography = MaterialTheme.typography
-    val homeTypography = remember(baseTypography) {
-        val tightenSp = 0.6f
-        fun tighten(style: androidx.compose.ui.text.TextStyle) =
-            style.copy(letterSpacing = (style.letterSpacing.value - tightenSp).sp)
-        baseTypography.copy(
-            titleLarge = tighten(baseTypography.titleLarge),
-            titleMedium = tighten(baseTypography.titleMedium),
-            titleSmall = tighten(baseTypography.titleSmall),
-            bodyLarge = tighten(baseTypography.bodyLarge),
-            bodyMedium = tighten(baseTypography.bodyMedium),
-            bodySmall = tighten(baseTypography.bodySmall),
-            labelLarge = tighten(baseTypography.labelLarge),
-            labelMedium = tighten(baseTypography.labelMedium),
-            labelSmall = tighten(baseTypography.labelSmall),
-        )
-    }
+    val homeTypography = MaterialTheme.typography
 
     MaterialTheme(
         colorScheme = MaterialTheme.colorScheme,
@@ -1823,12 +1805,7 @@ fun HomeScreen(
 
                         Text(
                             text = stringResource(R.string.home),
-                            style = TextStyle(
-                                fontFamily = InterFontFamily,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 32.sp,
-                                letterSpacing = (-0.06).em,
-                            ),
+                            style = MaterialTheme.typography.headlineLarge,
                             color = Color.White,
                             maxLines = 1,
                             modifier = Modifier.graphicsLayer {

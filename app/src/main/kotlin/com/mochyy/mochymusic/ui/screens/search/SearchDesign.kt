@@ -2,6 +2,17 @@
 
 package com.mochyy.mochymusic.ui.screens.search
 
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.Role
+
+import com.mochyy.mochymusic.ui.theme.PippoColors
+import com.mochyy.mochymusic.ui.theme.PippoSpacing
+import com.mochyy.mochymusic.ui.theme.PippoSize
+import com.mochyy.mochymusic.ui.theme.PippoCorners
+import com.mochyy.mochymusic.ui.theme.PippoMotion
+import androidx.compose.foundation.layout.heightIn
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -87,9 +98,9 @@ import com.mochyy.mochymusic.ui.component.containerTransformSource
 import com.mochyy.mochymusic.ui.utils.stableStatusBars
 import com.mochyy.mochymusic.ui.component.RemoteFocus
 
-val SearchHorizontalPadding = 24.dp
+val SearchHorizontalPadding = PippoSpacing.Page
 
-val SearchFieldHeight = 48.dp
+val SearchFieldHeight = PippoSize.Field
 
 val AvatarSize = 36.dp
 
@@ -97,17 +108,18 @@ val SearchTitleBlockHeight = 62.dp
 
 val SearchTopClearance = 18.dp
 
+/** Compatibility names shared by Search, Library and Settings; values live in the design system. */
 object SearchColors {
-    val Field = Color(0xFF141416)
-    val FieldFocused = Color(0xFF1E1E21)
-    val Tile = Color(0xFF121214)
-    val TileHigh = Color(0xFF1C1C1F)
-    val Divider = Color(0xFF232326)
-    val Primary = Color.White
-    val Secondary = Color(0xFF9A9AA0)
-    val Placeholder = Color(0xFF77777D)
+    val Field = PippoColors.Surface
+    val FieldFocused = PippoColors.SurfaceRaised
+    val Tile = PippoColors.Surface
+    val TileHigh = PippoColors.SurfaceRaised
+    val Divider = PippoColors.Divider
+    val Primary = PippoColors.Text
+    val Secondary = PippoColors.SecondaryText
+    val Placeholder = PippoColors.MutedText
 
-    fun page(pureBlack: Boolean): Color = Color.Black
+    fun page(pureBlack: Boolean): Color = PippoColors.page(pureBlack)
 }
 
 val SearchCollapseEasing = CubicBezierEasing(0.57f, 0.53f, 0f, 1f)
@@ -323,10 +335,7 @@ fun SearchGlassTopBar(
                         Column(verticalArrangement = Arrangement.Center) {
                             Text(
                                 text = title,
-                                style = MaterialTheme.typography.displaySmall.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 34.sp,
-                                ),
+                                style = MaterialTheme.typography.headlineLarge,
                                 color = SearchColors.Primary,
                                 maxLines = 1,
                             )
@@ -481,7 +490,8 @@ fun SearchField(
             .fillMaxWidth()
             .height(SearchFieldHeight)
             .clip(RoundedCornerShape(50))
-            .background(if (focused) SearchColors.FieldFocused else SearchColors.Field)
+            .background(if (focused || fieldHasFocus) SearchColors.FieldFocused else SearchColors.Field)
+            .border(1.dp, if (focused || fieldHasFocus) PippoColors.Accent else PippoColors.Divider, PippoCorners.Pill)
             .then(
                 if (readOnlyClick != null) {
                     Modifier.clickable(
@@ -504,7 +514,7 @@ fun SearchField(
             if (value.text.isEmpty()) {
                 Text(
                     text = placeholder,
-                    style = MaterialTheme.typography.bodyMedium.copy(fontSize = 15.sp),
+                    style = MaterialTheme.typography.bodyMedium,
                     color = SearchColors.Placeholder,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -516,9 +526,9 @@ fun SearchField(
                     onValueChange = onValueChange,
                     singleLine = true,
                     textStyle = LocalTextStyle.current.merge(
-                        TextStyle(color = SearchColors.Primary, fontSize = 15.sp)
+                        MaterialTheme.typography.bodyLarge.copy(color = SearchColors.Primary)
                     ),
-                    cursorBrush = SolidColor(SearchColors.Primary),
+                    cursorBrush = SolidColor(PippoColors.Accent),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                     keyboardActions = KeyboardActions(onSearch = { onSearch(value.text) }),
                     modifier = Modifier
@@ -566,7 +576,7 @@ fun SearchSectionHeader(
             text = title,
             style = MaterialTheme.typography.titleLarge.copy(
                 fontSize = if (large) 22.sp else 18.sp,
-                fontWeight = FontWeight.Bold,
+                fontWeight = FontWeight.SemiBold,
             ),
             color = SearchColors.Primary,
             maxLines = 1,
@@ -745,12 +755,18 @@ fun SearchCategoryRow(
     ) {
         itemsIndexed(categories) { index, label ->
             val selected = index == selectedIndex
+            val chipColor by androidx.compose.animation.animateColorAsState(
+                targetValue = if (selected) PippoColors.Accent else SearchColors.Tile,
+                animationSpec = androidx.compose.animation.core.tween(PippoMotion.StateChange),
+                label = "pippoSearchCategory",
+            )
             Box(
                 modifier = Modifier
-                    .height(34.dp)
-                    .clip(RoundedCornerShape(50))
-                    .background(if (selected) Color.White else SearchColors.Tile)
-                    .clickable { onSelect(index) }
+                    .heightIn(min = PippoSize.TouchTarget)
+                    .clip(PippoCorners.Pill)
+                    .background(chipColor)
+                    .semantics { this.selected = selected }
+                    .clickable(role = Role.Tab) { onSelect(index) }
                     .padding(horizontal = 16.dp),
                 contentAlignment = Alignment.Center,
             ) {
@@ -760,7 +776,7 @@ fun SearchCategoryRow(
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Medium,
                     ),
-                    color = if (selected) Color.Black else SearchColors.Primary,
+                    color = if (selected) PippoColors.OnAccent else SearchColors.Primary,
                     maxLines = 1,
                 )
             }
@@ -815,14 +831,14 @@ fun SearchSimpleRow(
 fun SearchOverflowDots(onClick: () -> Unit, modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
-            .size(32.dp)
+            .size(PippoSize.TouchTarget)
             .clip(CircleShape)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         Icon(
             painter = painterResource(R.drawable.more_horiz),
-            contentDescription = null,
+            contentDescription = stringResource(R.string.more_options),
             tint = SearchColors.Secondary,
             modifier = Modifier.size(20.dp),
         )
@@ -889,45 +905,12 @@ fun SearchArtwork(
 
 @Composable
 fun SearchLoadingDots(modifier: Modifier = Modifier) {
-    val transition = androidx.compose.animation.core.rememberInfiniteTransition(label = "searchLoading")
-    Row(
-        modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        repeat(3) { index ->
-            val phase by transition.animateFloat(
-                initialValue = 0f,
-                targetValue = 1f,
-                animationSpec = androidx.compose.animation.core.infiniteRepeatable(
-                    animation = androidx.compose.animation.core.tween(
-                        durationMillis = 900,
-                        delayMillis = index * 150,
-                        easing = androidx.compose.animation.core.CubicBezierEasing(0.4f, 0f, 0.2f, 1f),
-                    ),
-                    repeatMode = androidx.compose.animation.core.RepeatMode.Reverse,
-                ),
-                label = "searchLoadingDot$index",
-            )
-            Box(
-                modifier = Modifier
-                    .size(7.dp)
-                    .graphicsLayer {
-                        alpha = 0.3f + 0.7f * phase
-                        val s = 0.75f + 0.25f * phase
-                        scaleX = s
-                        scaleY = s
-                    }
-                    .clip(CircleShape)
-                    .background(Color.White)
-            )
-        }
-    }
+    com.mochyy.mochymusic.ui.component.PippoLoadingDots(modifier)
 }
 
-fun Modifier.searchCardBorder(radius: Dp = 16.dp): Modifier = this.border(
+fun Modifier.searchCardBorder(radius: Dp = PippoCorners.Card): Modifier = this.border(
     width = androidx.compose.ui.unit.Dp.Hairline,
-    color = Color.White.copy(alpha = 0.05f),
+    color = PippoColors.Divider,
     shape = RoundedCornerShape(radius),
 )
 

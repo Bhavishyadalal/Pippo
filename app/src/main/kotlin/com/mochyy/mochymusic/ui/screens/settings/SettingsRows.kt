@@ -2,6 +2,9 @@
 
 package com.mochyy.mochymusic.ui.screens.settings
 
+import androidx.compose.material3.MaterialTheme
+import com.mochyy.mochymusic.ui.theme.PippoSpacing
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -35,15 +38,13 @@ internal fun SettingsSection(title: String?, items: List<SettingsItem>) {
     if (title != null) {
         Text(
             text = title,
-            fontFamily = InterFontFamily,
-            fontWeight = FontWeight.Bold,
-            fontSize = 15.sp,
-            color = Color.White,
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.padding(bottom = 10.dp, start = 4.dp),
         )
     }
     SettingsGroup(style = SettingsGroupStyle.Grouped, items = items)
-    Spacer(Modifier.height(18.dp))
+    Spacer(Modifier.height(PippoSpacing.Page))
 }
 
 internal fun List<SettingsItem>.matching(query: String): List<SettingsItem> {
@@ -70,7 +71,7 @@ internal fun ValueTitle(title: String, value: String) {
             fontFamily = InterFontFamily,
             fontWeight = FontWeight.Bold,
             fontSize = 13.sp,
-            color = Color.White.copy(alpha = 0.70f),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }
@@ -129,7 +130,7 @@ private fun NextArrow() {
     Icon(
         painter = painterResource(R.drawable.navigate_next),
         contentDescription = null,
-        tint = Color.White.copy(alpha = 0.5f),
+        tint = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.size(20.dp),
     )
 }

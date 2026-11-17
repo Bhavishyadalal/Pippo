@@ -2,6 +2,10 @@
 
 package com.mochyy.mochymusic.ui.component
 
+import com.mochyy.mochymusic.ui.theme.PippoCorners
+import com.mochyy.mochymusic.ui.theme.PippoMotion
+import com.mochyy.mochymusic.ui.theme.PippoSpacing
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -95,11 +99,11 @@ private fun ClassicItems(items: List<SettingsItem>) {
         items.forEach { item ->
             AnimatedVisibility(
                 visible = item.isVisible,
-                enter = expandVertically(animationSpec = tween(300)) + fadeIn(animationSpec = tween(300)),
-                exit = shrinkVertically(animationSpec = tween(300)) + fadeOut(animationSpec = tween(300))
+                enter = expandVertically(animationSpec = tween(PippoMotion.StateChange)) + fadeIn(animationSpec = tween(PippoMotion.StateChange)),
+                exit = shrinkVertically(animationSpec = tween(PippoMotion.StateChange)) + fadeOut(animationSpec = tween(PippoMotion.StateChange))
             ) {
 
-                val shape = RoundedCornerShape(20.dp)
+                val shape = RoundedCornerShape(PippoCorners.Card)
 
                 Card(
                     modifier = Modifier
@@ -141,7 +145,7 @@ private fun GroupedItems(items: List<SettingsItem>) {
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(28.dp),
+        shape = RoundedCornerShape(PippoCorners.Group),
         colors = CardDefaults.cardColors(
             containerColor = com.mochyy.mochymusic.ui.screens.search.SearchColors.Field
         ),
@@ -151,8 +155,8 @@ private fun GroupedItems(items: List<SettingsItem>) {
             clusters.forEach { cluster ->
                 AnimatedVisibility(
                     visible = cluster.parent.isVisible,
-                    enter = expandVertically(animationSpec = tween(300)) + fadeIn(animationSpec = tween(300)),
-                    exit = shrinkVertically(animationSpec = tween(300)) + fadeOut(animationSpec = tween(300))
+                    enter = expandVertically(animationSpec = tween(PippoMotion.StateChange)) + fadeIn(animationSpec = tween(PippoMotion.StateChange)),
+                    exit = shrinkVertically(animationSpec = tween(PippoMotion.StateChange)) + fadeOut(animationSpec = tween(PippoMotion.StateChange))
                 ) {
                     ClusterRows(cluster)
                 }
@@ -167,12 +171,12 @@ private fun ClusterRows(cluster: ItemCluster) {
 
     val pillAlpha by animateFloatAsState(
         targetValue = if (hasVisibleSubs) 1f else 0f,
-        animationSpec = tween(300),
+        animationSpec = tween(PippoMotion.StateChange),
         label = "pillAlpha"
     )
     val pillInset by animateDpAsState(
         targetValue = if (hasVisibleSubs) 6.dp else 0.dp,
-        animationSpec = tween(300),
+        animationSpec = tween(PippoMotion.StateChange),
         label = "pillInset"
     )
 
@@ -191,8 +195,8 @@ private fun ClusterRows(cluster: ItemCluster) {
             cluster.subs.forEach { sub ->
                 AnimatedVisibility(
                     visible = sub.isVisible,
-                    enter = expandVertically(animationSpec = tween(300)) + fadeIn(animationSpec = tween(300)),
-                    exit = shrinkVertically(animationSpec = tween(300)) + fadeOut(animationSpec = tween(300))
+                    enter = expandVertically(animationSpec = tween(PippoMotion.StateChange)) + fadeIn(animationSpec = tween(PippoMotion.StateChange)),
+                    exit = shrinkVertically(animationSpec = tween(PippoMotion.StateChange)) + fadeOut(animationSpec = tween(PippoMotion.StateChange))
                 ) {
                     SettingsItemRow(item = sub, style = SettingsGroupStyle.Grouped)
                 }
@@ -260,7 +264,7 @@ private fun SettingsItemRow(
                     { TopToaster.show(full, iconRes = R.drawable.info) }
                 },
             )
-            .padding(horizontal = 20.dp, vertical = 14.dp),
+            .padding(horizontal = PippoSpacing.ExtraLarge, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
 
@@ -335,7 +339,7 @@ private fun SettingsItemRow(
             }
             val titleColor = when {
                 !item.enabled -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-                style == SettingsGroupStyle.Grouped -> MaterialTheme.colorScheme.onSurfaceVariant
+                style == SettingsGroupStyle.Grouped -> MaterialTheme.colorScheme.onSurface
                 else -> MaterialTheme.colorScheme.onSurface
             }
             ProvideTextStyle(titleBaseStyle.copy(color = titleColor)) {
@@ -352,16 +356,16 @@ private fun SettingsItemRow(
                 Spacer(modifier = Modifier.height(1.dp))
                 Text(
                     text = item.descriptionText,
-                    style = MaterialTheme.typography.labelMedium,
+                    style = MaterialTheme.typography.bodySmall,
                     color = descColor,
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
             } else if (item.descriptionText == null) {
                 item.description?.let { desc ->
                     Spacer(modifier = Modifier.height(2.dp))
                     ProvideTextStyle(
-                        MaterialTheme.typography.labelMedium.copy(color = descColor)
+                        MaterialTheme.typography.bodySmall.copy(color = descColor)
                     ) {
 
                         desc()

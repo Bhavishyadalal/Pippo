@@ -45,25 +45,46 @@ fun MochyTheme(
 
     // Dynamic (Material You) colour is deliberately not used - the app ships its own palette.
     // The branch is gone rather than dead-but-present: dynamic*ColorScheme is API 31.
-    val baseColorScheme = run {
+    val baseColorScheme = remember(darkTheme) {
 
         if (darkTheme) {
             darkColorScheme(
-                primary = Color(0xFFE0E0E0),
-                onPrimary = Color.Black,
-                primaryContainer = Color(0xFF333333),
-                onPrimaryContainer = Color.White,
-                secondary = Color(0xFFB0B0B0),
-                onSecondary = Color.Black,
-                secondaryContainer = Color(0xFF2C2C2C),
-                onSecondaryContainer = Color.White,
-                background = Color.Black,
-                onBackground = Color.White,
-                surface = Color.Black,
-                onSurface = Color.White,
-                surfaceVariant = Color(0xFF1A1A1A),
-                onSurfaceVariant = Color.White,
-                surfaceTint = Color.Black
+                primary = PippoColors.Accent,
+                onPrimary = PippoColors.OnAccent,
+                primaryContainer = PippoColors.AccentContainer,
+                onPrimaryContainer = PippoColors.Text,
+                secondary = PippoColors.Sage,
+                onSecondary = PippoColors.OnSage,
+                secondaryContainer = Color(0xFF303B2C),
+                onSecondaryContainer = PippoColors.Sage,
+                tertiary = PippoColors.Lavender,
+                onTertiary = Color(0xFF342440),
+                tertiaryContainer = Color(0xFF44354F),
+                onTertiaryContainer = PippoColors.Lavender,
+                background = PippoColors.Background,
+                onBackground = PippoColors.Text,
+                surface = PippoColors.Background,
+                onSurface = PippoColors.Text,
+                surfaceVariant = PippoColors.SurfaceRaised,
+                onSurfaceVariant = PippoColors.SecondaryText,
+                surfaceTint = Color.Transparent,
+                surfaceDim = PippoColors.Background,
+                surfaceBright = PippoColors.SurfaceHighest,
+                surfaceContainerLowest = PippoColors.Background,
+                surfaceContainerLow = PippoColors.Surface,
+                surfaceContainer = PippoColors.Surface,
+                surfaceContainerHigh = PippoColors.SurfaceRaised,
+                surfaceContainerHighest = PippoColors.SurfaceHighest,
+                outline = PippoColors.Outline,
+                outlineVariant = PippoColors.Divider,
+                error = PippoColors.Error,
+                onError = Color(0xFF3D1614),
+                errorContainer = Color(0xFF602925),
+                onErrorContainer = PippoColors.Error,
+                inverseSurface = PippoColors.Text,
+                inverseOnSurface = PippoColors.Surface,
+                inversePrimary = PippoColors.AccentContainer,
+                scrim = Color.Black,
             )
         } else {
             lightColorScheme(
@@ -99,6 +120,7 @@ fun MochyTheme(
     MaterialTheme(
         colorScheme = colorScheme,
         typography = typography,
+        shapes = PippoShapes,
     ) {
         ProvideTextStyle(
             value = typography.bodyLarge,
