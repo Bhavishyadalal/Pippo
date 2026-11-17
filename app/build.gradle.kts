@@ -28,8 +28,9 @@ extensions.configure<ApplicationExtension> {
         resValue("string", "shortcut_target_package", "com.bhavishyadalal.pippo")
         minSdk = 24
         targetSdk = 37
-        versionCode = 73
-        versionName = "1.0.0"
+        // Stable 0.1.2; keep the code increasing so existing code-73 installs can upgrade.
+        versionCode = 74
+        versionName = "0.1.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
@@ -171,6 +172,7 @@ extensions.configure<ApplicationExtension> {
             isShrinkResources = true
             isCrunchPngs = false
             isDebuggable = false
+            isProfileable = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

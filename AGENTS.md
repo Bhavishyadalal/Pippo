@@ -8,4 +8,4 @@
 - The owner removed the four experimental Cassette, Midnight Glass, Pippo Duo and CD Walkman player screens. Keep the existing player screens; do not reintroduce the removed designs unless requested.
 - Do not build or publish another APK, or launch GitHub Actions, until the owner explicitly asks for that again.
 
-- The tested design-system pass was merged into main at bd58eae8 at the owner's request. Current customization work belongs on `preview-beta-v0.1.2`; preserve main and the backup branch, and merge only when requested.
+- Main remains at the tested design-system commit bd58eae8. The owner explicitly requested `stable-0.1.2` from beta commit 068574ee for stable-version testing. Stable preparation belongs on this new branch only; preserve `preview-beta-v0.1.2`, main and the backup branch. Do not merge, build an APK or run Actions unless requested.

@@ -24,3 +24,8 @@ See [NOTICE.md](NOTICE.md) for upstream attribution and [LICENSE](LICENSE) for t
 ## Preview beta v0.1.2
 
 The `preview-beta-v0.1.2` branch expands **Settings → Customisation** with navigation layouts/order/labels, accents and text controls, page motion and feedback, Home shelf visibility/order, Library spacing, mini-player options, character selection and named appearance presets with import/export/reset. Performance presets reuse the existing blur and animation controls. See [beta customization details](docs/PREVIEW-BETA-V0.1.2.md) for behavior and review limits. No APK or workflow was run while preparing this beta.
+
+
+## Stable 0.1.2 testing branch
+
+`stable-0.1.2` contains the customization, mini-player, startup and cozy settings changes from beta commit `068574ee`, with application version **0.1.2** / code **74**. Main and beta are preserved. Use **Optimized Release APK**, choose `stable-0.1.2` in **Run workflow → Branch**, and select ARM64 or Universal as appropriate. The release configuration enables R8 optimization/resource shrinking, excludes debugging/profiling, and retains the existing baseline profile. This branch was prepared without running builds, tests or Actions; device stability and smoothness remain unverified. See [stable preparation notes](docs/STABLE-0.1.2.md).
