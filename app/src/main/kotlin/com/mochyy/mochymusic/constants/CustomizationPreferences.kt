@@ -40,20 +40,3 @@ enum class UiCharacter { RANDOM, FEMALE, MALE, HIDDEN }
 val UiHomeOrderKey = stringPreferencesKey("pippo.ui.homeOrder")
 val UiHomeHiddenKey = stringPreferencesKey("pippo.ui.homeHidden")
 val UiLibraryRowsKey = stringPreferencesKey("pippo.ui.libraryRows")
-
-val MiniStyleKey = stringPreferencesKey("pippo.mini.style")
-val MiniProgressKey = stringPreferencesKey("pippo.mini.progress")
-val MiniCornersKey = stringPreferencesKey("pippo.mini.corners")
-val MiniSpacingKey = stringPreferencesKey("pippo.mini.spacing")
-val MiniPreviousKey = booleanPreferencesKey("pippo.mini.previous")
-val MiniNextKey = booleanPreferencesKey("pippo.mini.next")
-val MiniFavoriteKey = booleanPreferencesKey("pippo.mini.favorite")
-val MiniQueueKey = booleanPreferencesKey("pippo.mini.queue")
-val MiniElapsedKey = booleanPreferencesKey("pippo.mini.elapsed")
-val MiniQualityKey = booleanPreferencesKey("pippo.mini.quality")
-val MiniMarqueeKey = booleanPreferencesKey("pippo.mini.marquee")
-val MiniStatusKey = booleanPreferencesKey("pippo.mini.status")
-
-enum class MiniStyle { CLASSIC, FLOATING_PILL, COMPACT_CARD, TWO_LINE, ARTWORK_TINT, MINIMAL, CONNECTED_DOCK }
-enum class MiniProgress { NONE, TOP, BOTTOM }
-enum class MiniCorners { SQUARE, SOFT, ROUND }

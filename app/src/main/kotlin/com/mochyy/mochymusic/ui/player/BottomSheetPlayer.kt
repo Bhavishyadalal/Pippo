@@ -999,18 +999,6 @@ private fun PlayerSheet(
                     ambient = if (isFlagship || backgroundStyle == PlayerBackgroundStyle.AMBIENT) ambient else null,
                     frostedCover = isFlagship,
                 )
-                if (com.mochyy.mochymusic.ui.customization.UiCustomizationState.options.mini.customLayout) {
-                    PippoMiniPlayer(
-                        track = trackInfo,
-                        transport = transportState,
-                        progressProvider = progressProvider,
-                        onExpand = { state.expandSoft() },
-                        onQueue = {
-                            transition.open(PlayerPage.QUEUE)
-                            state.expandSoft()
-                        },
-                    )
-                }
             },
             onDismiss = {
                 playerConnection.service.clearAutomix()

@@ -21,13 +21,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.border
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.selected
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -136,7 +129,6 @@ private val LocalizedSettingsTitles = mapOf(
     "Transitions and feedback" to R.string.beta_motion,
     "Pippo characters" to R.string.beta_characters,
     "Saved presets" to R.string.beta_profiles,
-    "Mini-player styles" to R.string.mini_customization,
     "Home shelves" to R.string.beta_home,
     "More customization" to R.string.beta_more,
     "Cover rounding" to R.string.customise_cover_rounding,
@@ -165,7 +157,6 @@ private val LocalizedSettingsPages = mapOf(
 
 private val SettingsIndex = listOf(
     // Customisation
-    SettingsEntry("Mini-player styles", "Customisation", "customisation_settings", "mini player song bottom bar floating pill card artwork minimal dock progress time favorite queue"),
     SettingsEntry("Performance presets", "Customisation", "customisation_settings", "light balanced expressive battery performance"),
     SettingsEntry("App navigation", "Customisation", "customisation_settings", "bottom bar tabs order labels icons flat outline indicator"),
     SettingsEntry("Colors and text", "Customisation", "customisation_settings", "accent font contrast hex spacing corners text size"),
@@ -288,6 +279,7 @@ private val SettingsIndex = listOf(
 )
 
 internal val BubbleColor = Color(0xFF1C1C1E)
+private val SelectedBubbleColor = Color(0xFF3A3A3E)
 
 // the header holds the mochy mark with the big "Settings" under it, taller than search's title-only header
 private val SettingsTitleBlockHeight = 88.dp
@@ -386,14 +378,20 @@ fun MochySettingsScreen(navController: NavController, pane: SettingsPane? = null
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     if (results.isEmpty()) {
-                        SettingsEmptyState(query.text)
+                        Text(
+                            text = stringResource(R.string.settings_nothing_matches, query.text),
+                            fontFamily = InterFontFamily,
+                            fontSize = 15.sp,
+                            color = Color.White.copy(alpha = 0.6f),
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 12.dp)
+                        )
                     } else {
                         results.forEach { entry ->
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(20.dp))
-                                    .background(MaterialTheme.colorScheme.surfaceContainer)
+                                    .background(BubbleColor)
                                     .clickable {
                                         SettingsHighlight.pending = entry.highlightKey
                                         open(entry.route)
@@ -401,7 +399,20 @@ fun MochySettingsScreen(navController: NavController, pane: SettingsPane? = null
                                     .padding(horizontal = 16.dp, vertical = 14.dp)
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    SettingsIconTile(R.drawable.settings)
+                                    Box(
+                                        modifier = Modifier
+                                            .size(38.dp)
+                                            .clip(CircleShape)
+                                            .background(IconBgColor),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            painter = painterResource(R.drawable.settings),
+                                            contentDescription = null,
+                                            tint = Color.White,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
                                     Spacer(modifier = Modifier.width(11.dp))
                                     Column {
                                         Text(
@@ -432,8 +443,6 @@ fun MochySettingsScreen(navController: NavController, pane: SettingsPane? = null
                         .fillMaxWidth()
                         .graphicsLayer { alpha = contentAlpha }
                 ) {
-                    SettingsWelcomeCard(Modifier.padding(horizontal = 20.dp, vertical = 4.dp))
-                    Spacer(Modifier.height(16.dp))
                     RecommendedCard(recommendations = recommendations, open = open)
 
                     Spacer(modifier = Modifier.height(18.dp))
@@ -449,17 +458,16 @@ fun MochySettingsScreen(navController: NavController, pane: SettingsPane? = null
 
                     Spacer(modifier = Modifier.height(18.dp))
 
-                    // Tonal category cards grouped by listening, personal style and connections.
+                    // Separate Bubble Pills for Categories (No outlines, individually bubble-wrapped)
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 20.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        SettingsSectionHeading(stringResource(R.string.settings_cozy_sound), Modifier.padding(bottom = 2.dp))
+                        // in the order of the design: sound first, then how the app acts and looks, then the rest
                         CategoryBubble(
                             title = stringResource(R.string.settings_audio_lab_category),
-                            subtitle = stringResource(R.string.settings_cozy_audio_detail),
                             iconRes = R.drawable.equalizer,
                             selected = selected == "audio_lab",
                             onClick = { open("audio_lab") }
@@ -467,7 +475,6 @@ fun MochySettingsScreen(navController: NavController, pane: SettingsPane? = null
 
                         CategoryBubble(
                             title = stringResource(R.string.settings_playback_category),
-                            subtitle = stringResource(R.string.settings_cozy_playback_detail),
                             iconRes = R.drawable.play,
                             selected = selected == PlaybackSettingsRoute,
                             onClick = { open(PlaybackSettingsRoute) }
@@ -475,16 +482,13 @@ fun MochySettingsScreen(navController: NavController, pane: SettingsPane? = null
 
                         CategoryBubble(
                             title = stringResource(R.string.settings_now_playing),
-                            subtitle = stringResource(R.string.settings_cozy_player_detail),
                             iconRes = R.drawable.lyrics,
                             selected = selected == NowPlayingSettingsRoute,
                             onClick = { open(NowPlayingSettingsRoute) }
                         )
 
-                        SettingsSectionHeading(stringResource(R.string.settings_cozy_space), Modifier.padding(top = 12.dp, bottom = 2.dp))
                         CategoryBubble(
                             title = stringResource(R.string.settings_app_behaviour),
-                            subtitle = stringResource(R.string.settings_cozy_behavior_detail),
                             iconRes = R.drawable.settings,
                             selected = selected == "general_settings",
                             onClick = { open("general_settings") }
@@ -492,16 +496,13 @@ fun MochySettingsScreen(navController: NavController, pane: SettingsPane? = null
 
                         CategoryBubble(
                             title = stringResource(R.string.settings_customisation_category),
-                            subtitle = stringResource(R.string.settings_cozy_custom_detail),
                             iconRes = R.drawable.palette,
                             selected = selected == "customisation_settings",
                             onClick = { open("customisation_settings") }
                         )
 
-                        SettingsSectionHeading(stringResource(R.string.settings_cozy_connections), Modifier.padding(top = 12.dp, bottom = 2.dp))
                         CategoryBubble(
                             title = stringResource(R.string.storage),
-                            subtitle = stringResource(R.string.settings_cozy_storage_detail),
                             iconRes = R.drawable.storage,
                             selected = selected == "storage_settings",
                             onClick = { open("storage_settings") }
@@ -509,7 +510,6 @@ fun MochySettingsScreen(navController: NavController, pane: SettingsPane? = null
 
                         CategoryBubble(
                             title = stringResource(R.string.integrations),
-                            subtitle = stringResource(R.string.settings_cozy_integrations_detail),
                             iconRes = R.drawable.integration,
                             selected = selected == IntegrationsRoute,
                             onClick = { open(IntegrationsRoute) }
@@ -517,7 +517,6 @@ fun MochySettingsScreen(navController: NavController, pane: SettingsPane? = null
 
                         CategoryBubble(
                             title = stringResource(R.string.devices_title),
-                            subtitle = stringResource(R.string.settings_cozy_devices_detail),
                             iconRes = R.drawable.cast_connected,
                             selected = false,
                             onClick = { open(com.mochyy.mochymusic.ui.screens.devices.DeviceIntegrationRoute) }
@@ -525,7 +524,6 @@ fun MochySettingsScreen(navController: NavController, pane: SettingsPane? = null
 
                         CategoryBubble(
                             title = stringResource(R.string.settings_modules_category),
-                            subtitle = stringResource(R.string.settings_cozy_modules_detail),
                             iconRes = R.drawable.library_add,
                             selected = selected == "modules",
                             onClick = { open("modules") }
@@ -621,31 +619,45 @@ internal fun CategoryBubble(
     title: String,
     iconRes: Int,
     onClick: () -> Unit,
+    // lit while its page is open beside the list on a wide screen
     selected: Boolean = false,
-    subtitle: String? = null,
 ) {
-    val colors = MaterialTheme.colorScheme
-    val shape = RoundedCornerShape(com.mochyy.mochymusic.ui.theme.PippoCorners.Card)
-    val (hideDescriptions) = rememberPreference(com.mochyy.mochymusic.constants.HideSettingsDescriptionsKey, true)
-    Row(
-        modifier = Modifier.fillMaxWidth().heightIn(min = 72.dp).clip(shape)
-            .background(if (selected) colors.primary.copy(alpha = .12f) else colors.surfaceContainer)
-            .border(1.dp, if (selected) colors.primary.copy(alpha = .35f) else colors.onSurface.copy(alpha = .045f), shape)
-            .semantics { this.selected = selected }
-            .clickable(role = Role.Button, onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(64.dp)
+            .clip(RoundedCornerShape(22.dp))
+            .background(if (selected) SelectedBubbleColor else BubbleColor)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp),
+        contentAlignment = Alignment.CenterStart
     ) {
-        SettingsIconTile(iconRes)
-        Spacer(Modifier.width(14.dp))
-        Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = colors.onSurface)
-            if (subtitle != null && !hideDescriptions) {
-                Spacer(Modifier.height(4.dp))
-                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(IconBgColor),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    painter = painterResource(iconRes),
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(20.dp)
+                )
             }
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(
+                text = title,
+                fontFamily = InterFontFamily,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 17.sp,
+                color = Color.White,
+            )
         }
-        Spacer(Modifier.width(10.dp))
-        Icon(painterResource(R.drawable.navigate_next), null, tint = if (selected) colors.primary else colors.onSurfaceVariant, modifier = Modifier.size(20.dp))
     }
 }
