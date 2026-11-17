@@ -48,3 +48,7 @@ Named presets are kept separately from active settings and survive customization
 ## Review status
 
 Source and diff inspection only. No tests, compilation, APK build/publication or GitHub Actions were run for this beta. Compilation, device rendering, accessibility at large font sizes, document import/export, and frame-rate/battery measurements remain unverified. No claim of zero lag is made. Any later manual workflow run should select `preview-beta-v0.1.2` to build this source.
+
+## Main icon and startup follow-up
+
+The existing approved portrait #01 remains the default launcher icon; the 20 selectable alternatives are retained. The system splash now explicitly uses that same main adaptive icon instead of the plain equalizer. Home cold starts pass the main icon into the existing Canvas intro, enabling its zoom/ripple handoff to the music mark and Home header. The foreground respects the launcher's 18% inset. The icon prelude is shortened to 420 ms and the mark flight to 480 ms; existing readiness gates, timeouts and global animation-duration scaling are retained. Search-first launches, deep links and restored activities retain their existing startup paths. No new artwork, video or animation dependency is introduced. Device-specific splash masking and the handoff remain unverified without a build and device run.

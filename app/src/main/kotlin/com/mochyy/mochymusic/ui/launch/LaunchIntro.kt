@@ -69,10 +69,9 @@ import kotlin.math.sin
 /*
  * A cold start, in order:
  *
- *  1. The system splash shows the filled mark (an anime launcher icon on android 13+: the icon
- *     itself). On the app's first frame [LaunchIntroOverlay] draws the very same thing in the very
- *     same spot and the splash goes (see SplashScreenExit). The anime icon then zooms out with a
- *     bounce into the filled mark, a ripple running out from it, before step 3.
+ *  1. The system splash shows Pippo's main anime icon. On the app's first frame
+ *     [LaunchIntroOverlay] draws that icon before the system splash goes (see SplashScreenExit).
+ *     A short zoom and ripple hand it over to the music mark before step 3.
  *  2. The mark holds still while the essentials come up underneath it: the player service, the
  *     theme, and Home (its logo and bones). Anything slow here is invisible, nothing moves.
  *  3. The mark flies into Home's logo, crossfading from the filled splash mark into the outline
@@ -127,7 +126,7 @@ object LaunchGate {
 
 // the flight: still -> a gentle start -> a long settle into the logo. scale leads the move a
 // little, so the big mark has shrunk before it crosses the screen
-private const val FlightMillis = 660
+private const val FlightMillis = 480
 private val MoveEasing = CubicBezierEasing(0.55f, 0f, 0.1f, 1f)
 private val ScaleEasing = CubicBezierEasing(0.45f, 0f, 0.1f, 1f)
 
@@ -152,10 +151,10 @@ private const val SplashTimeoutMillis = 1_500L
 private const val BlurPeak = 8f
 
 // the anime icon bouncing out into the mark, ripple and all
-private const val PreludeMillis = 1_100
+private const val PreludeMillis = 420
 
-// an adaptive icon on the splash: its 108dp layers drawn at 240dp, shown through a 160dp circle
-private const val IconLayerSize = 240f / 288f * 235f
+// Match the adaptive launcher foreground: 18% inset on each side of its 240dp layer.
+private const val IconLayerSize = 240f / 288f * 235f * .64f
 private const val IconCircleRadius = 80f / 288f * 235f
 
 // the system splash draws an icon with no background at 288dp, masked to a 192dp circle
@@ -180,7 +179,7 @@ private val LayerBounds = RectF(28f, 28f, 207f, 207f)
 @Stable
 class LaunchIntroState internal constructor(
     val plays: Boolean,
-    // the anime icon the splash showed (android 13+); null starts from the filled mark as always
+    // The main Pippo icon shown by the splash; null retains the music-mark-only path.
     internal val icon: AppIcon? = null,
 ) {
     internal val prelude = Animatable(if (plays && icon != null) 0f else 1f)
@@ -500,7 +499,7 @@ private class LaunchIconArt(context: Context, icon: AppIcon) {
 /** the icon and the mark at one point of the prelude, and the blur over both */
 private class PreludeLook(val iconAlpha: Float, val iconScale: Float, val markAlpha: Float, val markScale: Float, val blur: Float)
 
-// mochy winds up a little and zooms out, then the mark pops in past its size and settles while the ripple runs out
+// Pippo pulls back gently, then the music mark settles as the ripple runs out.
 private fun preludeLook(t: Float): PreludeLook {
     val out = (t / 0.5f).coerceIn(0f, 1f)
     val pop = ((t - 0.38f) / 0.62f).coerceIn(0f, 1f)

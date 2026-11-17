@@ -63,10 +63,8 @@ object AppIcons {
         return AppIcon.entries.firstOrNull { started.endsWith(".${it.alias}") }
     }
 
-    // A neutral music mark keeps the system splash legible under every icon mask.
-    fun splashShows(icon: AppIcon?): Boolean = false
-
-    fun syncSplash(activity: Activity, icon: AppIcon = current(activity)) {
+    // Keep future system splashes aligned with the main-icon Compose handoff.
+    fun syncSplash(activity: Activity) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             runCatching { activity.splashScreen.setSplashScreenTheme(R.style.Theme_App_Starting) }
         }

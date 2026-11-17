@@ -2,11 +2,11 @@
 
     <style name="Theme.App.Starting" parent="Theme.SplashScreen">
         <item name="windowSplashScreenBackground">@android:color/black</item>
-        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash_mark</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
         <item name="postSplashScreenTheme">@style/Theme.mochy</item>
     </style>
 
-    <!-- the anime icons' splash, only told apart on android 12+ (values-v31) -->
+    <!-- Compatibility name retained for older shortcuts; every entry uses the main Pippo icon. -->
     <style name="Theme.App.Starting.Icon" parent="Theme.App.Starting" />
 
     <style name="Theme.mochy" parent="android:Theme.Material.NoActionBar">

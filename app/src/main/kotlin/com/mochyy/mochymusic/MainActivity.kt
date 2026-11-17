@@ -660,8 +660,8 @@ class MainActivity : ComponentActivity() {
                     val plays = introRequested && (tabOpenedFromShortcut ?: defaultOpenTab) == NavigationTab.HOME
                     introPlays = plays
                     if (introRequested && !plays) LaunchGate.skip()
-                    // an anime icon's splash shows the icon itself, so the intro bounces out of it; every other launch starts from the bare mark
-                    val icon = com.mochyy.mochymusic.utils.AppIcons.launchedFrom(intent)?.takeIf(com.mochyy.mochymusic.utils.AppIcons::splashShows)
+                    // Match the explicit main icon used by the system splash, including direct launches.
+                    val icon = com.mochyy.mochymusic.utils.AppIcon.Default
                     LaunchIntroState(plays, icon)
                 }
 
