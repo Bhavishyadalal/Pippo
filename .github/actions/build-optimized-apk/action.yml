@@ -1,0 +1,209 @@
+name: Build optimized Pippo APK
+description: Build an R8-optimized release APK with optional private release signing.
+inputs:
+  architecture:
+    description: arm64 for modern phones, universal for all supported device ABIs.
+    default: arm64
+  signing:
+    description: auto uses release secrets when complete; preview needs no secrets; release requires secrets.
+    default: auto
+runs:
+  using: composite
+  steps:
+    - name: Select architecture and signing mode
+      id: configure
+      shell: bash
+      env:
+        APK_ARCHITECTURE: ${{ inputs.architecture }}
+        APK_SIGNING: ${{ inputs.signing }}
+      run: |
+        set -euo pipefail
+        case "$APK_ARCHITECTURE" in
+          arm64) flavor=arm64Gms; task=assembleArm64GmsRelease ;;
+          universal) flavor=universalGms; task=assembleUniversalGmsRelease ;;
+          *) echo '::error::Choose arm64 or universal.'; exit 1 ;;
+        esac
+        present=0
+        missing=()
+        for name in KEYSTORE_BASE64 STORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
+          if [ -n "${!name:-}" ]; then
+            present=$((present + 1))
+          else
+            missing+=("$name")
+          fi
+        done
+        case "$APK_SIGNING" in
+          preview) mode=preview ;;
+          release) mode=release ;;
+          auto)
+            if [ "$present" -eq 0 ]; then
+              mode=preview
+            else
+              mode=release
+            fi ;;
+          *) echo '::error::Choose auto, preview, or release signing.'; exit 1 ;;
+        esac
+        if [ "$mode" = release ] && [ "${#missing[@]}" -ne 0 ]; then
+          for name in "${missing[@]}"; do
+            echo "::error::Missing release signing secret: $name. Add it under Settings > Secrets and variables > Actions, or choose preview signing. STORE_PASSWORD also accepts the legacy KEYSTORE_PASSWORD secret."
+          done
+          exit 1
+        fi
+        {
+          echo "architecture=$APK_ARCHITECTURE"
+          echo "flavor=$flavor"
+          echo "task=$task"
+          echo "signing=$mode"
+        } >> "$GITHUB_OUTPUT"
+
+    - name: Set up Java 21
+      uses: actions/setup-java@v5
+      with:
+        distribution: temurin
+        java-version: '21'
+
+    - name: Prepare signing key
+      shell: bash
+      env:
+        SIGNING_MODE: ${{ steps.configure.outputs.signing }}
+      run: |
+        set -euo pipefail
+        umask 077
+        mkdir -p app/keystore "$RUNNER_TEMP/pippo-signing"
+        if [ "$SIGNING_MODE" = release ]; then
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > app/keystore/release.keystore
+          # Validate both the store and the private-key password before downloading tools or compiling.
+          keytool -importkeystore -noprompt \
+            -srckeystore app/keystore/release.keystore \
+            -srcstorepass:env STORE_PASSWORD -srckeypass:env KEY_PASSWORD -srcalias "$KEY_ALIAS" \
+            -destkeystore "$RUNNER_TEMP/pippo-signing/validation.p12" -deststoretype PKCS12 \
+            -deststorepass:env STORE_PASSWORD -destkeypass:env STORE_PASSWORD > /dev/null 2>&1 || {
+              echo '::error::Could not open the private signing key. Check the keystore, alias, store password and key password.'
+              exit 1
+            }
+          rm -f "$RUNNER_TEMP/pippo-signing/validation.p12"
+        else
+          # This key is temporary and never cached, committed, or uploaded.
+          export STORE_PASSWORD=android KEY_PASSWORD=android KEY_ALIAS=androiddebugkey
+          keytool -genkeypair -noprompt \
+            -keystore app/keystore/release.keystore -storetype JKS \
+            -storepass:env STORE_PASSWORD -keypass:env KEY_PASSWORD -alias "$KEY_ALIAS" \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -dname 'CN=Pippo Preview,O=Pippo,C=US' > /dev/null 2>&1
+          echo '::notice::Building an optimized preview APK with a temporary signing key. Configure release secrets for stable signing across builds.'
+        fi
+
+    - name: Set up Android SDK
+      uses: android-actions/setup-android@v3
+      with:
+        packages: platform-tools
+        log-accepted-android-sdk-licenses: false
+
+    - name: Install matching Android and native tools
+      shell: bash
+      run: sdkmanager "platforms;android-37.0" "build-tools;36.0.0" "ndk;27.0.12077973" "cmake;3.22.1"
+
+    - name: Set up Gradle dependency and task caches
+      uses: gradle/actions/setup-gradle@v4
+      with:
+        cache-read-only: false
+
+    - name: Cache native compilation
+      uses: actions/cache@v4
+      with:
+        path: |
+          app/.cxx
+          app/build/intermediates/cxx
+        key: ${{ runner.os }}-pippo-native-optimized-v1-${{ inputs.architecture }}-${{ hashFiles('app/src/main/cpp/**', 'app/build.gradle.kts', 'gradle/libs.versions.toml', 'gradle/wrapper/gradle-wrapper.properties', '.github/actions/build-optimized-apk/action.yml') }}
+
+    - name: Build optimized release APK
+      shell: bash
+      env:
+        APK_TASK: ${{ steps.configure.outputs.task }}
+        STORE_PASSWORD: ${{ steps.configure.outputs.signing == 'preview' && 'android' || env.STORE_PASSWORD }}
+        KEY_PASSWORD: ${{ steps.configure.outputs.signing == 'preview' && 'android' || env.KEY_PASSWORD }}
+        KEY_ALIAS: ${{ steps.configure.outputs.signing == 'preview' && 'androiddebugkey' || env.KEY_ALIAS }}
+      run: |
+        set -euo pipefail
+        chmod +x gradlew
+        ./gradlew ":app:$APK_TASK" \
+          --no-daemon --no-configuration-cache --build-cache --parallel --max-workers=2 \
+          --console=plain --warning-mode=summary \
+          '-Dorg.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g -XX:+UseParallelGC -Dfile.encoding=UTF-8' \
+          -Pkotlin.compiler.execution.strategy=in-process
+
+    - name: Verify APK and optimization output
+      shell: bash
+      env:
+        APK_FLAVOR: ${{ steps.configure.outputs.flavor }}
+      run: |
+        set -euo pipefail
+        shopt -s nullglob
+        apks=(app/build/outputs/apk/"$APK_FLAVOR"/release/*.apk)
+        if [ "${#apks[@]}" -ne 1 ]; then
+          echo '::error::Expected exactly one release APK.'
+          exit 1
+        fi
+        tools="$ANDROID_HOME/build-tools/36.0.0"
+        "$tools/apksigner" verify --verbose "${apks[0]}"
+        badging="$("$tools/aapt" dump badging "${apks[0]}")"
+        if ! grep -q "^package: name='com.bhavishyadalal.pippo' " <<< "$badging"; then
+          echo '::error::The APK does not have the expected Pippo release application ID.'
+          exit 1
+        fi
+        if grep -q '^application-debuggable' <<< "$badging"; then
+          echo '::error::Expected a non-debuggable release APK.'
+          exit 1
+        fi
+        if [ ! -s "app/build/outputs/mapping/${APK_FLAVOR}Release/mapping.txt" ]; then
+          echo '::error::R8 mapping output is missing. Check that release minification is enabled.'
+          exit 1
+        fi
+
+    - name: Upload installable APK
+      id: apk
+      uses: actions/upload-artifact@v4
+      with:
+        name: pippo-${{ steps.configure.outputs.architecture }}-gms-${{ steps.configure.outputs.signing }}-optimized-${{ github.run_number }}
+        path: app/build/outputs/apk/${{ steps.configure.outputs.flavor }}/release/*.apk
+        if-no-files-found: error
+        compression-level: 0
+        retention-days: 14
+
+    - name: Upload R8 mapping for crash diagnosis
+      uses: actions/upload-artifact@v4
+      with:
+        name: pippo-${{ steps.configure.outputs.architecture }}-r8-mapping-${{ github.run_number }}
+        path: app/build/outputs/mapping/${{ steps.configure.outputs.flavor }}Release/mapping.txt
+        if-no-files-found: error
+        retention-days: 30
+
+    - name: Write download instructions
+      shell: bash
+      env:
+        APK_URL: ${{ steps.apk.outputs.artifact-url }}
+        SIGNING_MODE: ${{ steps.configure.outputs.signing }}
+        APK_ARCHITECTURE: ${{ steps.configure.outputs.architecture }}
+      run: |
+        {
+          echo '## Pippo optimized APK'
+          echo
+          echo "[Download APK artifact]($APK_URL), then extract its ZIP and open the APK."
+          echo
+          echo "Architecture: **$APK_ARCHITECTURE** · Signing: **$SIGNING_MODE**"
+          echo
+          echo 'Built using the release configuration: non-debuggable, R8 optimization and resource shrinking enabled.'
+          echo
+          if [ "$SIGNING_MODE" = preview ]; then
+            echo 'This preview uses a temporary signing key. A later preview or a release-signed APK may not install over it. Use a backed-up private release key for consistent updates.'
+          else
+            echo 'Keep your private keystore backed up and reuse it for future updates.'
+          fi
+        } >> "$GITHUB_STEP_SUMMARY"
+
+    - name: Remove private signing material
+      if: always()
+      shell: bash
+      run: |
+        rm -f app/keystore/release.keystore
+        rm -rf "$RUNNER_TEMP/pippo-signing"

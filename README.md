@@ -8,7 +8,9 @@ Pippo's characters are selected randomly once per app process. They stay consist
 
 All GitHub Actions workflows are manual. Open **Actions → CI & Debug Build → Run workflow** for a debug APK without release signing secrets. Download the APK artifact when your run completes.
 
-**Android Release APK** and **Fast Signed APK (ARM64)** require your own release signing secrets as described in their workflow files. No workflows were launched for this rebrand.
+On `design/pippo-design-system`, **Android Release APK** and the new **Optimized Release APK** use a shared optimized release builder. Select ARM64 for a smaller build or Universal for broader device support. Auto signing needs no secrets for a temporary preview; a complete private signing configuration enables stable release signing. See [optimized APK and signing instructions](docs/OPTIMIZED-APK.md).
+
+The separate **Fast Signed APK (ARM64)** workflow still requires release signing secrets. All workflows remain manual; none was launched while adding these build options.
 
 The release application ID is `com.bhavishyadalal.pippo`, with separate `.debug`, `.fast`, and `.profileable` variants. Pippo installs separately from older Mochy APKs; use the existing export/import features to transfer supported library data. Updates are installed manually. The app does not fetch upstream app updates, developer profiles, donation prompts, or the upstream module catalogue. Modules supplied by the user and configured music integrations remain supported.
 
@@ -17,3 +19,4 @@ The release application ID is `com.bhavishyadalal.pippo`, with separate `.debug`
 The Kotlin namespace, library interfaces, and stored compatibility keys retain their existing names where needed. Visible app branding and production artwork use Pippo. Approved character masters are in `docs/mascot-concepts/refined-cozy`, with icon concept sheets in `docs/icon-concepts/anime-20`.
 
 See [NOTICE.md](NOTICE.md) for upstream attribution and [LICENSE](LICENSE) for the retained GNU GPL v3 license. Copyright notices and upstream history are preserved.
+
