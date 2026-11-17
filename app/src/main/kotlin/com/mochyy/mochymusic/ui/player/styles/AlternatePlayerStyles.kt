@@ -85,6 +85,8 @@ fun AlternatePlayerStyle(
         PlayerStyle.VIDEO -> com.mochyy.mochymusic.ui.player.video.VideoPlayerStyle(actions, modifier, preview)
         PlayerStyle.BEDSIDE -> com.mochyy.mochymusic.ui.player.bedside.BedsidePlayerStyle(actions, modifier, preview)
         PlayerStyle.BEDSIDE_TILES -> com.mochyy.mochymusic.ui.player.bedside.BedsideTilesStyle(actions, modifier, preview)
+        PlayerStyle.CASSETTE, PlayerStyle.MIDNIGHT_GLASS, PlayerStyle.PIPPO_DUO, PlayerStyle.CD_WALKMAN ->
+            PremiumPlayerStyle(style, actions, modifier, preview)
         PlayerStyle.MODULE -> ModulePlayerStyle(actions, modifier, preview)
         PlayerStyle.FLAGSHIP, PlayerStyle.CLASSIC, PlayerStyle.TURNTABLE -> Unit
     }

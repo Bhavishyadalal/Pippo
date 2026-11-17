@@ -3,6 +3,7 @@
 package com.mochyy.mochymusic.ui.screens.gesture
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -112,6 +113,35 @@ internal fun PlaylistStylePreview(style: PlaylistStyle, coverRadius: Dp) {
 @Composable
 internal fun PlayerStylePreview(style: PlayerStyle) {
     when (style) {
+        PlayerStyle.CASSETTE -> Column(Modifier.fillMaxSize().background(Color(0xFF211C20)).padding(12.dp)) {
+            Box(Modifier.fillMaxWidth().height(82.dp).background(Color(0xFFDCC9AB), RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) {
+                Row(horizontalArrangement = Arrangement.spacedBy(22.dp)) {
+                    repeat(2) { Box(Modifier.size(22.dp).background(Color(0xFF3D3031), CircleShape).border(3.dp, Color(0xFF9E9385), CircleShape)) }
+                }
+            }
+            Spacer(Modifier.height(14.dp))
+            NowPlayingBars()
+        }
+        PlayerStyle.MIDNIGHT_GLASS -> Column(Modifier.fillMaxSize().background(Color(0xFF16131C)).padding(12.dp)) {
+            Box(Modifier.fillMaxWidth().height(96.dp).background(ArtFill, RoundedCornerShape(14.dp)).border(1.dp, BoneDim, RoundedCornerShape(14.dp)))
+            Spacer(Modifier.height(14.dp))
+            NowPlayingBars()
+        }
+        PlayerStyle.PIPPO_DUO -> Column(Modifier.fillMaxSize().background(Color(0xFF251923))) {
+            coil3.compose.AsyncImage(com.mochyy.mochymusic.R.drawable.pippo_duo_player, null, contentScale = androidx.compose.ui.layout.ContentScale.Crop, alignment = Alignment.TopCenter, modifier = Modifier.fillMaxWidth().height(110.dp))
+            Column(Modifier.padding(12.dp)) { NowPlayingBars() }
+        }
+        PlayerStyle.CD_WALKMAN -> Column(Modifier.fillMaxSize().background(Color(0xFF26222B)).padding(12.dp)) {
+            Box(Modifier.fillMaxWidth().height(90.dp).background(Color(0xFF6C6471), RoundedCornerShape(16.dp)), contentAlignment = Alignment.Center) {
+                Box(Modifier.size(74.dp).background(Color(0xFFCABFD2), CircleShape), contentAlignment = Alignment.Center) {
+                    Box(Modifier.size(26.dp).background(ArtFill, CircleShape), contentAlignment = Alignment.Center) { Box(Modifier.size(8.dp).background(Color(0xFF26222B), CircleShape)) }
+                }
+            }
+            Spacer(Modifier.height(10.dp))
+            Box(Modifier.fillMaxWidth().height(22.dp).background(Color(0xFFB9C4A8), RoundedCornerShape(4.dp)))
+            Spacer(Modifier.height(10.dp))
+            NowPlayingBars()
+        }
         PlayerStyle.IPOD -> IpodPreview()
         // the video across the card with a line of lyrics over it and the pane's bar at the bottom right
         PlayerStyle.VIDEO -> Box(Modifier.fillMaxSize().background(ArtFill)) {
