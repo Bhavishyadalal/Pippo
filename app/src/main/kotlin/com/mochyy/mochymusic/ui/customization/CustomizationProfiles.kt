@@ -12,7 +12,9 @@ import org.json.JSONObject
 
 /** Explicit appearance-only allowlist: credentials, music, downloads and accounts cannot enter a theme file. */
 object CustomizationProfiles {
-    private val booleans = listOf(UiContrastKey, UiNavSwipeKey, UiPressEffectsKey, UiHapticsKey, UiLoadingMotionKey,
+    private val booleans = listOf(
+        MiniPreviousKey, MiniNextKey, MiniFavoriteKey, MiniQueueKey, MiniElapsedKey, MiniQualityKey, MiniMarqueeKey, MiniStatusKey,
+        UiContrastKey, UiNavSwipeKey, UiPressEffectsKey, UiHapticsKey, UiLoadingMotionKey,
         PureBlackKey, DisableBlurKey, EnableProgressiveBlurKey, ElementBlurKey, EnableElementBlurAnimatorKey,
         DiscRotatingAnimationKey, CanvasThumbnailAnimationKey, HideSettingsDescriptionsKey, MiniPlayerOutlineKey,
         PureBlackMiniPlayerKey, HideAudioQualityBadgeKey, EnableHighRefreshRateKey,
@@ -20,6 +22,10 @@ object CustomizationProfiles {
     private val floats = mapOf(UiTextScaleKey to (.85f..1.25f), AnimationSpeedKey to (.5f..2f),
         ThumbnailCornerRadiusKey to (0f..45f), BlurStrengthPxKey to (0f..1500f))
     private val strings: Map<Preferences.Key<String>, Set<String>> = mapOf(
+        MiniStyleKey to MiniStyle.entries.map { it.name }.toSet(),
+        MiniProgressKey to MiniProgress.entries.map { it.name }.toSet(),
+        MiniCornersKey to MiniCorners.entries.map { it.name }.toSet(),
+        MiniSpacingKey to UiSpacing.entries.map { it.name }.toSet(),
         UiAccentKey to UiAccent.entries.map { it.name }.toSet(),
         UiFontKey to UiFont.entries.map { it.name }.toSet(),
         UiCornersKey to UiCorners.entries.map { it.name }.toSet(),
@@ -149,6 +155,7 @@ object CustomizationProfiles {
             p[AnimationSpeedKey] = if (light) 1.25f else 1f
             p[UiPressEffectsKey] = !light
             p[UiLoadingMotionKey] = !light
+            if (light) p[MiniMarqueeKey] = false
             p[DiscRotatingAnimationKey] = !light
             p[CanvasThumbnailAnimationKey] = expressive
             p[UiNavStyleKey] = if (light) UiNavStyle.FLAT.name else UiNavStyle.CURRENT.name

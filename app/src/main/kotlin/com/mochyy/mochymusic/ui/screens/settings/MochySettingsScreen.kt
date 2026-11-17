@@ -129,6 +129,7 @@ private val LocalizedSettingsTitles = mapOf(
     "Transitions and feedback" to R.string.beta_motion,
     "Pippo characters" to R.string.beta_characters,
     "Saved presets" to R.string.beta_profiles,
+    "Mini-player styles" to R.string.mini_customization,
     "Home shelves" to R.string.beta_home,
     "More customization" to R.string.beta_more,
     "Cover rounding" to R.string.customise_cover_rounding,
@@ -157,6 +158,7 @@ private val LocalizedSettingsPages = mapOf(
 
 private val SettingsIndex = listOf(
     // Customisation
+    SettingsEntry("Mini-player styles", "Customisation", "customisation_settings", "mini player song bottom bar floating pill card artwork minimal dock progress time favorite queue"),
     SettingsEntry("Performance presets", "Customisation", "customisation_settings", "light balanced expressive battery performance"),
     SettingsEntry("App navigation", "Customisation", "customisation_settings", "bottom bar tabs order labels icons flat outline indicator"),
     SettingsEntry("Colors and text", "Customisation", "customisation_settings", "accent font contrast hex spacing corners text size"),

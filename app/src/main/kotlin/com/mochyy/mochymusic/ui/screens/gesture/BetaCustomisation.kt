@@ -326,3 +326,24 @@ internal fun BetaProfilesSection() {
         dismissButton = { TextButton(onClick = { reset = false }) { Text(stringResource(R.string.cancel)) } },
     )
 }
+
+
+@Composable
+internal fun BetaMiniPlayerSection() {
+    BetaCard(R.string.mini_customization, R.string.mini_customization_help) {
+        PreferenceChoice(R.string.mini_style, MiniStyleKey, MiniStyle.CLASSIC)
+        PreferenceChoice(R.string.mini_progress, MiniProgressKey, MiniProgress.NONE)
+        PreferenceChoice(R.string.mini_corners, MiniCornersKey, MiniCorners.SOFT)
+        PreferenceChoice(R.string.mini_spacing, MiniSpacingKey, UiSpacing.COMFORTABLE)
+        PreferenceToggle(R.string.mini_show_previous, MiniPreviousKey, false)
+        PreferenceToggle(R.string.mini_show_next, MiniNextKey, true)
+        PreferenceToggle(R.string.mini_show_favorite, MiniFavoriteKey, false)
+        PreferenceToggle(R.string.mini_show_queue, MiniQueueKey, false)
+        PreferenceToggle(R.string.mini_show_elapsed, MiniElapsedKey, false)
+        PreferenceToggle(R.string.mini_show_quality, MiniQualityKey, false)
+        PreferenceToggle(R.string.mini_show_status, MiniStatusKey, false)
+        PreferenceToggle(R.string.mini_marquee, MiniMarqueeKey, false)
+        PreferenceToggle(R.string.beta_mini_outline, MiniPlayerOutlineKey, true)
+        PreferenceToggle(R.string.beta_mini_black, PureBlackMiniPlayerKey, false)
+    }
+}

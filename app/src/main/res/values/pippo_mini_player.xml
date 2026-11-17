@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="mini_customization">Mini-player styles</string>
+    <string name="mini_customization_help">Choose a compact player that fits Pippo. All styles use the existing tap-to-expand and swipe-to-skip gestures. Extra buttons move into More on narrow screens. Classic with default options keeps the original morphing artwork; customized layouts crossfade into the full player. Connected dock aligns the phone player and navigation surfaces. Wide layouts keep their shared dock. Motion follows your animation settings.</string>
+    <string name="mini_style">Mini-player design</string>
+    <string name="mini_progress">Progress line position</string>
+    <string name="mini_corners">Artwork corners</string>
+    <string name="mini_spacing">Content spacing</string>
+    <string name="mini_show_previous">Previous-track button</string>
+    <string name="mini_show_next">Next-track button</string>
+    <string name="mini_show_favorite">Favorite button</string>
+    <string name="mini_show_queue">Queue button</string>
+    <string name="mini_show_elapsed">Elapsed time</string>
+    <string name="mini_show_quality">Audio-quality label</string>
+    <string name="mini_show_status">Playback status details</string>
+    <string name="mini_marquee">Scroll long titles while playing</string>
+    <string name="mini_expand">Expand player</string>
+    <string name="mini_more">More player controls</string>
+    <string name="mini_next">Next track</string>
+    <string name="mini_previous">Previous track</string>
+    <string name="mini_favorite">Add to favorites</string>
+    <string name="mini_unfavorite">Remove from favorites</string>
+    <string name="mini_queue">Open queue</string>
+    <string name="mini_paused">Paused</string>
+    <string name="mini_buffering">Buffering</string>
+    <string name="mini_offline">Waiting for connection</string>
+    <string name="mini_error">Playback error</string>
+    <string name="mini_finished">Finished</string>
+    <string name="mini_replay">Replay</string>
+</resources>

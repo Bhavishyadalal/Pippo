@@ -742,7 +742,9 @@ class MainActivity : ComponentActivity() {
                     com.mochyy.mochymusic.ui.component.rememberWideBar(maxWidth, maxHeight, navigationItems.size)
                 } else null
                 val miniPill = when {
-                    wideBar == null -> com.mochyy.mochymusic.ui.component.PhoneMiniPill
+                    wideBar == null -> if (com.mochyy.mochymusic.ui.customization.UiCustomizationState.options.mini.style == com.mochyy.mochymusic.constants.MiniStyle.CONNECTED_DOCK) {
+                        com.mochyy.mochymusic.ui.component.MiniPillFrame(start = 8.dp, end = 8.dp, merged = false, withPrevious = false)
+                    } else com.mochyy.mochymusic.ui.component.PhoneMiniPill
                     shouldShowNavigationBar -> wideBar.miniFrame
                     else -> wideBar.miniAloneFrame
                 }
@@ -1147,6 +1149,16 @@ class MainActivity : ComponentActivity() {
                                         )
                                         val withPlayerNow = remember(withPlayer) { { withPlayer.value } }
 
+                                        if (wideBar == null && shouldShowNavigationBar &&
+                                            com.mochyy.mochymusic.ui.customization.UiCustomizationState.options.mini.style == com.mochyy.mochymusic.constants.MiniStyle.CONNECTED_DOCK) {
+                                            com.mochyy.mochymusic.ui.player.ConnectedMiniDockBackground(
+                                                playerProgress = { playerBottomSheetState.progress.coerceIn(0f, 1f) },
+                                                presence = withPlayerNow,
+                                                bottomInset = bottomInset,
+                                                navHeight = navPadding,
+                                                modifier = Modifier.fillMaxSize().launchRise(order = 3),
+                                            )
+                                        }
                                         if (wideBar != null) {
                                             com.mochyy.mochymusic.ui.component.WideBarBackground(
                                                 bar = wideBar,

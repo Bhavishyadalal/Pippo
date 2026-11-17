@@ -132,10 +132,6 @@ private const val PillPressMaxProgress = 0.02f
 /** The progress the mini player's hairline outline and shadow are gone by. */
 private const val PillEdgeFadeEnd = 0.08f
 
-/** The collapsed sheet, the mini player: its corners; how tall it is and how far in from each side are the MiniPillFrame's. */
-private val PillCornerRadius = 20.dp
-private val PillShape = RoundedCornerShape(PillCornerRadius)
-
 private val PillTiltSpring = spring<Float>(
     dampingRatio = Spring.DampingRatioNoBouncy,
     stiffness = 420f,
@@ -331,7 +327,7 @@ fun BottomSheet(
             val moduleGlass = rememberChromeModuleGlass()
             val currentPillFrame by androidx.compose.runtime.rememberUpdatedState(pillFrame)
             // in the wide bar the pill is a stadium like the bar round it, so it lifts out of it cleanly
-            val pillCorner = if (pillFrame.merged) pillFrame.height / 2 else PillCornerRadius
+            val pillCorner = if (pillFrame.merged) pillFrame.height / 2 else com.mochyy.mochymusic.ui.customization.UiCustomizationState.options.mini.surfaceRadius.dp
 
             val sheetClipShape = remember {
                 object : androidx.compose.ui.graphics.Shape {
@@ -782,7 +778,7 @@ private fun BoxScope.PillShadow(state: BottomSheetState, pillPress: PillPress, p
                     .padding(start = pillFrame.start, end = pillFrame.end)
                     .fillMaxWidth()
                     .height(pillFrame.height)
-                    .dropShadow(PillShape, ChromeShadow)
+                    .dropShadow(RoundedCornerShape(com.mochyy.mochymusic.ui.customization.UiCustomizationState.options.mini.surfaceRadius.dp), ChromeShadow)
             )
         }
     }

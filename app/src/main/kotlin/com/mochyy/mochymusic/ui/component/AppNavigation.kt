@@ -235,8 +235,9 @@ fun AppNavigationBar(
     onSearchDoubleTap: (() -> Unit)? = null
 ) {
     val ui = UiCustomizationState.options
-    val glassEnabled = ui.navStyle == UiNavStyle.CURRENT
-    val navShape = if (glassEnabled) NavBarShape else RoundedCornerShape(20.dp)
+    val connectedMini = ui.mini.style == MiniStyle.CONNECTED_DOCK
+    val glassEnabled = ui.navStyle == UiNavStyle.CURRENT && !connectedMini
+    val navShape = if (glassEnabled) NavBarShape else RoundedCornerShape(if (connectedMini) 12.dp else 20.dp)
     val glassState = LocalGlassState.current ?: remember { GlassState() }
     val accentWash = rememberChromeAccentWash()
     val selectedIndex = navigationItems.indexOfFirst { it.route == selectedTabRoute }
@@ -254,7 +255,7 @@ fun AppNavigationBar(
             modifier = Modifier
                 .fillMaxWidth()
                 .windowInsetsPadding(WindowInsets.systemBars.only(WindowInsetsSides.Horizontal))
-                .padding(horizontal = if (ui.navStyle == UiNavStyle.FULL_WIDTH) 8.dp else 24.dp, vertical = 8.dp)
+                .padding(horizontal = if (ui.navStyle == UiNavStyle.FULL_WIDTH || connectedMini) 8.dp else 24.dp, vertical = 8.dp)
                 .align(Alignment.TopCenter)
                 .height(NavBarHeight)
                 .press3D(maxTilt = 4f, pressedScale = 0.985f)
@@ -272,7 +273,7 @@ fun AppNavigationBar(
                 accentWash = accentWash,
                 modifier = Modifier.fillMaxSize(),
                 pill = if (ui.navIndicator == UiNavIndicator.PILL) glassPill else null,
-            ) else Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainer))
+            ) else Box(Modifier.fillMaxSize().background(if (connectedMini && ui.miniBlack) Color.Black else MaterialTheme.colorScheme.surfaceContainer))
 
             Row(
                 modifier = Modifier
