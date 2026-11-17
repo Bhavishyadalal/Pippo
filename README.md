@@ -4,17 +4,6 @@ An Android music player with cozy original character artwork, twenty selectable 
 
 Pippo's characters are selected randomly once per app process. They stay consistent while navigating and recomposing screens. The default launcher uses icon 01; the other portraits and named variants are available in **Customisation → Icons**.
 
-## Player screens
-
-Four additional styles are available by holding the player (or opening its player selector), choosing a style, and tapping **Set**:
-
-- **Cassette:** cream tape label, animated hubs, and tape packs that follow playback progress.
-- **Midnight Glass:** album-colored ambient lighting, soft artwork backdrop on supported Android versions, and restrained glass surfaces.
-- **Pippo Duo:** original character illustration with gentle camera drift during playback.
-- **CD Walkman:** translucent disc enclosure, rotating album-art disc, and an LCD-style track display.
-
-Each keeps the existing seek bar, lyrics, queue, playback controls and mini-player. Layouts adapt to portrait and landscape, with scrolling for large text and compact controls for narrow panels. Decorative motion pauses when the app is hidden, playback pauses, or motion is disabled. Midnight Glass and Pippo Duo are also available through the TV remote's style picker; mechanical styles stay on phones/tablets.
-
 ## APK builds
 
 All GitHub Actions workflows are manual. Open **Actions → CI & Debug Build → Run workflow** for a debug APK without release signing secrets. Download the APK artifact when your run completes.

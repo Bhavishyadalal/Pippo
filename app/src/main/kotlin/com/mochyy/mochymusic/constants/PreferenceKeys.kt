@@ -706,12 +706,7 @@ enum class PlayerStyle(val displayName: String, val selectorName: String) {
     BEDSIDE("Bedside clock", "Big clock"),
     // the nightstand as two tiles side by side, the music on one and the lyrics or a clock on the other, each scrolled on its own
     BEDSIDE_TILES("Bedside", "Bedside"),
-    // Additional Pippo looks use the shared playback session and overlay pages.
-    CASSETTE("Cassette", "Cassette"),
-    MIDNIGHT_GLASS("Midnight Glass", "Midnight Glass"),
-    PIPPO_DUO("Pippo Duo", "Pippo Duo"),
-    CD_WALKMAN("CD Walkman", "CD Walkman"),
-    // Optional module style remains last; existing built-in style ordinals stay stable.
+    // a look module's own player, drawn from its layout; kept last so the others keep their places, and only offered while such a module is on
     MODULE("Module", "Module");
 
     val editable: Boolean get() = this == FLAGSHIP || this == CLASSIC || this == TURNTABLE || this == POSTER || this == IPOD || isBedside
@@ -726,15 +721,13 @@ enum class PlayerStyle(val displayName: String, val selectorName: String) {
     val hasFullEditor: Boolean get() = this == FLAGSHIP || this == CLASSIC
 
     // the styles whose menu has a rotate button, each with a landscape layout of its own to turn into
-    val turnable: Boolean get() = this == TURNTABLE || this == POSTER || this == TIMELINE || this == LYRICS || this == MODULE || isPremium || isBedside
-
-    val isPremium: Boolean get() = this == CASSETTE || this == MIDNIGHT_GLASS || this == PIPPO_DUO || this == CD_WALKMAN
+    val turnable: Boolean get() = this == TURNTABLE || this == POSTER || this == TIMELINE || this == LYRICS || this == MODULE || isBedside
 
     // laid out sideways until someone turns it upright, the way a phone stands on a nightstand
     val startsSideways: Boolean get() = this == BEDSIDE_TILES
 
     // the looks that read well across a room and stay smooth on a tv's gpu; the rest stay on phones
-    val availableOnTv: Boolean get() = this == FLAGSHIP || this == POSTER || this == VIDEO || this == TIMELINE || this == MIDNIGHT_GLASS || this == PIPPO_DUO || isBedside
+    val availableOnTv: Boolean get() = this == FLAGSHIP || this == POSTER || this == VIDEO || this == TIMELINE || isBedside
 
     companion object {
         /** the styles these replaced, so a stored choice lands on its nearest successor */
@@ -743,6 +736,8 @@ enum class PlayerStyle(val displayName: String, val selectorName: String) {
             "LYRICS_ABSTRACT" -> LYRICS
             // everyone on the old flagship moves to the new one once; picking classic later sticks
             "DEFAULT" -> FLAGSHIP
+            // Retired experimental looks fall back safely for users who selected the preview.
+            "CASSETTE", "MIDNIGHT_GLASS", "PIPPO_DUO", "CD_WALKMAN" -> FLAGSHIP
             else -> null
         }
 
@@ -757,10 +752,6 @@ enum class PlayerStyle(val displayName: String, val selectorName: String) {
             listOf(POSTER),
             // the lyrics stage sits under the timeline, the way the classic sits under the flagship
             listOf(TIMELINE, LYRICS),
-            listOf(CASSETTE),
-            listOf(MIDNIGHT_GLASS),
-            listOf(PIPPO_DUO),
-            listOf(CD_WALKMAN),
         )
     }
 }
