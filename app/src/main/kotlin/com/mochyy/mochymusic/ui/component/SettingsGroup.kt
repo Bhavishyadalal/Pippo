@@ -14,6 +14,7 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -111,8 +112,9 @@ private fun ClassicItems(items: List<SettingsItem>) {
                         .padding(bottom = 8.dp),
                     shape = shape,
                     colors = CardDefaults.cardColors(
-                        containerColor = com.mochyy.mochymusic.ui.screens.search.SearchColors.Field
+                        containerColor = MaterialTheme.colorScheme.surfaceContainer
                     ),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = .045f)),
                     elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                 ) {
                     SettingsItemRow(item = item, style = SettingsGroupStyle.Classic)
@@ -147,8 +149,9 @@ private fun GroupedItems(items: List<SettingsItem>) {
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(PippoCorners.Group),
         colors = CardDefaults.cardColors(
-            containerColor = com.mochyy.mochymusic.ui.screens.search.SearchColors.Field
+            containerColor = MaterialTheme.colorScheme.surfaceContainer
         ),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = .045f)),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Column(modifier = Modifier.padding(vertical = 6.dp)) {
@@ -181,7 +184,7 @@ private fun ClusterRows(cluster: ItemCluster) {
     )
 
     // Expanded sub-menu background slightly brighter than accent surface
-    val pillColor = Color(0xFF282830).copy(alpha = pillAlpha)
+    val pillColor = MaterialTheme.colorScheme.primary.copy(alpha = .065f * pillAlpha)
 
     Box(
         modifier = Modifier
@@ -271,9 +274,9 @@ private fun SettingsItemRow(
         item.icon?.let { icon ->
             Box(
                 modifier = Modifier
-                    .size(32.dp)
-                    .clip(androidx.compose.foundation.shape.CircleShape)
-                    .background(Color(0xFFE5E5EA)),
+                    .size(36.dp)
+                    .clip(item.iconShape ?: RoundedCornerShape(12.dp))
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = .12f)),
                 contentAlignment = Alignment.Center
             ) {
                 if (item.showBadge) {
@@ -289,9 +292,9 @@ private fun SettingsItemRow(
                                 painter = icon,
                                 contentDescription = null,
                                 tint = if (!item.enabled)
-                                    Color(0xFF1C1C1E).copy(alpha = 0.38f)
+                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.38f)
                                 else
-                                    Color(0xFF1C1C1E),
+                                    MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(20.dp)
                             )
                         } else {
@@ -309,9 +312,9 @@ private fun SettingsItemRow(
                             painter = icon,
                             contentDescription = null,
                             tint = if (!item.enabled)
-                                Color(0xFF1C1C1E).copy(alpha = 0.38f)
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.38f)
                             else
-                                Color(0xFF1C1C1E),
+                                MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(16.dp)
                         )
                     } else {

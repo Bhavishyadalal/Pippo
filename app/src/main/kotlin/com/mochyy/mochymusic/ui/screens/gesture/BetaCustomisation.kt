@@ -9,6 +9,13 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.res.painterResource
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.BorderStroke
+import com.mochyy.mochymusic.ui.screens.settings.CozySettingsCard
+import com.mochyy.mochymusic.ui.screens.settings.SettingsIconTile
+import com.mochyy.mochymusic.ui.customization.UiCustomizationState
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -26,7 +33,6 @@ import com.mochyy.mochymusic.ui.customization.CustomizationProfiles
 import com.mochyy.mochymusic.ui.customization.UiCustomization
 import com.mochyy.mochymusic.ui.screens.NavigationTab
 import com.mochyy.mochymusic.ui.screens.Screens
-import com.mochyy.mochymusic.ui.screens.audiolab.LabCard
 import com.mochyy.mochymusic.ui.screens.audiolab.LabToggleRow
 import com.mochyy.mochymusic.utils.rememberEnumPreference
 import com.mochyy.mochymusic.utils.rememberPreference
@@ -41,16 +47,50 @@ import java.util.Locale
 private fun BetaCard(title: Int, subtitle: Int? = null, content: @Composable ColumnScope.() -> Unit) {
     var expanded by rememberSaveable { mutableStateOf(false) }
     val state = stringResource(if (expanded) R.string.beta_expanded else R.string.beta_collapsed)
-    LabCard(padding = 20.dp) {
-        Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).semantics { stateDescription = state }.clickable(role = Role.Button) { expanded = !expanded }, verticalAlignment = Alignment.CenterVertically) {
-            Text(stringResource(title), style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
-            Text(if (expanded) "−" else "+", style = MaterialTheme.typography.titleLarge)
+    val ui = UiCustomizationState.options
+    val icon = when (title) {
+        R.string.mini_customization -> R.drawable.album
+        R.string.beta_home -> R.drawable.home
+        R.string.beta_performance -> R.drawable.speed
+        R.string.beta_navigation -> R.drawable.library_music
+        R.string.beta_appearance -> R.drawable.palette
+        R.string.beta_motion -> R.drawable.graphic_eq
+        R.string.beta_characters -> R.drawable.person
+        R.string.beta_profiles -> R.drawable.backup
+        else -> R.drawable.tune
+    }
+    val summary = when (title) {
+        R.string.mini_customization -> ui.mini.style.caption()
+        R.string.beta_navigation -> ui.navStyle.caption()
+        R.string.beta_appearance -> "${ui.accent.caption()} · ${ui.font.caption()}"
+        R.string.beta_motion -> ui.transition.caption()
+        R.string.beta_characters -> ui.character.caption()
+        R.string.beta_home -> stringResource(R.string.settings_cozy_shelves)
+        R.string.beta_performance -> stringResource(R.string.settings_cozy_presets)
+        R.string.beta_profiles -> stringResource(R.string.settings_cozy_profiles)
+        else -> stringResource(R.string.settings_cozy_details)
+    }
+    CozySettingsCard {
+        Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).semantics { stateDescription = state }
+            .clickable(role = Role.Button) { expanded = !expanded }, verticalAlignment = Alignment.CenterVertically) {
+            SettingsIconTile(icon)
+            Spacer(Modifier.width(14.dp))
+            Column(Modifier.weight(1f).padding(end = 8.dp)) {
+                Text(stringResource(title), style = MaterialTheme.typography.titleMedium)
+                Spacer(Modifier.height(4.dp))
+                Text(summary, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Icon(painterResource(R.drawable.expand_more), contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(20.dp).graphicsLayer { rotationZ = if (expanded) 180f else 0f })
         }
         if (expanded) {
             if (subtitle != null) {
                 Spacer(Modifier.height(8.dp))
                 Text(stringResource(subtitle), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
+            Spacer(Modifier.height(16.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = .07f))
             Spacer(Modifier.height(12.dp))
             content()
         }
@@ -65,12 +105,18 @@ private fun <T : Enum<T>> BetaChoice(title: Int, selected: T, values: List<T>, o
     Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(stringResource(title), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f).padding(end = 8.dp))
         Box {
-            OutlinedButton(onClick = { expanded = true }, modifier = Modifier.widthIn(max = 160.dp).heightIn(min = 48.dp)) {
+            OutlinedButton(onClick = { expanded = true },
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = .22f)),
+                colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.primary.copy(alpha = .07f)),
+                modifier = Modifier.widthIn(max = 160.dp).heightIn(min = 48.dp)) {
                 Text(selected.caption(), maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             DropdownMenu(expanded, { expanded = false }) {
                 values.forEach { item ->
-                    DropdownMenuItem(text = { Text(item.caption()) }, onClick = { expanded = false; onSelect(item) })
+                    DropdownMenuItem(text = { Text(item.caption()) },
+                        leadingIcon = { RadioButton(selected = item == selected, onClick = null) },
+                        onClick = { expanded = false; onSelect(item) })
                 }
             }
         }

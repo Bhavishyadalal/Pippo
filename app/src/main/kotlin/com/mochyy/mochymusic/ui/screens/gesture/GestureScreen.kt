@@ -189,13 +189,7 @@ fun CustomisationScreen(navController: NavController) {
                 Spacer(Modifier.height(18.dp))
 
                 if (shown.isEmpty()) {
-                    Text(
-                        text = stringResource(R.string.customise_nothing_matches, query),
-                        fontFamily = InterFontFamily,
-                        fontSize = 15.sp,
-                        color = Color.White.copy(alpha = 0.6f),
-                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 12.dp),
-                    )
+                    com.mochyy.mochymusic.ui.screens.settings.SettingsEmptyState(query)
                 }
                 shown.forEachIndexed { index, section ->
                     if (index > 0) SectionRule()

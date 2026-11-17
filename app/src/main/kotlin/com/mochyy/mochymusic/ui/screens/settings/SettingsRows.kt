@@ -21,27 +21,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.mochyy.mochymusic.R
 import com.mochyy.mochymusic.ui.component.AppSwitch
 import com.mochyy.mochymusic.ui.component.SettingsGroup
 import com.mochyy.mochymusic.ui.component.SettingsGroupStyle
 import com.mochyy.mochymusic.ui.component.SettingsItem
-import com.mochyy.mochymusic.ui.theme.InterFontFamily
 
 // a section's title (if it has one) and its grouped rows, left out whole when the search hides every row
 @Composable
 internal fun SettingsSection(title: String?, items: List<SettingsItem>) {
     if (items.isEmpty()) return
     if (title != null) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.padding(bottom = 10.dp, start = 4.dp),
-        )
+        SettingsSectionHeading(title, Modifier.padding(bottom = 12.dp, start = 4.dp))
     }
     SettingsGroup(style = SettingsGroupStyle.Grouped, items = items)
     Spacer(Modifier.height(PippoSpacing.Page))
@@ -65,14 +57,8 @@ internal fun ValueTitle(title: String, value: String) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
-        Text(title)
-        Text(
-            text = value,
-            fontFamily = InterFontFamily,
-            fontWeight = FontWeight.Bold,
-            fontSize = 13.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        Text(title, modifier = Modifier.weight(1f).padding(end = 12.dp))
+        SettingsValueBadge(value)
     }
 }
 

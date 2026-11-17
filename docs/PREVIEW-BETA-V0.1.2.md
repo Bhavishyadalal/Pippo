@@ -56,3 +56,7 @@ The existing approved portrait #01 remains the default launcher icon; the 20 sel
 ## Mini-player follow-up
 
 Seven designs and optional controls/details are available under Customisation → Mini-player styles. See [mini-player behavior and review limits](MINI-PLAYER-BETA.md). Default Classic is preserved; customized layouts share the existing audio connection and sheet gestures. These options participate in saved presets, import/export and reset. No build or workflow was run.
+
+## Settings appearance follow-up
+
+The settings hub, shared grouped rows, search fields and beta customization cards now share softer tonal cards, accent details, clearer headings and current-choice summaries. Existing artwork is reused for the welcome card. See [cozy settings details](COZY-SETTINGS-BETA.md) for scope and review limits. No build or workflow was run.

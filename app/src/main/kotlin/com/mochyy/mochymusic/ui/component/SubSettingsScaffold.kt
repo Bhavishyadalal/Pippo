@@ -15,6 +15,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -379,56 +380,36 @@ fun SubSettingsSearchBar(
     onQueryChange: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val colors = MaterialTheme.colorScheme
+    val shape = RoundedCornerShape(PippoSize.Field / 2)
     Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .height(PippoSize.Field)
-            .clip(androidx.compose.foundation.shape.RoundedCornerShape(PippoSize.Field / 2))
-            .background(PippoColors.Surface)
-            .padding(horizontal = 20.dp),
-        contentAlignment = Alignment.CenterStart
+        modifier = modifier.fillMaxWidth().height(PippoSize.Field).clip(shape)
+            .background(colors.surfaceContainer)
+            .border(1.dp, colors.onSurface.copy(alpha = .065f), shape)
+            .padding(start = 18.dp, end = 4.dp),
+        contentAlignment = Alignment.CenterStart,
     ) {
-        androidx.compose.foundation.layout.Row(
-            modifier = Modifier.fillMaxSize(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+        Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
+            Icon(rememberAsyncImagePainter(R.raw.search), null, tint = colors.onSurfaceVariant, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(12.dp))
             androidx.compose.foundation.text.BasicTextField(
                 value = query,
                 onValueChange = onQueryChange,
                 singleLine = true,
-                textStyle = androidx.compose.ui.text.TextStyle(
-                    fontFamily = com.mochyy.mochymusic.ui.theme.InterFontFamily,
-                    fontSize = 16.sp,
-                    color = Color.White,
-                    fontWeight = FontWeight.Normal
-                ),
-                cursorBrush = androidx.compose.ui.graphics.SolidColor(Color.White),
+                textStyle = MaterialTheme.typography.bodyMedium.copy(color = colors.onSurface),
+                cursorBrush = SolidColor(colors.primary),
                 modifier = Modifier.weight(1f),
                 decorationBox = { innerTextField ->
-                    if (query.isEmpty()) {
-                        Text(
-                            text = stringResource(R.string.settings_search_placeholder),
-                            fontFamily = com.mochyy.mochymusic.ui.theme.InterFontFamily,
-                            fontSize = 16.sp,
-                            color = Color.White.copy(alpha = 0.5f)
-                        )
-                    }
+                    if (query.isEmpty()) Text(stringResource(R.string.settings_search_placeholder),
+                        style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     innerTextField()
-                }
+                },
             )
-
             if (query.isNotEmpty()) {
-                androidx.compose.foundation.layout.Spacer(modifier = Modifier.size(8.dp))
-                Icon(
-                    painter = painterResource(R.drawable.close),
-                    contentDescription = stringResource(R.string.settings_clear_search),
-                    tint = Color.White.copy(alpha = 0.7f),
-                    modifier = Modifier
-                        .size(20.dp)
-                        .clip(CircleShape)
-                        .clickable { onQueryChange("") }
-                )
-            }
+                Box(Modifier.size(48.dp).clip(CircleShape).clickable { onQueryChange("") }, contentAlignment = Alignment.Center) {
+                    Icon(painterResource(R.drawable.close), stringResource(R.string.settings_clear_search), tint = colors.onSurfaceVariant, modifier = Modifier.size(20.dp))
+                }
+            } else Spacer(Modifier.width(14.dp))
         }
     }
 }
