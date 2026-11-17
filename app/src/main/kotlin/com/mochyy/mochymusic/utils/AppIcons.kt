@@ -1,5 +1,3 @@
-// every launcher icon mochy can wear, ready-made or on a custom colour, each an activity-alias in the manifest with exactly one switched on
-
 package com.mochyy.mochymusic.utils
 
 import android.app.Activity
@@ -15,125 +13,89 @@ import androidx.core.content.edit
 import com.mochyy.mochymusic.R
 
 enum class AppIconFamily(@StringRes val title: Int) {
-    Mark(R.string.app_icon_family_mark),
-    Outline(R.string.app_icon_family_outline),
-    Anime(R.string.app_icon_family_anime),
-    ;
-
-    // the art this family wears on a custom colour: the outline goes dark on a pale one, like on white
-    @DrawableRes
-    fun artOn(color: AppIconColor): Int = when (this) {
-        Mark -> R.drawable.ic_launcher_mark
-        Outline -> if (color.pale) R.drawable.ic_launcher_outline_dark else R.drawable.ic_launcher_monochrome
-        Anime -> R.drawable.ic_launcher_anime
-    }
+    Anime(R.string.pippo_icons_portraits),
+    Named(R.string.pippo_icons_named),
 }
 
-/** a custom background any family can sit on; [pale] ones take the outline's dark art */
-enum class AppIconColor(@ColorRes val background: Int, @StringRes val label: Int, val pale: Boolean = false) {
-    Red(R.color.app_icon_custom_red, R.string.app_icon_color_red),
-    Orange(R.color.app_icon_custom_orange, R.string.app_icon_color_orange),
-    Yellow(R.color.app_icon_custom_yellow, R.string.app_icon_color_yellow, pale = true),
-    Green(R.color.app_icon_custom_green, R.string.app_icon_color_green),
-    Teal(R.color.app_icon_custom_teal, R.string.app_icon_color_teal),
-    Sky(R.color.app_icon_custom_sky, R.string.app_icon_color_sky, pale = true),
-    Blue(R.color.app_icon_custom_blue, R.string.app_icon_color_blue),
-    Indigo(R.color.app_icon_custom_indigo, R.string.app_icon_color_indigo),
-    Purple(R.color.app_icon_custom_purple, R.string.app_icon_color_purple),
-    Pink(R.color.app_icon_custom_pink, R.string.app_icon_color_pink),
-    Graphite(R.color.app_icon_custom_graphite, R.string.app_icon_color_graphite),
-    Cream(R.color.app_icon_custom_cream, R.string.app_icon_color_cream, pale = true),
-}
-
-/** [background] null is see-through: the launcher shows the wallpaper behind the art; [color] is set on a custom one */
 class AppIcon private constructor(
-    /** what's saved for the icon in use, so it must never change */
     val name: String,
     val alias: String,
     val family: AppIconFamily,
     @DrawableRes val foreground: Int,
     @ColorRes val background: Int?,
     @StringRes val label: Int,
-    val color: AppIconColor? = null,
 ) {
     companion object {
-        val Default = AppIcon("Default", "IconDefault", AppIconFamily.Mark, R.drawable.ic_launcher_mark, R.color.ic_launcher_background, R.string.app_icon_default)
-
-        // the ready-made ones, each family's in the order its row shows them
-        val presets: List<AppIcon> = listOf(
-            Default,
-            AppIcon("MarkWhite", "IconMarkWhite", AppIconFamily.Mark, R.drawable.ic_launcher_mark, R.color.app_icon_white, R.string.app_icon_white),
-            AppIcon("MarkBlack", "IconMarkBlack", AppIconFamily.Mark, R.drawable.ic_launcher_mark, R.color.app_icon_black, R.string.app_icon_black),
-            AppIcon("MarkMaterial", "IconMarkMaterial", AppIconFamily.Mark, R.drawable.ic_launcher_mark, R.color.app_icon_material, R.string.app_icon_material),
-            AppIcon("MarkTransparent", "IconMarkTransparent", AppIconFamily.Mark, R.drawable.ic_launcher_mark, null, R.string.app_icon_transparent),
-            AppIcon("Outline", "IconOutline", AppIconFamily.Outline, R.drawable.ic_launcher_monochrome, R.color.ic_launcher_background, R.string.app_icon_outline),
-            AppIcon("OutlineWhite", "IconOutlineWhite", AppIconFamily.Outline, R.drawable.ic_launcher_outline_dark, R.color.app_icon_white, R.string.app_icon_outline_white),
-            AppIcon("OutlineBlack", "IconOutlineBlack", AppIconFamily.Outline, R.drawable.ic_launcher_monochrome, R.color.app_icon_black, R.string.app_icon_outline_black),
-            AppIcon("OutlineMaterial", "IconOutlineMaterial", AppIconFamily.Outline, R.drawable.ic_launcher_monochrome, R.color.app_icon_material, R.string.app_icon_outline_material),
-            AppIcon("OutlineTransparent", "IconOutlineTransparent", AppIconFamily.Outline, R.drawable.ic_launcher_monochrome, null, R.string.app_icon_outline_transparent),
-            AppIcon("AnimeWhite", "IconAnimeWhite", AppIconFamily.Anime, R.drawable.ic_launcher_anime, R.color.app_icon_white, R.string.app_icon_anime_white),
-            AppIcon("AnimeDark", "IconAnimeDark", AppIconFamily.Anime, R.drawable.ic_launcher_anime, R.color.app_icon_black, R.string.app_icon_anime_dark),
-            AppIcon("AnimeMaterial", "IconAnimeMaterial", AppIconFamily.Anime, R.drawable.ic_launcher_anime, R.color.app_icon_material, R.string.app_icon_anime_material),
-            AppIcon("AnimeTransparent", "IconAnimeTransparent", AppIconFamily.Anime, R.drawable.ic_launcher_anime, null, R.string.app_icon_anime_transparent),
+        val entries: List<AppIcon> = listOf(
+            AppIcon("Default", "IconDefault", AppIconFamily.Anime, R.drawable.pippo_icon_01, R.color.pippo_icon_bg_01, R.string.pippo_icon_label_01),
+            AppIcon("Pippo02", "PippoIcon02", AppIconFamily.Anime, R.drawable.pippo_icon_02, R.color.pippo_icon_bg_02, R.string.pippo_icon_label_02),
+            AppIcon("Pippo03", "PippoIcon03", AppIconFamily.Anime, R.drawable.pippo_icon_03, R.color.pippo_icon_bg_03, R.string.pippo_icon_label_03),
+            AppIcon("Pippo04", "PippoIcon04", AppIconFamily.Anime, R.drawable.pippo_icon_04, R.color.pippo_icon_bg_04, R.string.pippo_icon_label_04),
+            AppIcon("Pippo05", "PippoIcon05", AppIconFamily.Anime, R.drawable.pippo_icon_05, R.color.pippo_icon_bg_05, R.string.pippo_icon_label_05),
+            AppIcon("Pippo06", "PippoIcon06", AppIconFamily.Anime, R.drawable.pippo_icon_06, R.color.pippo_icon_bg_06, R.string.pippo_icon_label_06),
+            AppIcon("Pippo07", "PippoIcon07", AppIconFamily.Anime, R.drawable.pippo_icon_07, R.color.pippo_icon_bg_07, R.string.pippo_icon_label_07),
+            AppIcon("Pippo08", "PippoIcon08", AppIconFamily.Anime, R.drawable.pippo_icon_08, R.color.pippo_icon_bg_08, R.string.pippo_icon_label_08),
+            AppIcon("Pippo09", "PippoIcon09", AppIconFamily.Anime, R.drawable.pippo_icon_09, R.color.pippo_icon_bg_09, R.string.pippo_icon_label_09),
+            AppIcon("Pippo10", "PippoIcon10", AppIconFamily.Anime, R.drawable.pippo_icon_10, R.color.pippo_icon_bg_10, R.string.pippo_icon_label_10),
+            AppIcon("Pippo11", "PippoIcon11", AppIconFamily.Named, R.drawable.pippo_icon_11, R.color.pippo_icon_bg_11, R.string.pippo_icon_label_11),
+            AppIcon("Pippo12", "PippoIcon12", AppIconFamily.Named, R.drawable.pippo_icon_12, R.color.pippo_icon_bg_12, R.string.pippo_icon_label_12),
+            AppIcon("Pippo13", "PippoIcon13", AppIconFamily.Named, R.drawable.pippo_icon_13, R.color.pippo_icon_bg_13, R.string.pippo_icon_label_13),
+            AppIcon("Pippo14", "PippoIcon14", AppIconFamily.Named, R.drawable.pippo_icon_14, R.color.pippo_icon_bg_14, R.string.pippo_icon_label_14),
+            AppIcon("Pippo15", "PippoIcon15", AppIconFamily.Named, R.drawable.pippo_icon_15, R.color.pippo_icon_bg_15, R.string.pippo_icon_label_15),
+            AppIcon("Pippo16", "PippoIcon16", AppIconFamily.Named, R.drawable.pippo_icon_16, R.color.pippo_icon_bg_16, R.string.pippo_icon_label_16),
+            AppIcon("Pippo17", "PippoIcon17", AppIconFamily.Named, R.drawable.pippo_icon_17, R.color.pippo_icon_bg_17, R.string.pippo_icon_label_17),
+            AppIcon("Pippo18", "PippoIcon18", AppIconFamily.Named, R.drawable.pippo_icon_18, R.color.pippo_icon_bg_18, R.string.pippo_icon_label_18),
+            AppIcon("Pippo19", "PippoIcon19", AppIconFamily.Named, R.drawable.pippo_icon_19, R.color.pippo_icon_bg_19, R.string.pippo_icon_label_19),
+            AppIcon("Pippo20", "PippoIcon20", AppIconFamily.Named, R.drawable.pippo_icon_20, R.color.pippo_icon_bg_20, R.string.pippo_icon_label_20),
         )
-
-        // every family on every custom colour, named MarkRed with the alias IconMarkRed, as the manifest has them
-        private val customs: List<AppIcon> = AppIconFamily.entries.flatMap { family ->
-            AppIconColor.entries.map { color ->
-                AppIcon(
-                    name = family.name + color.name,
-                    alias = "Icon${family.name}${color.name}",
-                    family = family,
-                    foreground = family.artOn(color),
-                    background = color.background,
-                    label = color.label,
-                    color = color,
-                )
-            }
-        }
-
-        val entries: List<AppIcon> = presets + customs
-
-        fun custom(family: AppIconFamily, color: AppIconColor): AppIcon = customs.first { it.family == family && it.color == color }
+        val Default: AppIcon = entries.first()
+        val presets: List<AppIcon> = entries
     }
 }
 
 object AppIcons {
-
     fun current(context: Context): AppIcon =
-        prefs(context).getString(Key, null)?.let { name -> AppIcon.entries.firstOrNull { it.name == name } } ?: AppIcon.Default
+        prefs(context).getString(Key, null)?.let { name -> AppIcon.entries.firstOrNull { it.name == name } }
+            ?: AppIcon.Default
 
-    /** the icon a launch came from, read off the alias that started it; null for anything but a tap on an icon */
     fun launchedFrom(intent: Intent?): AppIcon? {
         val started = intent?.component?.className ?: return null
         return AppIcon.entries.firstOrNull { started.endsWith(".${it.alias}") }
     }
 
-    /** whether this launch's splash showed [icon] itself: only an anime one, and only on android 13+, which can pick a splash per launch */
-    fun splashShows(icon: AppIcon?): Boolean = icon?.family == AppIconFamily.Anime && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+    // A neutral music mark keeps the system splash legible under every icon mask.
+    fun splashShows(icon: AppIcon?): Boolean = false
 
-    // the next launch's splash: the launcher icon for an anime one to bounce out of, the bare mark for the rest
     fun syncSplash(activity: Activity, icon: AppIcon = current(activity)) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
-        val theme = if (icon.family == AppIconFamily.Anime) R.style.Theme_App_Starting_Icon else R.style.Theme_App_Starting
-        runCatching { activity.splashScreen.setSplashScreenTheme(theme) }
-    }
-
-    /** switches the launcher to [icon]; the launcher redraws it on its own time, a few seconds on some phones */
-    fun apply(context: Context, icon: AppIcon) {
-        val pm = context.packageManager
-        // the new one first, so for a moment there are two icons rather than none
-        pm.setComponentEnabledSetting(componentOf(context, icon), PackageManager.COMPONENT_ENABLED_STATE_ENABLED, PackageManager.DONT_KILL_APP)
-        AppIcon.entries.filter { it != icon }.forEach {
-            pm.setComponentEnabledSetting(componentOf(context, it), PackageManager.COMPONENT_ENABLED_STATE_DISABLED, PackageManager.DONT_KILL_APP)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            runCatching { activity.splashScreen.setSplashScreenTheme(R.style.Theme_App_Starting) }
         }
-        prefs(context).edit { putString(Key, icon.name) }
     }
 
-    // the aliases are named after the code's package, which a debug build's app id doesn't share
-    private fun componentOf(context: Context, icon: AppIcon) = ComponentName(context, "com.mochyy.mochymusic.${icon.alias}")
+    @Synchronized
+    fun apply(context: Context, icon: AppIcon) {
+        require(icon in AppIcon.entries)
+        val previous = current(context)
+        val pm = context.packageManager
+        fun set(entry: AppIcon, enabled: Boolean) = pm.setComponentEnabledSetting(
+            componentOf(context, entry),
+            if (enabled) PackageManager.COMPONENT_ENABLED_STATE_ENABLED else PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+            PackageManager.DONT_KILL_APP,
+        )
+        try {
+            // Enable the new alias before retiring the old one, including on Android 7–12.
+            set(icon, true)
+            AppIcon.entries.filter { it != icon }.forEach { set(it, false) }
+            prefs(context).edit { putString(Key, icon.name) }
+        } catch (error: Exception) {
+            runCatching { set(previous, true) }
+            if (previous != icon) runCatching { set(icon, false) }
+            throw error
+        }
+    }
 
+    private fun componentOf(context: Context, icon: AppIcon) =
+        ComponentName(context, "com.mochyy.mochymusic.${icon.alias}")
     private fun prefs(context: Context) = context.getSharedPreferences("app_icon", Context.MODE_PRIVATE)
-
     private const val Key = "icon"
 }

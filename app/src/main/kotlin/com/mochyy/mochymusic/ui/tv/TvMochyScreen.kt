@@ -85,11 +85,8 @@ internal fun TvMochyScreen(profile: TvProfile) {
             stringResource(if (phoneControl) R.string.tv_on else R.string.tv_off),
             R.drawable.sync,
         ) { TvControl.setAllowed(!phoneControl) },
-        TvMochyTile("updates", stringResource(R.string.tv_mochy_updates), stringResource(R.string.tv_mochy_version, BuildConfig.VERSION_NAME), R.drawable.sync) {
+        TvMochyTile("updates", stringResource(R.string.about_app), stringResource(R.string.tv_mochy_version, BuildConfig.VERSION_NAME), R.drawable.sync) {
             popup.showUpdateSheet(updateState)
-        },
-        TvMochyTile("support", stringResource(R.string.tv_mochy_support), stringResource(R.string.tv_mochy_support_detail), R.drawable.favorite) {
-            popup.showDonateSheet()
         },
     )
 

@@ -69,22 +69,8 @@ internal data class DevPerson(
 )
 
 internal val DevPeople = listOf(
-    DevPerson(
-        name = "idkroo",
-        bio = "ui ux guy here uhh idk what to write here, pls star the repo",
-        avatar = R.drawable.frame_51_3,
-        takesDonations = true,
-        socials = listOf(
-            DevSocial("Instagram", InstagramUrl),
-            DevSocial("Discord", DiscordUrl),
-            DevSocial("Threads", ThreadsUrl),
-        ).filter { it.url.isNotBlank() },
-    ),
-    DevPerson(
-        name = "Keycii",
-        bio = "Hi hello hi",
-        avatar = R.drawable.dev_keycii,
-    ),
+    DevPerson(name = "Pippo", bio = "Your music, your space.", avatar = R.drawable.pippo_icon_01),
+    DevPerson(name = "Pippo", bio = "A little company for every song.", avatar = R.drawable.pippo_icon_02),
 )
 
 /** someone's picture, round, on the mock's light grey */

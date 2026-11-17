@@ -91,7 +91,6 @@ private val LocalizedSettingsTitles = mapOf(
     "Animation" to R.string.appearance_animation,
     "Lyrics animation" to R.string.appearance_lyrics_animation,
     "Larp mode" to R.string.larp_mode,
-    "Disable App Updates notice" to R.string.settings_updates_notice,
     "Offline mode" to R.string.settings_offline_mode,
     "Data saver" to R.string.settings_data_saver,
     "Proxy" to R.string.proxy,
@@ -154,7 +153,7 @@ private val SettingsIndex = listOf(
     SettingsEntry("Cover rounding", "Customisation", "customisation_settings", "square rounded corner radius px thumbnail art"),
     SettingsEntry("Playlist styles", "Customisation", "customisation_settings", "flow classic minimal header layout"),
     SettingsEntry("Player styles", "Customisation", "customisation_settings", "flagship turntable ipod poster timeline lyrics studio customize player cover"),
-    SettingsEntry("Home styles", "Customisation", "customisation_settings", "mochyy listen now hop in hero layout grid"),
+    SettingsEntry("Home styles", "Customisation", "customisation_settings", "Pippo listen now hop in hero layout grid"),
     SettingsEntry("Blur", "Customisation", "customisation_settings", "blur glass frosted performance lag"),
     SettingsEntry("Progressive blur", "Customisation", "customisation_settings", "gradient fade top bar hairline flat"),
     SettingsEntry("Blur quality", "Customisation", "customisation_settings", "low high glass performance"),
@@ -174,7 +173,6 @@ private val SettingsIndex = listOf(
     SettingsEntry("App behaviour", "App behaviour", "general_settings", "general app language updates network data library privacy"),
     SettingsEntry("Larp mode", "App behaviour", "general_settings", "larp 67 flac 768 khz wadax atlantis dac hi-res lossless bit-perfect flex"),
     SettingsEntry("App language", "App behaviour", "general_settings", "language bahasa locale device system indonesia english translate", R.string.app_language),
-    SettingsEntry("Disable App Updates notice", "App behaviour", "general_settings", "update popup notification updater"),
     SettingsEntry("Disable description on settings", "App behaviour", "general_settings", "hide subtitle text rows titles only"),
     SettingsEntry("Offline mode", "App behaviour", "general_settings", "play downloaded cache offline"),
     SettingsEntry("Data saver", "App behaviour", "general_settings", "data saver mobile metered cellular bandwidth lower quality canvas video"),
@@ -543,7 +541,7 @@ fun MochySettingsScreen(navController: NavController, pane: SettingsPane? = null
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Icon(
                         painter = painterResource(R.drawable.ic_mochy_mark),
-                        contentDescription = "Mochy",
+                        contentDescription = "Pippo",
                         tint = Color.White,
                         modifier = Modifier.size(SettingsMarkSize),
                     )

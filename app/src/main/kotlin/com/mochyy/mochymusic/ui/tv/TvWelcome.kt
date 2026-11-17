@@ -148,7 +148,7 @@ internal fun TvWelcome(onNext: () -> Unit) {
 @Composable
 private fun TvMascot(leave: () -> Float, modifier: Modifier = Modifier) {
     // decoded off the main thread, and she only swings in once the picture is ready, so she never pops in halfway
-    val painter = rememberAsyncImagePainter(R.drawable.tv_mascot)
+    val painter = rememberAsyncImagePainter(com.mochyy.mochymusic.ui.brand.PippoArtwork.resource(com.mochyy.mochymusic.ui.brand.PippoPose.Listening))
     val arrive = remember { Animatable(0f) }
     LaunchedEffect(painter) {
         painter.state.first { it is AsyncImagePainter.State.Success || it is AsyncImagePainter.State.Error }

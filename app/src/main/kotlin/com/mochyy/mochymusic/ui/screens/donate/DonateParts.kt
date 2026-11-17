@@ -34,7 +34,7 @@ import com.mochyy.mochymusic.ui.player.menu.MenuRowSurface
 import com.mochyy.mochymusic.ui.component.RemoteFocus
 
 // the art is 768 x 1013, solid down to 56% of her height and fading out below that
-internal const val CharacterAspect = 1013f / 768f
+internal const val CharacterAspect = 4f / 3f
 
 // gap between the sheet's handle row and the top of her hair
 internal val CharacterTop = 24.dp
@@ -51,7 +51,7 @@ internal fun DonateCharacter(width: Dp, modifier: Modifier = Modifier, overlapBe
     val context = LocalContext.current
     val request = remember(context) {
         ImageRequest.Builder(context)
-            .data(R.drawable.donate_character)
+            .data(com.mochyy.mochymusic.ui.brand.PippoArtwork.resource(com.mochyy.mochymusic.ui.brand.PippoPose.Thanks))
             .crossfade(true)
             .build()
     }

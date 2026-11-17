@@ -324,7 +324,7 @@ fun UpdateScreen(navController: NavHostController) {
                                                 ContextCompat.startActivity(context, installIntent, null)
                                             }
                                         } else {
-                                            val urlToDownload = currentStatus.apkUrl ?: "https://github.com/realidkroo/Mochy-Music/releases/download/${currentStatus.version}/mochy.apk"
+                                            val urlToDownload = currentStatus.apkUrl ?: ""
                                             val downloadRequest = OneTimeWorkRequestBuilder<UpdateDownloadWorker>()
                                                 .setInputData(workDataOf("apk_url" to urlToDownload, "version" to currentStatus.version, "file_size" to currentStatus.size))
                                                 .addTag("update_download")
@@ -551,8 +551,7 @@ const val KEY_BETA_UPDATES = "beta_updates"
 const val KEY_UPDATE_AVAILABLE = "update_available"
 
 fun getUpdateAvailableState(context: Context): Boolean {
-    val sharedPrefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-    return sharedPrefs.getBoolean(KEY_UPDATE_AVAILABLE, false)
+    return false
 }
 
 fun saveUpdateAvailableState(context: Context, available: Boolean) {
@@ -561,8 +560,7 @@ fun saveUpdateAvailableState(context: Context, available: Boolean) {
 }
 
 fun getAutoUpdateCheckSetting(context: Context): Boolean {
-    val sharedPrefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-    return sharedPrefs.getBoolean(KEY_AUTO_UPDATE_CHECK, true)
+    return false
 }
 
 fun saveAutoUpdateCheckSetting(context: Context, enabled: Boolean) {
@@ -573,8 +571,7 @@ fun saveAutoUpdateCheckSetting(context: Context, enabled: Boolean) {
 const val KEY_UPDATE_NOTIFICATIONS = "update_notifications"
 
 fun getUpdateNotificationsSetting(context: Context): Boolean {
-    val sharedPrefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-    return sharedPrefs.getBoolean(KEY_UPDATE_NOTIFICATIONS, true)
+    return false
 }
 
 fun saveUpdateNotificationsSetting(context: Context, enabled: Boolean) {
@@ -642,191 +639,7 @@ suspend fun checkForUpdate(
     onSuccess: (tag: String, isAvailable: Boolean, changelog: List<ChangelogSection>, size: String, date: String, description: String?, imageUrl: String?, apkUrl: String?) -> Unit,
     onError: () -> Unit,
 ) {
-    withContext(Dispatchers.IO) {
-        try {
-            val url = URL("https://api.github.com/repos/realidkroo/Mochy-Music/releases")
-            val json = url.openStream().bufferedReader().use { it.readText() }
-            val releases = JSONArray(json)
-
-            val currentVersion = BuildConfig.VERSION_NAME
-            val betaEnabled = getBetaUpdatesSetting(context)
-
-            var isNightlyUpdate = false
-            var nightlyRunObject: JSONObject? = null
-
-            if (betaEnabled) {
-                try {
-                    val nightlyUrl = URL("https://api.github.com/repos/realidkroo/Mochy-Music/actions/workflows/nightly.yml/runs?status=success&per_page=1")
-                    val nightlyJson = nightlyUrl.openStream().bufferedReader().use { it.readText() }
-                    val nightlyData = JSONObject(nightlyJson)
-                    val runs = nightlyData.optJSONArray("workflow_runs")
-                    if (runs != null && runs.length() > 0) {
-                        val firstRun = runs.getJSONObject(0)
-                        val runUpdatedAt = firstRun.getString("updated_at")
-                        val githubFormatter = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss'Z'")
-                        val runTime = java.time.LocalDateTime.parse(runUpdatedAt, githubFormatter)
-                        val runTimeEpoch = runTime.toInstant(java.time.ZoneOffset.UTC).toEpochMilli()
-
-                        val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
-                        val currentAppInstallTime = packageInfo.lastUpdateTime
-
-                        val sharedPreferences = context.getSharedPreferences("update_settings", Context.MODE_PRIVATE)
-                        if (!BuildConfig.IS_NIGHTLY) {
-                            sharedPreferences.edit().remove("last_installed_nightly_run").apply()
-                        }
-                        val lastInstalledRun = sharedPreferences.getInt("last_installed_nightly_run", -1)
-                        val runNumber = firstRun.getInt("run_number")
-
-                        val isNewer = if (lastInstalledRun != -1) {
-                            runNumber > lastInstalledRun
-                        } else if (!BuildConfig.IS_NIGHTLY) {
-                            true
-                        } else {
-                            runTimeEpoch > (currentAppInstallTime + 300_000)
-                        }
-
-                        if (isNewer) {
-                            isNightlyUpdate = true
-                            nightlyRunObject = firstRun
-                        }
-                    }
-                } catch (e: Exception) {
-                    Log.e("UpdateCheck", "Error checking nightly updates: ${e.message}", e)
-                }
-            }
-
-            if (isNightlyUpdate && nightlyRunObject != null) {
-                val runNumber = nightlyRunObject.getInt("run_number")
-                val runUpdatedAt = nightlyRunObject.getString("updated_at")
-                val displayTag = "nightly-r$runNumber"
-
-                val changelogList = mutableListOf<ChangelogSection>()
-                val headCommit = nightlyRunObject.optJSONObject("head_commit")
-                val commitMessage = headCommit?.optString("message") ?: "New features and bug fixes"
-
-                val subjectLine = commitMessage.lineSequence().firstOrNull { it.isNotBlank() } ?: commitMessage
-                changelogList.add(ChangelogSection(context.getString(R.string.changelog), listOf(subjectLine)))
-
-                val formattedReleaseDate = formatGitHubDate(runUpdatedAt)
-                val apkDownloadUrl = "https://nightly.link/realidkroo/Mochy-Music/workflows/nightly.yml/main/mochy-gms-nightly.zip"
-
-                withContext(Dispatchers.Main) {
-                    onSuccess(displayTag, true, changelogList, "~30", formattedReleaseDate, "Bleeding-edge nightly build from main branch.", null, apkDownloadUrl)
-                }
-                return@withContext
-            }
-
-            var bestStableRelease: JSONObject? = null
-            var bestOverallRelease: JSONObject? = null
-
-            for (i in 0 until releases.length()) {
-                val release = releases.getJSONObject(i)
-                val tagName = release.getString("tag_name")
-                val isBeta = tagName.startsWith("b")
-
-                if (!isBeta) {
-                    if (bestStableRelease == null || isNewerVersion(tagName, bestStableRelease.getString("tag_name"))) {
-                        bestStableRelease = release
-                    }
-                }
-
-                if (bestOverallRelease == null || isNewerVersion(tagName, bestOverallRelease.getString("tag_name"))) {
-                    bestOverallRelease = release
-                }
-            }
-
-            val targetRelease = if (betaEnabled) bestOverallRelease else bestStableRelease
-
-            if (targetRelease != null) {
-                val targetTagName = targetRelease.getString("tag_name")
-                val isNewer = isNewerVersion(targetTagName, currentVersion)
-
-                val currentIsBeta = currentVersion.startsWith("b")
-                val targetIsStable = targetTagName.startsWith("v")
-
-                val currentClean = currentVersion.removePrefix("b").removePrefix("v")
-                val targetClean = targetTagName.removePrefix("b").removePrefix("v")
-                val isDifferentVersion = currentClean != targetClean
-
-                var shouldShow = isNewer
-                if (!shouldShow && !betaEnabled) {
-
-                    if (currentIsBeta && targetIsStable) {
-                        shouldShow = true
-                    } else if (isDifferentVersion && targetIsStable) {
-
-                        shouldShow = true
-                    }
-                }
-
-                if (shouldShow) {
-                    val tagWithPrefix = targetRelease.getString("tag_name")
-                    val displayTag = tagWithPrefix
-
-                    val changelogList = mutableListOf<ChangelogSection>()
-                    var description: String? = null
-                    var imageUrl: String? = null
-                    try {
-                        val changelogUrl =
-                            URL("https://github.com/realidkroo/Mochy-Music/releases/download/$tagWithPrefix/changelog.json")
-                        val changelogJson = changelogUrl.openStream().bufferedReader().use { it.readText() }
-                        val changelogData = JSONObject(changelogJson)
-
-                        description = changelogData.optString("description").takeIf { it.isNotEmpty() }
-                        imageUrl = changelogData.optString("image").takeIf { it.isNotEmpty() }
-
-                        val changelogArray = changelogData.getJSONArray("changelog")
-                        for (j in 0 until changelogArray.length()) {
-                            val sectionObj = changelogArray.getJSONObject(j)
-                            val title = sectionObj.getString("title")
-                            val itemsArray = sectionObj.getJSONArray("items")
-                            val itemsList = mutableListOf<String>()
-                            for (k in 0 until itemsArray.length()) {
-                                itemsList.add(itemsArray.getString(k))
-                            }
-                            changelogList.add(ChangelogSection(title, itemsList))
-                        }
-                    } catch (e: Exception) {
-
-                        val body = targetRelease.optString("body", context.getString(R.string.no_changelog_available))
-                        val fallbackItems = body.split("\n").filter { it.isNotBlank() }
-                        changelogList.add(ChangelogSection(context.getString(R.string.changelog), fallbackItems))
-                    }
-
-                    val publishedAt = targetRelease.getString("published_at")
-                    val formattedReleaseDate = formatGitHubDate(publishedAt)
-                    val assets = targetRelease.getJSONArray("assets")
-
-                    var apkSizeInMB = ""
-                    var apkDownloadUrl = ""
-                    for (j in 0 until assets.length()) {
-                        val asset = assets.getJSONObject(j)
-                        val assetName = asset.getString("name")
-                        if (assetName == "mochy.apk") {
-                            val apkSizeInBytes = asset.getLong("size")
-                            apkSizeInMB = String.format("%.1f", apkSizeInBytes / (1024.0 * 1024.0))
-                            apkDownloadUrl = asset.getString("browser_download_url")
-                            break
-                        }
-                    }
-
-                    if (apkDownloadUrl.isNotEmpty()) {
-                        withContext(Dispatchers.Main) {
-                            onSuccess(displayTag, true, changelogList, apkSizeInMB, formattedReleaseDate, description, imageUrl, apkDownloadUrl)
-                        }
-                        return@withContext
-                    }
-                }
-            }
-
-            withContext(Dispatchers.Main) {
-                onSuccess(currentVersion, false, emptyList(), "", "", null, null, null)
-            }
-        } catch (e: Exception) {
-            Log.e("UpdateCheck", "Error checking for updates: ${e.message}", e)
-            withContext(Dispatchers.Main) { onError() }
-        }
-    }
+    onSuccess(BuildConfig.VERSION_NAME, false, emptyList(), "", "", null, null, null)
 }
 fun String.extractUrls(): List<Pair<IntRange, String>> {
     val urlPattern = Pattern.compile(

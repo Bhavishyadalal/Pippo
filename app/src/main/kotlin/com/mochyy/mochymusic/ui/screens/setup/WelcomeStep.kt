@@ -46,8 +46,6 @@ import com.mochyy.mochymusic.LocalAppContentObscured
 import com.mochyy.mochymusic.R
 import com.mochyy.mochymusic.ui.component.damageBoundary
 import com.mochyy.mochymusic.ui.screens.setup.onboarding.OnbTitleTracking
-import com.mochyy.mochymusic.ui.screens.setup.welcome.GirlArt
-import com.mochyy.mochymusic.ui.screens.setup.welcome.GirlMotion
 import com.mochyy.mochymusic.ui.screens.setup.welcome.WelcomeColors
 import com.mochyy.mochymusic.ui.screens.setup.welcome.WelcomeDots
 import com.mochyy.mochymusic.ui.screens.setup.welcome.WelcomeGirl
@@ -92,8 +90,6 @@ fun WelcomeStep(isHiding: Boolean, onNext: () -> Unit) {
         WelcomeWords(clock.seconds, layout.wordsSize, layout.wordsTop)
 
         WelcomeGirl(
-            motion = clock.girl,
-            seconds = clock.seconds,
             modifier = Modifier
                 .offset(x = layout.girlLeft, y = layout.girlTop)
                 .size(layout.girlWidth, layout.girlHeight)
@@ -173,7 +169,6 @@ fun WelcomeStep(isHiding: Boolean, onNext: () -> Unit) {
 // the page's one clock: each frame it moves the girl, then the rings and words read the same time
 private class WelcomeClock {
     val seconds = mutableFloatStateOf(0f)
-    val girl = GirlMotion()
     var running by mutableStateOf(false)
         private set
 
@@ -187,7 +182,6 @@ private class WelcomeClock {
                     // a stall only counts as a short step, so nothing leaps forward after a hitch
                     if (last >= 0L) t += ((now - last) / 1_000_000_000f).coerceAtMost(0.05f)
                     last = now
-                    girl.update(t)
                     seconds.floatValue = t
                 }
             }
@@ -234,7 +228,7 @@ private class WelcomeLayout(
 private fun welcomeLayout(width: Dp, height: Dp): WelcomeLayout {
     val w = width.value
     val h = height.value
-    val shape = GirlArt.FrameWidth / GirlArt.FrameHeight
+    val shape = 1088f / 1446f
     if (w / h < 0.9f) {
         val u = min(w / 393f, h / 820f).coerceIn(0.8f, 1.9f)
         val titleTop = max(64f, 76f * u)
@@ -246,7 +240,7 @@ private fun welcomeLayout(width: Dp, height: Dp): WelcomeLayout {
             unit = u,
             titleStart = max(24f, 36f * u).dp,
             titleTop = titleTop.dp,
-            girlLeft = (w * 0.985f - girlWidth * GirlArt.FingertipsAcross).dp,
+            girlLeft = (w * 0.985f - girlWidth * 0.82f).dp,
             girlTop = girlTop.dp,
             girlWidth = girlWidth.dp,
             girlHeight = girlHeight.dp,
@@ -262,7 +256,7 @@ private fun welcomeLayout(width: Dp, height: Dp): WelcomeLayout {
         unit = u,
         titleStart = (48f * u).dp,
         titleTop = max(56f, h * 0.16f).dp,
-        girlLeft = (w * 0.975f - girlWidth * GirlArt.FingertipsAcross).coerceAtLeast(w * 0.4f).dp,
+        girlLeft = (w * 0.975f - girlWidth * 0.82f).coerceAtLeast(w * 0.4f).dp,
         girlTop = max(8f, h * 0.02f).dp,
         girlWidth = girlWidth.dp,
         girlHeight = (girlWidth / shape).dp,

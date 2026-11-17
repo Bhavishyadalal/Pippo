@@ -101,56 +101,9 @@ fun CommitScreen(
     }
 
     fun fetchCommits() {
-        isLoading = true
+        commits = emptyList()
+        isLoading = false
         hasError = false
-        coroutineScope.launch(Dispatchers.IO) {
-            try {
-                val url = URL("https://api.github.com/repos/realidkroo/Mochy-Music/commits?branch=main&per_page=50")
-                val json = url.openStream().bufferedReader().use { it.readText() }
-                val array = JSONArray(json)
-                val outputFormatter = DateTimeFormatter.ofPattern("MMM d, yyyy", Locale.getDefault())
-
-                val list = mutableListOf<CommitData>()
-                for (i in 0 until array.length()) {
-                    val obj = array.getJSONObject(i)
-                    val sha = obj.getString("sha")
-                    val htmlUrl = obj.getString("html_url")
-
-                    val commitObj = obj.getJSONObject("commit")
-                    val fullMessage = commitObj.getString("message")
-
-                    val message = fullMessage.lines().firstOrNull { it.isNotBlank() } ?: fullMessage
-
-                    val authorObj = commitObj.getJSONObject("author")
-                    val authorName = authorObj.optString("name", "Unknown")
-                    val rawDate = authorObj.optString("date", "")
-                    val formattedDate = try {
-                        ZonedDateTime.parse(rawDate).format(outputFormatter)
-                    } catch (e: Exception) { rawDate }
-
-                    val authorLogin = if (!obj.isNull("author")) {
-                        obj.getJSONObject("author").optString("login", null)
-                    } else null
-                    val authorAvatarUrl = if (!obj.isNull("author")) {
-                        obj.getJSONObject("author").optString("avatar_url", null)
-                    } else null
-
-                    list.add(CommitData(sha, message, authorName, authorAvatarUrl, authorLogin, formattedDate, htmlUrl))
-                }
-
-                withContext(Dispatchers.Main) {
-                    commits = list
-                    isLoading = false
-                    hasError = false
-                }
-            } catch (e: Exception) {
-                Log.e("CommitScreen", "Error fetching commits: ${e.message}")
-                withContext(Dispatchers.Main) {
-                    hasError = true
-                    isLoading = false
-                }
-            }
-        }
     }
 
     LaunchedEffect(Unit) {

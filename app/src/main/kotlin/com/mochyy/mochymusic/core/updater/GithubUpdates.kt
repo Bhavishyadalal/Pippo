@@ -12,19 +12,16 @@ import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 
-const val GithubOwner = "realidkroo"
-const val GithubRepo = "Mochy-Music"
+const val GithubOwner = ""
+const val GithubRepo = ""
 
-const val GithubProfileUrl = "https://github.com/$GithubOwner"
-const val GithubRepoUrl = "https://github.com/$GithubOwner/$GithubRepo"
-const val InstagramUrl = "https://www.instagram.com/furfurrfoxx/"
+const val GithubProfileUrl = ""
+const val GithubRepoUrl = ""
+const val InstagramUrl = ""
 // Threads names follow the Instagram one
-const val ThreadsUrl = "https://www.threads.net/@furfurrfoxx"
+const val ThreadsUrl = ""
 // dev spaces hides the discord row while this is blank
-const val DiscordUrl = "https://discord.gg/NTmqVphbRY"
-
-private const val ReleasesApi =
-    "https://api.github.com/repos/$GithubOwner/$GithubRepo/releases?per_page=20"
+const val DiscordUrl = ""
 
 data class GithubRelease(
     val title: String,
@@ -82,44 +79,12 @@ fun parseFullVersion(text: String): FullVersion {
     )
 }
 
-private const val CacheTtlMillis = 15L * 60L * 1000L
-
-// older releases in this repo are the app under its old id, so "downgrade" to one would add a second app instead
-private val FirstReleaseWithThisId = FullVersion(major = 8, minor = 2, patch = 3)
-
-/** A release with the version it was parsed to, so it can be compared without parsing again. */
+/** Kept for compatibility with the existing update-state consumers. */
 private class ParsedRelease(val version: FullVersion, val release: GithubRelease)
-
-private val cacheLock = Any()
-private var cachedAt = 0L
-private var cachedResult: Result<List<ParsedRelease>>? = null
-private var inFlight: kotlinx.coroutines.Deferred<Result<List<ParsedRelease>>>? = null
-
-private val updateScope = kotlinx.coroutines.CoroutineScope(
-    kotlinx.coroutines.SupervisorJob() + Dispatchers.IO
-)
 
 /** Every published release, asked for once and shared for [CacheTtlMillis] unless [force]d. */
 private suspend fun getReleases(force: Boolean): Result<List<ParsedRelease>> {
-    val deferred = synchronized(cacheLock) {
-        if (!force) {
-            val cached = cachedResult
-            if (cached != null && System.currentTimeMillis() - cachedAt < CacheTtlMillis) {
-                return cached
-            }
-        }
-        inFlight ?: updateScope.async { fetchReleases() }.also { inFlight = it }
-    }
-
-    val result = deferred.await()
-    synchronized(cacheLock) {
-        if (inFlight === deferred) inFlight = null
-        if (result.isSuccess) {
-            cachedResult = result
-            cachedAt = System.currentTimeMillis()
-        }
-    }
-    return result
+    return Result.success(emptyList())
 }
 
 // release only sees releases; nightly sees the prereleases and the releases, and takes the newest of all
@@ -147,96 +112,7 @@ suspend fun getPreviousRelease(channel: UpdateChannel, force: Boolean = false): 
 }
 
 private suspend fun fetchReleases(): Result<List<ParsedRelease>> = withContext(Dispatchers.IO) {
-    runCatching {
-        val connection = (URL(ReleasesApi).openConnection() as HttpURLConnection).apply {
-            connectTimeout = 12_000
-            readTimeout = 12_000
-            setRequestProperty("Accept", "application/vnd.github+json")
-            setRequestProperty("User-Agent", "mochy-android")
-        }
-        val json = connection.inputStream.bufferedReader().use { it.readText() }
-        val releases = JSONArray(json)
-        val appArch = runCatching { BuildConfig.ARCHITECTURE }.getOrDefault("universal")
-
-        buildList {
-            for (i in 0 until releases.length()) {
-                val release = releases.getJSONObject(i)
-                if (release.optBoolean("draft", false)) continue
-
-                val tag = release.optString("tag_name").orEmpty()
-                val title = release.optString("name").orEmpty().ifBlank { tag }
-                val fullVer = parseFullVersion("$title $tag")
-
-                if (fullVer.major == 0 && fullVer.minor == 0 && fullVer.patch == 0) continue
-                if (fullVer.copy(buildNumber = 0) < FirstReleaseWithThisId) continue
-
-                val displayVersion = if (fullVer.buildNumber > 0) "${fullVer.name} (${fullVer.buildNumber})" else fullVer.name
-
-                val assets = release.optJSONArray("assets")
-                var selectedUrl: String? = null
-                var selectedName: String? = null
-                var selectedSize = 0L
-
-                var universalUrl: String? = null
-                var universalName: String? = null
-                var universalSize = 0L
-
-                var fallbackUrl: String? = null
-                var fallbackName: String? = null
-                var fallbackSize = 0L
-
-                if (assets != null) {
-                    for (a in 0 until assets.length()) {
-                        val asset = assets.getJSONObject(a)
-                        val name = asset.optString("name").orEmpty()
-                        if (!name.endsWith(".apk", ignoreCase = true)) continue
-                        val url = asset.optString("browser_download_url").orEmpty()
-                        val size = asset.optLong("size", 0L)
-
-                        if (appArch.isNotBlank() && appArch != "universal" && name.contains(appArch, ignoreCase = true)) {
-                            selectedUrl = url
-                            selectedName = name
-                            selectedSize = size
-                        } else if (name.contains("universal", ignoreCase = true)) {
-                            universalUrl = url
-                            universalName = name
-                            universalSize = size
-                        } else if (fallbackUrl == null) {
-                            fallbackUrl = url
-                            fallbackName = name
-                            fallbackSize = size
-                        }
-                    }
-                }
-
-                val apkUrl = selectedUrl ?: universalUrl ?: fallbackUrl
-                val apkName = selectedName ?: universalName ?: fallbackName
-                val apkSize = when {
-                    selectedUrl != null -> selectedSize
-                    universalUrl != null -> universalSize
-                    else -> fallbackSize
-                }
-
-                add(
-                    ParsedRelease(
-                        version = fullVer,
-                        release = GithubRelease(
-                            title = title,
-                            tag = tag,
-                            version = displayVersion,
-                            body = release.optString("body").orEmpty(),
-                            htmlUrl = release.optString("html_url").orEmpty().ifBlank { "$GithubRepoUrl/releases" },
-                            apkUrl = apkUrl,
-                            apkName = apkName,
-                            apkSizeBytes = apkSize,
-                            publishedAt = release.optString("published_at").orEmpty(),
-                            isNightly = release.optBoolean("prerelease", false),
-                        ),
-                    ),
-                )
-            }
-        }
-    }
+    Result.success(emptyList())
 }
 
 fun isNewerThanInstalled(candidateVersionText: String): Boolean {
@@ -250,46 +126,11 @@ suspend fun downloadApk(
     release: GithubRelease,
     onProgress: (Float) -> Unit,
 ): Result<File> = withContext(Dispatchers.IO) {
-    runCatching {
-        val url = release.apkUrl ?: error("This release has no APK attached")
-        val target = apkFileFor(context, release)
-
-        if (isDownloaded(context, release)) {
-            onProgress(1f)
-            return@runCatching target
-        }
-        if (target.exists()) target.delete()
-
-        val connection = (URL(url).openConnection() as HttpURLConnection).apply {
-            connectTimeout = 15_000
-            readTimeout = 30_000
-            instanceFollowRedirects = true
-            setRequestProperty("User-Agent", "mochy-android")
-        }
-        val total = release.apkSizeBytes.takeIf { it > 0 }
-            ?: connection.contentLengthLong.takeIf { it > 0 }
-            ?: -1L
-
-        connection.inputStream.use { input ->
-            target.outputStream().use { output ->
-                val buffer = ByteArray(64 * 1024)
-                var written = 0L
-                while (true) {
-                    val read = input.read(buffer)
-                    if (read == -1) break
-                    output.write(buffer, 0, read)
-                    written += read
-                    if (total > 0) onProgress((written.toFloat() / total).coerceIn(0f, 1f))
-                }
-            }
-        }
-        onProgress(1f)
-        target
-    }
+    Result.failure(IllegalStateException("Pippo updates are installed manually"))
 }
 
 fun apkFileFor(context: Context, release: GithubRelease): File =
-    File(context.cacheDir, release.apkName ?: "mochy-update.apk")
+    File(context.cacheDir, release.apkName ?: "pippo-update.apk")
 
 fun isDownloaded(context: Context, release: GithubRelease): Boolean {
     val f = apkFileFor(context, release)

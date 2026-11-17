@@ -453,70 +453,25 @@ private fun Density.placementAt(state: LaunchIntroState, size: IntSize): MarkPla
 
 /** the two marks, in the splash drawable's units, ready to draw at any scale */
 private class LaunchMarkArt {
-    private val triangle = path(
-        "M163.5 96.3493C180.167 105.972 180.167 130.028 163.5 139.651L108 171.694C91.3333 181.316 " +
-            "70.5 169.288 70.5 150.043V85.9569C70.5 66.7119 91.3333 54.6838 108 64.3063L163.5 96.3493Z"
-    )
-    // the face: the little chevron and the smile under it
-    private val face = path("M97 112L108.5 98L120 112M110.325 125C111.871 133.439 121.868 148.704 142.944 149.92")
-    private val mask = Path().apply { addCircle(Pivot.x, Pivot.y, SplashMaskRadius, Path.Direction.CW) }
-
-    // ic_splash_mark: a white shape with a dark outline and a dark face
-    private val fill = paint(android.graphics.Color.WHITE) { style = Paint.Style.FILL }
-    private val darkOutline = paint(0xFF212121.toInt()) {
+    private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.WHITE
         style = Paint.Style.STROKE
-        strokeWidth = 19f
-        strokeJoin = Paint.Join.ROUND
-    }
-    private val darkFace = paint(0xFF212121.toInt()) {
-        style = Paint.Style.STROKE
-        strokeWidth = 11f
         strokeCap = Paint.Cap.ROUND
-        strokeJoin = Paint.Join.ROUND
+        strokeWidth = 20f
     }
-
-    // ic_mochy_mark: the same outline and face, white, nothing filled
-    private val lightOutline = paint(android.graphics.Color.WHITE) {
-        style = Paint.Style.STROKE
-        strokeWidth = 19f
-        strokeJoin = Paint.Join.ROUND
-    }
-    private val lightFace = paint(android.graphics.Color.WHITE) {
-        style = Paint.Style.STROKE
-        strokeWidth = 11f
-        strokeCap = Paint.Cap.ROUND
-        strokeJoin = Paint.Join.ROUND
-    }
-
     fun draw(canvas: android.graphics.Canvas, filledAlpha: Float, outlineAlpha: Float, filledScale: Float = 1f) {
-        // each mark is faded as a whole, so its overlapping strokes never show through each other
-        if (filledAlpha > 0.002f) {
-            canvas.saveLayerAlpha(LayerBounds, (filledAlpha * 255f).toInt())
-            canvas.scale(filledScale, filledScale, Pivot.x, Pivot.y)
-            canvas.clipPath(mask)
-            canvas.drawPath(triangle, fill)
-            canvas.drawPath(triangle, darkOutline)
-            canvas.drawPath(face, darkFace)
-            canvas.restore()
-        }
-        if (outlineAlpha > 0.002f) {
-            canvas.saveLayerAlpha(ArtBounds, (outlineAlpha * 255f).toInt())
-            canvas.drawPath(triangle, lightOutline)
-            canvas.drawPath(face, lightFace)
-            canvas.restore()
-        }
+        val alpha = maxOf(filledAlpha, outlineAlpha).coerceIn(0f, 1f)
+        if (alpha <= 0.002f) return
+        paint.alpha = (alpha * 255f).toInt()
+        canvas.save()
+        canvas.scale(filledScale, filledScale, Pivot.x, Pivot.y)
+        canvas.drawLine(82f, 100f, 82f, 136f, paint)
+        canvas.drawLine(117.5f, 77f, 117.5f, 159f, paint)
+        canvas.drawLine(153f, 92f, 153f, 144f, paint)
+        canvas.restore()
     }
-
-    private fun path(data: String): Path = PathParser.createPathFromPathData(data)
-
-    private inline fun paint(color: Int, setup: Paint.() -> Unit) =
-        Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            this.color = color
-            setup()
-        }
 }
 
-/** the launcher icon as the splash drew it: its background and art through a circle, in splash units */
 private class LaunchIconArt(context: Context, icon: AppIcon) {
     private val fill = icon.background?.let { color -> Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = context.getColor(color) } }
     // drawn into a fixed box and scaled, so a vector renders sharp at whatever size the canvas asks

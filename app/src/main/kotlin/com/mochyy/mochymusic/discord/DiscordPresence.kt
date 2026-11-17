@@ -296,8 +296,8 @@ class DiscordPresence @Inject constructor(
     private fun candidatesFor(picture: PresencePicture?): List<String> = when (picture) {
         null -> emptyList()
         is PresencePicture.Web -> listOf(picture.url)
-        is PresencePicture.Status -> listOf(PresenceImages.statusUrl(picture))
-        PresencePicture.Logo -> listOf(PresenceImages.LogoUrl)
+        is PresencePicture.Status -> emptyList()
+        PresencePicture.Logo -> emptyList()
         is PresencePicture.Spinning -> listOfNotNull(spinning.urlFor(picture.sourceUrl, picture.style), stillUrl(picture.sourceUrl))
         is PresencePicture.Local -> listOfNotNull(uploads.urlFor(picture.sourceUrl))
     }

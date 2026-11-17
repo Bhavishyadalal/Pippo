@@ -39,6 +39,7 @@ internal fun devText(
 internal fun devFigureSp(dp: Float): TextUnit = with(LocalDensity.current) { dp.dp.toSp() }
 
 internal fun Context.openDevUrl(url: String) {
+    if (url.isBlank()) return
     runCatching {
         startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }

@@ -89,7 +89,7 @@ data class PresenceActivity(
                 details = PresenceText.line(settings.details, track),
                 detailsUrl = PresenceButtonTarget.YOUTUBE_MUSIC.linkFor(track).takeIf { track.isYouTube },
                 state = PresenceText.line(settings.state, track),
-                largeImage = PresenceImages.pick(settings.largeImage, track, nowMs, settings.spin, settings.largeCustomImage) ?: PresencePicture.Logo,
+                largeImage = PresenceImages.pick(settings.largeImage, track, nowMs, settings.spin, settings.largeCustomImage),
                 largeText = PresenceText.line(settings.largeText, track),
                 smallImage = PresenceImages.pick(settings.smallImage, track, nowMs, settings.spin, settings.smallCustomImage),
                 smallText = PresenceText.line(settings.smallText, track),
@@ -97,7 +97,7 @@ data class PresenceActivity(
                 endMs = end,
                 buttons = listOf(settings.button1, settings.button2).mapNotNull { button ->
                     PresenceText.line(button.text, track, maxLength = 32)
-                        ?.let { Link(label = it, url = button.target.linkFor(track)) }
+                        ?.let { label -> button.target.linkFor(track).takeIf { it.isNotBlank() }?.let { Link(label = label, url = it) } }
                 },
             )
         }

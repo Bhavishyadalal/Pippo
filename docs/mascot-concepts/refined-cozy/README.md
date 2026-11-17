@@ -29,3 +29,7 @@ These are artwork files only. Android resources, animation layers and random cha
 | 02-C | 06-C |
 | --- | --- |
 | ![02-C Thank you](02-C-thanks.png) | ![06-C Thank you](06-C-thanks.png) |
+
+## Production integration
+
+The approved 02 and 06 sets now ship as resized WebP resources. Additional original waving poses are saved as `02-D-wave.png` and `06-D-wave.png`. Pippo randomly selects a consistent character and welcome variation once per app process; listening and thanks surfaces use that same character. The coral sound-wave emblem replaces the rejected crescent motif.

@@ -62,7 +62,7 @@ const val ModuleRoutePattern = "module/{id}"
 fun moduleRoute(id: String) = "module/$id"
 
 /** how to make a module, the guide on mochy's wiki */
-const val ModuleDocsUrl = "https://realidkroo.github.io/Mochy-Music/wiki/#modules-types"
+const val ModuleDocsUrl = ""
 
 private val CardShape = RoundedCornerShape(26.dp)
 
@@ -85,10 +85,10 @@ fun ModulesScreen(navController: NavController, viewModel: ModulesViewModel = hi
         onBack = { navController.navigateUp() },
         titleBadge = { BetaBadge() },
     ) {
-        ThirdPartyCard { context.openDevUrl(ModuleDocsUrl) }
+
         Spacer(Modifier.height(14.dp))
         // mochy's bar is where people share modules, so its browser sits right up top
-        ModulesBarBanner { navController.navigate(ModuleBrowserRoute) }
+
         Spacer(Modifier.height(22.dp))
         Box(Modifier.fillMaxWidth().padding(horizontal = 2.dp).height(1.dp).background(Color.White.copy(alpha = 0.28f)))
         Spacer(Modifier.height(28.dp))
@@ -197,7 +197,7 @@ private fun ModulesBarBanner(onClick: () -> Unit) {
     ) {
         // the drawing ends at her jacket, so sitting on the card's bottom edge cuts her off there like the design
         Image(
-            painterResource(R.drawable.modules_bar_mochy), null,
+            com.mochyy.mochymusic.ui.component.rememberResourcePainter(com.mochyy.mochymusic.ui.brand.PippoArtwork.resource(com.mochyy.mochymusic.ui.brand.PippoPose.Welcome)), null,
             contentScale = ContentScale.Fit,
             modifier = Modifier.align(Alignment.Bottom).padding(top = 10.dp).fillMaxHeight(),
         )

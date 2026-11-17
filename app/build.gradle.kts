@@ -24,11 +24,12 @@ extensions.configure<ApplicationExtension> {
     ndkVersion = "27.0.12077973"
 
     defaultConfig {
-        applicationId = "com.mochyy.mochymusic"
+        applicationId = "com.bhavishyadalal.pippo"
+        resValue("string", "shortcut_target_package", "com.bhavishyadalal.pippo")
         minSdk = 24
         targetSdk = 37
         versionCode = 73
-        versionName = "8.4.2 build#1261"
+        versionName = "1.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
@@ -184,6 +185,7 @@ extensions.configure<ApplicationExtension> {
         }
         debug {
             applicationIdSuffix = ".debug"
+            resValue("string", "shortcut_target_package", "com.bhavishyadalal.pippo.debug")
             isDebuggable = true
             signingConfig = signingConfigs.getByName("debug")
         }
@@ -200,6 +202,7 @@ extensions.configure<ApplicationExtension> {
         create("profileable") {
             initWith(getByName("release"))
             applicationIdSuffix = ".profileable"
+            resValue("string", "shortcut_target_package", "com.bhavishyadalal.pippo.profileable")
             isProfileable = true
             signingConfig = signingConfigs.getByName("debug")
             // The provider modules only publish debug/release variants; without this, resolving
@@ -212,6 +215,7 @@ extensions.configure<ApplicationExtension> {
         create("fast") {
             initWith(getByName("debug"))
             applicationIdSuffix = ".fast"
+            resValue("string", "shortcut_target_package", "com.bhavishyadalal.pippo.fast")
             isDebuggable = false
             isProfileable = true
             isMinifyEnabled = false
