@@ -10,7 +10,6 @@ import com.mochyy.mochymusic.constants.*
 
 /** Only preference changes update this snapshot; animation frames never touch preference storage. */
 data class UiCustomization(
-    val mini: MiniPlayerOptions = MiniPlayerOptions(),
     val accent: UiAccent = UiAccent.CORAL,
     val customAccent: Int = 0xFFF2B5A7.toInt(),
     val highContrast: Boolean = false,
@@ -55,7 +54,6 @@ data class UiCustomization(
     companion object {
         const val DefaultNavOrder = "home,search_input,library,settings"
         fun from(p: Preferences) = UiCustomization(
-            mini = MiniPlayerOptions.from(p),
             accent = selected(p[UiAccentKey], UiAccent.CORAL),
             customAccent = p[UiCustomAccentKey] ?: 0xFFF2B5A7.toInt(),
             highContrast = p[UiContrastKey] ?: false,

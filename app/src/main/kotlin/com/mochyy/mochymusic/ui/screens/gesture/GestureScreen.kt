@@ -119,7 +119,6 @@ fun GestureScreen(navController: NavController) = CustomisationScreen(navControl
 
 // the customize page's parts in order, with what a search or a settings result can find each one by
 private enum class CustomiseSection(@StringRes val titleRes: Int, val keys: List<String>, val words: String) {
-    MINI_PLAYER(R.string.mini_customization, listOf("Mini-player styles"), "mini player bottom song bar floating pill compact card minimal two line artwork dock progress elapsed favorite queue"),
     HOME_LAYOUT(R.string.beta_home, listOf("Home shelves"), "home shelves order hide show recently played artists playlists videos history"),
     PERFORMANCE(R.string.beta_performance, listOf("Performance presets"), "performance light balanced expressive fast battery smooth presets"),
     NAVIGATION(R.string.beta_navigation, listOf("App navigation"), "navigation bottom tabs labels reorder icons pill flat outline indicator swipe"),
@@ -189,7 +188,13 @@ fun CustomisationScreen(navController: NavController) {
                 Spacer(Modifier.height(18.dp))
 
                 if (shown.isEmpty()) {
-                    com.mochyy.mochymusic.ui.screens.settings.SettingsEmptyState(query)
+                    Text(
+                        text = stringResource(R.string.customise_nothing_matches, query),
+                        fontFamily = InterFontFamily,
+                        fontSize = 15.sp,
+                        color = Color.White.copy(alpha = 0.6f),
+                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 12.dp),
+                    )
                 }
                 shown.forEachIndexed { index, section ->
                     if (index > 0) SectionRule()
@@ -206,7 +211,6 @@ fun CustomisationScreen(navController: NavController) {
 private fun CustomiseSectionContent(section: CustomiseSection, navController: NavController) {
     val pagerBleed = Modifier.bleedHorizontally(CustomisePageMargin)
     when (section) {
-        CustomiseSection.MINI_PLAYER -> BetaMiniPlayerSection()
         CustomiseSection.HOME_LAYOUT -> BetaHomeSection()
         CustomiseSection.PERFORMANCE -> BetaPerformanceSection()
         CustomiseSection.NAVIGATION -> BetaNavigationSection()

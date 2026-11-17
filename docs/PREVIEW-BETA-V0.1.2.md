@@ -52,11 +52,3 @@ Source and diff inspection only. No tests, compilation, APK build/publication or
 ## Main icon and startup follow-up
 
 The existing approved portrait #01 remains the default launcher icon; the 20 selectable alternatives are retained. The system splash now explicitly uses that same main adaptive icon instead of the plain equalizer. Home cold starts pass the main icon into the existing Canvas intro, enabling its zoom/ripple handoff to the music mark and Home header. The foreground respects the launcher's 18% inset. The icon prelude is shortened to 420 ms and the mark flight to 480 ms; existing readiness gates, timeouts and global animation-duration scaling are retained. Search-first launches, deep links and restored activities retain their existing startup paths. No new artwork, video or animation dependency is introduced. Device-specific splash masking and the handoff remain unverified without a build and device run.
-
-## Mini-player follow-up
-
-Seven designs and optional controls/details are available under Customisation → Mini-player styles. See [mini-player behavior and review limits](MINI-PLAYER-BETA.md). Default Classic is preserved; customized layouts share the existing audio connection and sheet gestures. These options participate in saved presets, import/export and reset. No build or workflow was run.
-
-## Settings appearance follow-up
-
-The settings hub, shared grouped rows, search fields and beta customization cards now share softer tonal cards, accent details, clearer headings and current-choice summaries. Existing artwork is reused for the welcome card. See [cozy settings details](COZY-SETTINGS-BETA.md) for scope and review limits. No build or workflow was run.

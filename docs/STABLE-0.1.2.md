@@ -1,12 +1,12 @@
 # Pippo stable 0.1.2 preparation
 
 - Branch: `stable-0.1.2`.
-- Based on beta commit `068574eeac1c98c55331521da2a5643186c22c92`.
+- App code restored to beta commit `1e17d0b8` at the owner's request; subsequent mini-player and cozy-settings redesigns are removed.
 - Version name: `0.1.2`, version code: `74` (previously `1.0.0`, code `73`). Android compares the increasing version code for installation upgrades.
 - Package remains `com.bhavishyadalal.pippo`; stored data and the existing preferences/schema are retained.
 - Main, `preview-beta-v0.1.2` and the backup branch are preserved. No merge or release tag/publication is performed.
 
-Includes beta customization, seven mini-player choices, the main-icon startup handoff and cozy settings refinements. Internal resource identifiers and helper names containing `beta` are retained for compatibility; they do not add a beta suffix to the installed version.
+Includes the customization controls and main-icon startup handoff present at `1e17d0b8`. Later mini-player choices and cozy settings refinements have been reverted. Internal resource identifiers and helper names containing `beta` are retained for compatibility; they do not add a beta suffix to the installed version.
 
 ## Optimized release configuration
 
