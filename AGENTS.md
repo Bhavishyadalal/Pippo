@@ -9,3 +9,5 @@
 - Do not build or publish another APK, or launch GitHub Actions, until the owner explicitly asks for that again.
 
 - The tested design-system pass was merged into main at bd58eae8 at the owner's request. Current customization work belongs on `preview-beta-v0.1.2`; preserve main and the backup branch, and merge only when requested.
+
+- Latest authorized work: playback/network/Bluetooth reliability and module URL copying on `preview-beta-v0.1.2`. The owner explicitly authorized logic/function testing for these fixes. Keep main, stable and backup untouched unless requested. Preserve the restored design; do not reintroduce the reverted mini-player or cozy-settings redesigns.

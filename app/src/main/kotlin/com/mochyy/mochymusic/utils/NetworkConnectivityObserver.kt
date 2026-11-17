@@ -1,66 +1,47 @@
-// NetworkConnectivityObserver.kt
-
 package com.mochyy.mochymusic.utils
 
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
-import android.net.NetworkRequest
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 class NetworkConnectivityObserver(context: Context) {
-    private val connectivityManager =
-        context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-
-    private val _networkStatus = Channel<Boolean>(Channel.CONFLATED)
-    val networkStatus = _networkStatus.receiveAsFlow()
+    private val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+    private val initialNetwork = runCatching { connectivityManager.activeNetwork }.getOrNull()
+    private val state = ValidatedNetworkState(initialNetwork?.networkHandle, isCurrentlyConnected())
+    private val _networkStatus = MutableStateFlow(state.connected)
+    // Every collector receives the current status; a Channel split updates between consumers.
+    val networkStatus = _networkStatus.asStateFlow()
 
     private val networkCallback = object : ConnectivityManager.NetworkCallback() {
         override fun onAvailable(network: Network) {
-            _networkStatus.trySend(true)
+            _networkStatus.value = state.available(network.networkHandle)
         }
-
+        override fun onCapabilitiesChanged(network: Network, capabilities: NetworkCapabilities) {
+            _networkStatus.value = state.capabilities(network.networkHandle,
+                capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET),
+                capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED))
+        }
         override fun onLost(network: Network) {
-            _networkStatus.trySend(false)
+            _networkStatus.value = state.lost(network.networkHandle)
         }
     }
 
     init {
-        val request = NetworkRequest.Builder()
-            .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-            .addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_RESTRICTED)
-            .build()
-
-        try {
-            connectivityManager.registerNetworkCallback(request, networkCallback)
-        } catch (e: Exception) {
-
-            _networkStatus.trySend(true)
-        }
-
-        val isInitiallyConnected = isCurrentlyConnected()
-        _networkStatus.trySend(isInitiallyConnected)
+        // Default-network observation is available on API 24, this app's minimum SDK.
+        runCatching { connectivityManager.registerDefaultNetworkCallback(networkCallback) }
     }
 
     fun unregister() {
-        connectivityManager.unregisterNetworkCallback(networkCallback)
+        runCatching { connectivityManager.unregisterNetworkCallback(networkCallback) }
     }
 
-    fun isCurrentlyConnected(): Boolean {
-        return try {
-            val activeNetwork = connectivityManager.activeNetwork
-            val networkCapabilities = connectivityManager.getNetworkCapabilities(activeNetwork)
-
-            val hasInternet = networkCapabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
-
-            val isValidated =
-                networkCapabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) == true
-
-            hasInternet && isValidated
-        } catch (e: Exception) {
-            false
-        }
-    }
+    fun isCurrentlyConnected(): Boolean = runCatching {
+        val network = connectivityManager.activeNetwork
+        val capabilities = connectivityManager.getNetworkCapabilities(network)
+        capabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true &&
+            capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+    }.getOrDefault(false)
 }

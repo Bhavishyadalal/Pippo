@@ -102,8 +102,15 @@ class AudioOutputs(private val context: Context) {
     @Volatile
     private var mixedDevice: AudioDeviceInfo? = null
 
+    private val settleRoute = Runnable { routeChanged() }
+    private fun deviceChanged() {
+        routeChanged()
+        mainHandler.removeCallbacks(settleRoute)
+        mainHandler.postDelayed(settleRoute, 500L)
+    }
+
     private val callback = object : AudioDeviceCallback() {
-        override fun onAudioDevicesAdded(addedDevices: Array<out AudioDeviceInfo>) = routeChanged()
+        override fun onAudioDevicesAdded(addedDevices: Array<out AudioDeviceInfo>) = deviceChanged()
 
         override fun onAudioDevicesRemoved(removedDevices: Array<out AudioDeviceInfo>) {
             if (removedDevices.any { it.id == chosenId }) chosenId = null
@@ -111,7 +118,7 @@ class AudioOutputs(private val context: Context) {
                 mixedDevice = null
                 _mixer.value = null
             }
-            routeChanged()
+            deviceChanged()
         }
     }
 
@@ -121,6 +128,7 @@ class AudioOutputs(private val context: Context) {
     }
 
     fun release() {
+        mainHandler.removeCallbacks(settleRoute)
         runCatching { audioManager.unregisterAudioDeviceCallback(callback) }
         clearMixer()
     }

@@ -5,6 +5,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.w3c.dom.Element
 import java.io.File
+import java.util.Locale
 import javax.xml.parsers.DocumentBuilderFactory
 
 /** Check the selector and the Indonesian format strings against the actual resource tree. */
@@ -38,10 +39,12 @@ class LanguageResourcesTest {
                 val qualifier = folder.name.removePrefix("values-")
                 val tag = if (qualifier.startsWith("b+")) qualifier.removePrefix("b+").replace('+', '-')
                     else qualifier.replace("-r", "-")
-                when (tag) { "in" -> "id"; "iw" -> "he"; else -> tag }
+                // Android resource qualifiers retain legacy language codes, including regional forms.
+                Locale.forLanguageTag(tag).toLanguageTag()
             }.toSet() + "en"
         assertEquals("Duplicate language tags", tags.size, tags.toSet().size)
         assertEquals(locales, tags.toSet())
+        tags.forEach { tag -> assertEquals("Non-canonical picker tag: $tag", Locale.forLanguageTag(tag).toLanguageTag(), tag) }
     }
 
     @Test fun `Indonesian strings preserve the default format arguments`() {
