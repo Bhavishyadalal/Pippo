@@ -8,4 +8,4 @@
 - The owner removed the four experimental Cassette, Midnight Glass, Pippo Duo and CD Walkman player screens. Keep the existing player screens; do not reintroduce the removed designs unless requested.
 - Do not build or publish another APK, or launch GitHub Actions, until the owner explicitly asks for that again.
 
-- This design-system pass belongs on `design/pippo-design-system`. Preserve `main` and `backup/pre-design-system-2026-11-17` as the starting app code; merge only when the owner requests it.
+- The tested design-system pass was merged into main at bd58eae8 at the owner's request. Current customization work belongs on `preview-beta-v0.1.2`; preserve main and the backup branch, and merge only when requested.

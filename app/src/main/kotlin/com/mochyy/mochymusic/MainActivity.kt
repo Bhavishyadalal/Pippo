@@ -633,8 +633,9 @@ class MainActivity : ComponentActivity() {
                 val navBackStackEntry by navController.currentBackStackEntryAsState()
                 val (previousTab, setPreviousTab) = rememberSaveable { mutableStateOf("home") }
 
-                val navigationItems = remember {
-                        Screens.MainScreens
+                val navOrder = com.mochyy.mochymusic.ui.customization.UiCustomizationState.options.navOrder
+                val navigationItems = remember(navOrder) {
+                    com.mochyy.mochymusic.ui.customization.UiCustomization.ordered(Screens.MainScreens, navOrder) { it.route }
                 }
                 val (slimNav) = rememberPreference(SlimNavBarKey, defaultValue = false)
                 // flipped in Experimental while the app is open: it starts (or stops) turning right away
@@ -1506,10 +1507,12 @@ class MainActivity : ComponentActivity() {
                         speed = prefs[com.mochyy.mochymusic.constants.AnimationSpeedKey] ?: 1f,
                         elementBlur = prefs[com.mochyy.mochymusic.constants.ElementBlurKey] ?: true,
                         coverRadius = prefs[com.mochyy.mochymusic.constants.ThumbnailCornerRadiusKey] ?: 25f,
+                        customization = com.mochyy.mochymusic.ui.customization.UiCustomization.from(prefs),
                     )
                 }
                 .distinctUntilChanged()
                 .collect { look ->
+                    com.mochyy.mochymusic.ui.customization.UiCustomizationState.options = look.customization
                     com.mochyy.mochymusic.ui.utils.AppMotion.enabled = look.animations
                     com.mochyy.mochymusic.ui.utils.AppMotion.speed = look.speed
                     com.mochyy.mochymusic.ui.utils.AppMotion.elementBlur = look.elementBlur
@@ -1521,7 +1524,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private data class LookSettings(val animations: Boolean, val speed: Float, val elementBlur: Boolean, val coverRadius: Float)
+    private data class LookSettings(val animations: Boolean, val speed: Float, val elementBlur: Boolean, val coverRadius: Float, val customization: com.mochyy.mochymusic.ui.customization.UiCustomization)
 
     // people who had the old lyrics shader switch off land on the matching shaderless lyric style, once
     private fun moveOffOldLyricsShaderSwitch() {

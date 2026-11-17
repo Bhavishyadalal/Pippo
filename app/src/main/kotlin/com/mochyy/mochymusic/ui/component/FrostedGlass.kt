@@ -2,6 +2,8 @@
 
 package com.mochyy.mochymusic.ui.component
 
+import androidx.compose.foundation.background
+
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -84,12 +86,17 @@ fun FrostedChromeGlass(
     // the lit tab's pill for a glass that draws it, given the bar's size; read while drawing
     pill: ((Size) -> ChromePill?)? = null,
 ) {
-    val moduleGlass = rememberChromeModuleGlass()
-    if (moduleGlass != null && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-        ModuleChromeGlass(state, moduleGlass, pureBlack, accentWash, surface, modifier, pill)
+    if (surface == ChromeSurface.MiniPlayer && com.mochyy.mochymusic.ui.customization.UiCustomizationState.options.miniBlack) {
+        Box(modifier.background(Color.Black))
         return
     }
-    val color = if (pureBlack) Color.Black else GlassChromeColor
+    val black = pureBlack
+    val moduleGlass = rememberChromeModuleGlass()
+    if (moduleGlass != null && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+        ModuleChromeGlass(state, moduleGlass, black, accentWash, surface, modifier, pill)
+        return
+    }
+    val color = if (black) Color.Black else GlassChromeColor
     // the grain only matters on the finer, high quality glass
     val grain = LocalBlurQuality.current == com.mochyy.mochymusic.constants.BlurQuality.HIGH
     Box(

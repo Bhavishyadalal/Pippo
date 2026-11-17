@@ -1,5 +1,7 @@
 package com.mochyy.mochymusic.ui.theme
 
+import com.mochyy.mochymusic.ui.customization.UiCustomizationState
+
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Shapes
 import androidx.compose.ui.graphics.Color
@@ -12,12 +14,12 @@ object PippoColors {
     val SurfaceRaised = Color(0xFF231F2A)
     val SurfaceHighest = Color(0xFF302B38)
     val Text = Color(0xFFF4EFF5)
-    val SecondaryText = Color(0xFFBBB4C3)
-    val MutedText = Color(0xFF9D95A7)
-    val Outline = Color(0xFF49414F)
+    val SecondaryText get() = if (UiCustomizationState.options.highContrast) Text else Color(0xFFBBB4C3)
+    val MutedText get() = if (UiCustomizationState.options.highContrast) Text else Color(0xFF9D95A7)
+    val Outline get() = if (UiCustomizationState.options.highContrast) Text.copy(alpha = .6f) else Color(0xFF49414F)
     val Divider = Color(0xFF332D3A)
-    val Accent = Color(0xFFF2B5A7)
-    val OnAccent = Color(0xFF35221F)
+    val Accent get() = UiCustomizationState.options.accentColor
+    val OnAccent get() = UiCustomizationState.options.accentInk
     val AccentContainer = Color(0xFF4A3037)
     val Sage = Color(0xFFBFCEB6)
     val OnSage = Color(0xFF263123)
@@ -28,13 +30,13 @@ object PippoColors {
 }
 
 object PippoSpacing {
-    val Micro = 4.dp
-    val Small = 8.dp
-    val Medium = 12.dp
-    val Large = 16.dp
-    val ExtraLarge = 20.dp
-    val Page = 24.dp
-    val Section = 32.dp
+    val Micro get() = (4 * UiCustomizationState.options.spacingScale).dp
+    val Small get() = (8 * UiCustomizationState.options.spacingScale).dp
+    val Medium get() = (12 * UiCustomizationState.options.spacingScale).dp
+    val Large get() = (16 * UiCustomizationState.options.spacingScale).dp
+    val ExtraLarge get() = (20 * UiCustomizationState.options.spacingScale).dp
+    val Page get() = (24 * UiCustomizationState.options.spacingScale).dp
+    val Section get() = (32 * UiCustomizationState.options.spacingScale).dp
 }
 
 object PippoSize {
@@ -46,10 +48,10 @@ object PippoSize {
 }
 
 object PippoCorners {
-    val Small = 12.dp
-    val Card = 20.dp
-    val Group = 24.dp
-    val Sheet = 32.dp
+    val Small get() = (12 * UiCustomizationState.options.cornerScale).dp
+    val Card get() = (20 * UiCustomizationState.options.cornerScale).dp
+    val Group get() = (24 * UiCustomizationState.options.cornerScale).dp
+    val Sheet get() = (32 * UiCustomizationState.options.cornerScale).dp
     val Pill = RoundedCornerShape(percent = 50)
 }
 
@@ -61,7 +63,7 @@ object PippoMotion {
     const val Loading = 900
 }
 
-val PippoShapes = Shapes(
+val PippoShapes get() = Shapes(
     extraSmall = RoundedCornerShape(8.dp),
     small = RoundedCornerShape(PippoCorners.Small),
     medium = RoundedCornerShape(PippoCorners.Card),

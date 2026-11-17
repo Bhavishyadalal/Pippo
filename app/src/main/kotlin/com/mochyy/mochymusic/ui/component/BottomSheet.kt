@@ -397,7 +397,7 @@ fun BottomSheet(
                             val p = state.progress.coerceIn(0f, 1f)
                             // the pill's hairline fades out as it opens (it used to drop in one frame at 5%); the wide bar draws its own round both halves
                             val edge = 1f - p / PillEdgeFadeEnd
-                            if (edge > 0f && !pillFrame.merged && moduleGlass?.outline != false) {
+                            if (edge > 0f && com.mochyy.mochymusic.ui.customization.UiCustomizationState.options.miniOutline && !pillFrame.merged && moduleGlass?.outline != false) {
                                 val left = androidx.compose.ui.unit.lerp(pillFrame.start, 0.dp, p).toPx()
                                 val right = androidx.compose.ui.unit.lerp(pillFrame.end, 0.dp, p).toPx()
                                 drawChromeOutline(

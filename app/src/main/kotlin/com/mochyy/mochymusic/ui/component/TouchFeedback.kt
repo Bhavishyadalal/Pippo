@@ -174,6 +174,7 @@ fun Modifier.pressBounce(
     interactionSource: InteractionSource,
     pressedScale: Float = 0.88f,
 ): Modifier {
+    if (!com.mochyy.mochymusic.ui.customization.UiCustomizationState.options.pressEffects || !com.mochyy.mochymusic.ui.utils.AppMotion.enabled) return this
     val scale = remember { Animatable(1f) }
     LaunchedEffect(interactionSource, pressedScale) {
         var pressed = 0

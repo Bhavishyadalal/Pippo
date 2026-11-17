@@ -99,7 +99,7 @@ import com.mochyy.mochymusic.ui.component.containerTransformSource
 import com.mochyy.mochymusic.ui.utils.stableStatusBars
 import com.mochyy.mochymusic.ui.component.RemoteFocus
 
-val SearchHorizontalPadding = PippoSpacing.Page
+val SearchHorizontalPadding get() = PippoSpacing.Page
 
 val SearchFieldHeight = PippoSize.Field
 
@@ -117,8 +117,8 @@ object SearchColors {
     val TileHigh = PippoColors.SurfaceRaised
     val Divider = PippoColors.Divider
     val Primary = PippoColors.Text
-    val Secondary = PippoColors.SecondaryText
-    val Placeholder = PippoColors.MutedText
+    val Secondary get() = PippoColors.SecondaryText
+    val Placeholder get() = PippoColors.MutedText
 
     fun page(pureBlack: Boolean): Color = PippoColors.page(pureBlack)
 }
