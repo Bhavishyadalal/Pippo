@@ -35,3 +35,7 @@ New AI-generated artwork inspired by the supplied references' cherry-red/black, 
 | **12** | Daisy Play — sage and cream headphones, play/P mark and daisy. |
 
 These are generated design proposals, not app screenshots, production adaptive-icon assets, or internet images presented as original work. Further refinements and Android icon variants can follow the selected number. No tests, builds, APKs or GitHub Actions were run for this artwork-only update. Main and stable are unchanged.
+
+## Selected direction and next round
+
+The selected favorites are **04, 10 and 11**. [See 10 more designs, numbered 13–22](../star-cable-v5/README.md), exploring their stars, headphone cables and bold P/play marks.
