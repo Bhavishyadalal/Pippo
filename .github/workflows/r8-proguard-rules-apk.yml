@@ -1,0 +1,55 @@
+name: R8 Release APK (ProGuard Rules)
+
+on:
+  workflow_dispatch:
+    inputs:
+      architecture:
+        description: 'ARM64 is faster to build and smaller; universal supports more devices.'
+        type: choice
+        required: true
+        default: arm64
+        options:
+          - arm64
+          - universal
+      signing:
+        description: 'Auto: private release key when configured, otherwise a temporary preview key.'
+        type: choice
+        required: true
+        default: auto
+        options:
+          - auto
+          - preview
+          - release
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pippo-r8-proguard-rules-${{ github.workflow }}-${{ github.ref }}-${{ inputs.architecture }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: R8 release with ProGuard rules · ${{ inputs.architecture }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+      STORE_PASSWORD: ${{ secrets.STORE_PASSWORD || secrets.KEYSTORE_PASSWORD }}
+      KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+      KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+      LASTFM_API_KEY: ${{ secrets.LASTFM_API_KEY }}
+      LASTFM_SECRET: ${{ secrets.LASTFM_SECRET }}
+      LIBREFM_API_KEY: ${{ secrets.LIBREFM_API_KEY }}
+      LIBREFM_SECRET: ${{ secrets.LIBREFM_SECRET }}
+      DISCORD_CLIENT_ID: ${{ secrets.DISCORD_CLIENT_ID }}
+    steps:
+      - name: Check out the selected branch
+        uses: actions/checkout@v5
+      - name: Build and upload R8 release APK
+        uses: ./.github/actions/build-optimized-apk
+        with:
+          architecture: ${{ inputs.architecture || 'arm64' }}
+          signing: ${{ inputs.signing || 'auto' }}
+          artifact-label: r8-proguard-rules
+          mapping-label: r8-proguard-rules-mapping
