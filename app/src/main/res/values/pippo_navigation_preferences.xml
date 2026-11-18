@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="true_black_amoled">True Black (AMOLED)</string>
+    <string name="true_black_amoled_description">Use pure black for pages and large surfaces.</string>
+    <string name="nav_appearance_title">Bottom navigation</string>
+    <string name="nav_style_glass">Current Glass</string>
+    <string name="nav_style_capsule">Compact Capsule</string>
+    <string name="nav_style_docked">Docked</string>
+    <string name="nav_style_ribbon">Ribbon</string>
+    <string name="nav_motion_title">Open and close motion</string>
+    <string name="nav_motion_description">How the bar moves when the player opens or closes.</string>
+    <string name="nav_motion_slide">Slide</string>
+    <string name="nav_motion_fold">Fold</string>
+    <string name="nav_motion_fade">Fade</string>
+    <string name="nav_motion_preview">Preview motion</string>
+</resources>

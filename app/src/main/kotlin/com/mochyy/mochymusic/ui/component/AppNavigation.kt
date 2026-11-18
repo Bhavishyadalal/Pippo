@@ -4,6 +4,7 @@ package com.mochyy.mochymusic.ui.component
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
@@ -14,8 +15,10 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
@@ -25,6 +28,7 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
@@ -201,7 +205,6 @@ class TabOwnership(private val navigationItems: List<Screens>) {
 
 /** The bar itself, a stadium the mini player's 64dp matches. */
 internal val NavBarHeight = 64.dp
-internal val NavBarShape = RoundedCornerShape(50)
 
 /** How bright an unlit tab's icon is. */
 private const val UnlitIconAlpha = 0.7f
@@ -209,23 +212,25 @@ private const val UnlitIconAlpha = 0.7f
 @Composable
 fun AppNavigationBar(
     navigationItems: List<Screens>,
-    currentRoute: String?,
     /** from [owningTab]: the tab the page on screen belongs to */
     selectedTabRoute: String,
     onItemClick: (Screens, Boolean) -> Unit,
     modifier: Modifier = Modifier,
     pureBlack: Boolean = false,
-    slimNav: Boolean = false,
+    style: BottomNavigationStyle = BottomNavigationStyle.GLASS,
     /** a second quick tap on Search: straight into typing */
-    onSearchDoubleTap: (() -> Unit)? = null
+    onSearchDoubleTap: (() -> Unit)? = null,
+    preview: Boolean = false,
 ) {
     val glassState = LocalGlassState.current ?: remember { GlassState() }
-    val accentWash = rememberChromeAccentWash()
+    val accentWash = if (!preview) rememberChromeAccentWash() else null
     val selectedIndex = navigationItems.indexOfFirst { it.route == selectedTabRoute }
     val tabCount = navigationItems.size
     val pill = rememberNavPill(selectedIndex)
     // a look's glass can draw its own edge and its own pill, and then mochy leaves its hairline, shadow or highlight out
-    val moduleGlass = rememberChromeModuleGlass()
+    val glass = style == BottomNavigationStyle.GLASS
+    val moduleGlass = if (glass && !preview) rememberChromeModuleGlass() else null
+    val shape = style.barShape
     val density = LocalDensity.current
     val glassPill = remember(pill, tabCount, density) {
         { bar: Size -> pill.forGlass(bar, with(density) { NavRowPadding.toPx() }, tabCount, density) }
@@ -234,35 +239,55 @@ fun AppNavigationBar(
     Box(modifier = modifier) {
         Box(
             modifier = Modifier
+                .then(if (preview) Modifier else Modifier.windowInsetsPadding(WindowInsets.systemBars.only(WindowInsetsSides.Horizontal)))
+                .padding(horizontal = style.horizontalMargin, vertical = 8.dp)
+                .then(if (style == BottomNavigationStyle.CAPSULE) Modifier.widthIn(max = 348.dp) else Modifier)
                 .fillMaxWidth()
-                .windowInsetsPadding(WindowInsets.systemBars.only(WindowInsetsSides.Horizontal))
-                .padding(horizontal = 24.dp, vertical = 8.dp)
                 .align(Alignment.TopCenter)
-                .height(NavBarHeight)
-                .press3D(maxTilt = 4f, pressedScale = 0.985f)
-                .then(if (moduleGlass?.shadow == false) Modifier else Modifier.dropShadow(NavBarShape, ChromeShadow))
-                .clip(NavBarShape)
-                .drawWithContent {
-                    drawContent()
-                    if (moduleGlass?.outline != false) drawChromeOutline(Offset.Zero, size, cornerRadius = size.height / 2f)
-                }
+                .height(style.barHeight)
+                .then(if (glass && !preview) Modifier.press3D(maxTilt = 4f, pressedScale = 0.985f) else Modifier)
+                .then(if (glass && moduleGlass?.shadow != false) Modifier.dropShadow(shape, ChromeShadow) else Modifier)
+                .clip(shape)
+                .then(if (glass) {
+                    Modifier.drawWithContent {
+                        drawContent()
+                        if (moduleGlass?.outline != false) drawChromeOutline(Offset.Zero, size, cornerRadius = size.height / 2f)
+                    }
+                } else Modifier)
         ) {
-            FrostedChromeGlass(
-                state = glassState,
-                pureBlack = pureBlack,
-                accentWash = accentWash,
-                modifier = Modifier.fillMaxSize(),
-                pill = glassPill,
-            )
+            if (glass && preview) {
+                Box(Modifier.fillMaxSize().background(Brush.verticalGradient(
+                    if (pureBlack) listOf(Color(0xFF19191B), Color.Black)
+                    else listOf(Color(0xFF3C3A45), Color(0xFF212129)),
+                )))
+            } else if (glass) {
+                FrostedChromeGlass(
+                    state = glassState,
+                    pureBlack = pureBlack,
+                    accentWash = accentWash,
+                    modifier = Modifier.fillMaxSize(),
+                    pill = glassPill,
+                )
+            } else {
+                val background = if (pureBlack) Color.Black else MaterialTheme.colorScheme.surfaceContainerHigh
+                Box(Modifier.fillMaxSize().background(background).drawWithContent {
+                    drawContent()
+                    if (style != BottomNavigationStyle.CAPSULE) {
+                        drawLine(Color.White.copy(alpha = .13f), Offset.Zero, Offset(size.width, 0f), 1.dp.toPx())
+                    }
+                })
+            }
 
             Row(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(horizontal = NavRowPadding)
-                    .navHighlight(pill, tabCount) { moduleGlass?.drawsPill != true }
-                    .navPillDrag(pill, tabCount, selectedIndex) { index ->
-                        navigationItems.getOrNull(index)?.let { onItemClick(it, index == selectedIndex) }
-                    },
+                    .then(if (style != BottomNavigationStyle.RIBBON) {
+                        Modifier.navHighlight(pill, tabCount) { moduleGlass?.drawsPill != true }
+                            .then(if (preview) Modifier else Modifier.navPillDrag(pill, tabCount, selectedIndex) { index ->
+                                navigationItems.getOrNull(index)?.let { onItemClick(it, index == selectedIndex) }
+                            })
+                    } else Modifier),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 navigationItems.forEach { screen ->
@@ -273,6 +298,8 @@ fun AppNavigationBar(
                         isSelected = screen.route == selectedTabRoute,
                         onItemClick = onItemClick,
                         onDoubleTap = onSearchDoubleTap.takeIf { screen == Screens.Search },
+                        ribbon = style == BottomNavigationStyle.RIBBON,
+                        interactive = !preview,
                     )
                 }
             }
@@ -306,6 +333,8 @@ internal fun RowScope.NavTab(
     isSelected: Boolean,
     onItemClick: (Screens, Boolean) -> Unit,
     onDoubleTap: (() -> Unit)?,
+    ribbon: Boolean = false,
+    interactive: Boolean = true,
 ) {
     val viewConfiguration = LocalViewConfiguration.current
     val interactionSource = remember { MutableInteractionSource() }
@@ -325,15 +354,19 @@ internal fun RowScope.NavTab(
         modifier = Modifier
             .weight(1f)
             .fillMaxHeight()
-            .pressBounce(interactionSource, pressedScale = 0.85f)
-            .clickable(
-                interactionSource = interactionSource,
-                indication = RemoteFocus,
-                onClick = {
-                    tabTapped(lastTap, viewConfiguration.doubleTapTimeoutMillis, onDoubleTap) {
-                        onItemClick(screen, isSelected)
-                    }
-                }
+            .then(
+                if (interactive) {
+                    Modifier.pressBounce(interactionSource, pressedScale = 0.85f)
+                        .clickable(
+                            interactionSource = interactionSource,
+                            indication = RemoteFocus,
+                            onClick = {
+                                tabTapped(lastTap, viewConfiguration.doubleTapTimeoutMillis, onDoubleTap) {
+                                    onItemClick(screen, isSelected)
+                                }
+                            },
+                        )
+                } else Modifier,
             ),
         contentAlignment = Alignment.Center
     ) {
@@ -341,6 +374,14 @@ internal fun RowScope.NavTab(
             LibraryDownloadIcon { TabIcons(screen, unlitIcon, litIcon, iconSize) { lit.value } }
         } else {
             TabIcons(screen, unlitIcon, litIcon, iconSize) { lit.value }
+        }
+        if (ribbon) {
+            Box(
+                Modifier.align(Alignment.BottomCenter).padding(bottom = 6.dp)
+                    .size(width = 20.dp, height = 2.dp)
+                    .graphicsLayer { alpha = lit.value }
+                    .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(50)),
+            )
         }
     }
 }
