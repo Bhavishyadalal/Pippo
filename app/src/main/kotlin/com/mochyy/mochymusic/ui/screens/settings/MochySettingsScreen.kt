@@ -4,6 +4,8 @@ package com.mochyy.mochymusic.ui.screens.settings
 
 import com.mochyy.mochymusic.ui.component.navigateToTab
 import androidx.activity.compose.BackHandler
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
@@ -273,14 +275,27 @@ internal val IconBgColor = Color(0xFF333338)
 @Composable
 fun MochySettingsScreen(navController: NavController, pane: SettingsPane? = null) {
     val focusManager = LocalFocusManager.current
+    val keyboard = LocalSoftwareKeyboardController.current
+    var query by remember { mutableStateOf(TextFieldValue()) }
+    var isSearchFocused by remember { mutableStateOf(false) }
+    val isSearching = isSearchFocused || query.text.isNotBlank()
+    val currentEntry by navController.currentBackStackEntryAsState()
+
+    fun closeSearch() {
+        keyboard?.hide()
+        focusManager.clearFocus()
+        isSearchFocused = false
+        query = TextFieldValue()
+    }
     val sheets = com.mochyy.mochymusic.ui.component.LocalZoomOutOverlayState.current
     val devices = com.mochyy.mochymusic.ui.screens.devices.rememberDevicesLink()
     // on a wide screen the list stays put and its pages open beside it; device integration is a sheet over either
     val open: (String) -> Unit = { route ->
+        if (isSearching) closeSearch()
         when {
             route == com.mochyy.mochymusic.ui.screens.devices.DeviceIntegrationRoute -> sheets.showDeviceIntegration(devices)
             pane != null -> navController.openSettingsPage(route)
-            else -> navController.navigate(route)
+            else -> navController.navigate(route) { launchSingleTop = true }
         }
     }
     val selected = pane?.selectedRoute
@@ -289,16 +304,12 @@ fun MochySettingsScreen(navController: NavController, pane: SettingsPane? = null
 
     val (profilePicUri) = rememberPreference(ProfilePicUriKey, "")
 
-    var query by remember { mutableStateOf(TextFieldValue()) }
-    var isSearchFocused by remember { mutableStateOf(false) }
-
-    val isSearching = isSearchFocused || query.text.isNotBlank()
-
-    BackHandler(enabled = isSearching) {
-        query = TextFieldValue()
-        isSearchFocused = false
-        focusManager.clearFocus()
-    }
+    // A wide screen keeps the list composed next to the options page.
+    // Only the active list may intercept Back to dismiss its search.
+    BackHandler(
+        enabled = isSearching && currentEntry?.destination?.route == SettingsListRoute,
+        onBack = ::closeSearch,
+    )
 
     val context = LocalContext.current
     // picked again each time the list opens, so a tip that was just followed stops showing
