@@ -1,7 +1,7 @@
 # Pippo stable 0.1.2 preparation
 
 - Branch: `stable-0.1.2`.
-- Includes beta through `7d74a25`, with playback and Bluetooth fixes, automatic refresh rate, module URL copying, and the matching startup and Home icon with Home scroll fixes.
+- Includes beta through `9014503`, with the Ribbon P icon collection, immersive player modes, Home artwork rotation, Settings Back fix, and five home-screen widgets.
 - Version name: `0.1.2`, version code: `74` (previously `1.0.0`, code `73`). Android compares the increasing version code for installation upgrades.
 - Package remains `com.bhavishyadalal.pippo`; stored data and the existing preferences/schema are retained.
 

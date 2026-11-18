@@ -101,6 +101,7 @@ import com.mochyy.mochymusic.ui.player.flagship.CoverFrost
 import com.mochyy.mochymusic.ui.player.flagship.flagshipBarFootprint
 import com.mochyy.mochymusic.ui.player.flagship.rememberAmbientColors
 import androidx.activity.compose.BackHandler
+import androidx.compose.runtime.saveable.rememberSaveable
 import com.mochyy.mochymusic.ui.component.BottomSheet
 import com.mochyy.mochymusic.ui.component.BottomSheetState
 import com.mochyy.mochymusic.ui.component.ExpandedSwipe
@@ -319,6 +320,8 @@ private fun PlayerSheet(
     var showStreamInfo by remember { mutableStateOf(false) }
 
     var showActionMenu by remember { mutableStateOf(false) }
+    var immersiveOpen by rememberSaveable { mutableStateOf(false) }
+    val immersiveVisible = immersiveOpen && state.isExpandedOrExpanding && !onTv
     // Which surface opened the menu. The lyrics tools only appear when it came from the lyrics
     // page, where they have something visible to act on.
     var menuFromLyrics by remember { mutableStateOf(false) }
@@ -501,7 +504,14 @@ private fun PlayerSheet(
         active = styleTurned && playerFullyOpen,
     )
 
-    val styleActions = remember(openStudio) {
+    val enterImmersive: () -> Unit = {
+        showActionMenu = false
+        showExpandMenu = false
+        menuReveal.floatValue = 0f
+        immersiveOpen = true
+    }
+
+    val styleActions = remember(openStudio, onTv) {
         com.mochyy.mochymusic.ui.player.styles.StyleActions(
             onOtherMenu = {
                 // the styles that perform the lyrics get the lyrics tools too: provider, translation
@@ -527,6 +537,7 @@ private fun PlayerSheet(
             onClose = { state.collapseSoft() },
             onQueue = { styleQueueOpen = true },
             turn = if (onTv) null else styleTurn,
+            onImmersive = if (onTv) null else enterImmersive,
         )
     }
 
@@ -534,6 +545,7 @@ private fun PlayerSheet(
     // the window's height changes under the open player, until the sheet catches up, and each
     // drop shut the chevron's menu as it opened.
     OnSheetHeadingDown(state) {
+        immersiveOpen = false
         studio.reset()
 
         showActionMenu = false
@@ -559,7 +571,7 @@ private fun PlayerSheet(
     val sheetShowing by remember(state) { derivedStateOf { state.progress > 0f } }
 
     // the record and the lyrics move with no finger on them, which android 15+ otherwise draws at 60hz
-    com.mochyy.mochymusic.ui.utils.HighRefreshWhile { sheetShowing && transportState.isPlaying }
+    com.mochyy.mochymusic.ui.utils.HighRefreshWhile { sheetShowing && !immersiveVisible && transportState.isPlaying }
 
     // Settings > Customise > Gesture: a swipe down anywhere on the open player closes it (#121)
     val (swipeDownAnywhere) = rememberPreference(
@@ -904,6 +916,7 @@ private fun PlayerSheet(
                 com.mochyy.mochymusic.ui.player.studio.PlayerMenuAction.EQUALIZER -> openEqualizer()
                 com.mochyy.mochymusic.ui.player.studio.PlayerMenuAction.OUTPUT -> showDeviceOutput = true
                 com.mochyy.mochymusic.ui.player.studio.PlayerMenuAction.FULL_VIDEO -> enterVideoMode()
+                com.mochyy.mochymusic.ui.player.studio.PlayerMenuAction.IMMERSIVE -> enterImmersive()
                 com.mochyy.mochymusic.ui.player.studio.PlayerMenuAction.ROTATE -> styleTurn.toggle()
                 else -> menuExtras.run(action)
             }
@@ -956,7 +969,7 @@ private fun PlayerSheet(
             pureBlack = pureBlack,
             background = {},
             sharedContent = {
-                MorphingCover(
+                if (!immersiveVisible) MorphingCover(
                     progressProvider = progressProvider,
                     horizontalOffsetProvider = horizontalOffsetProvider,
                     trackInfo = trackInfo,
@@ -1007,6 +1020,7 @@ private fun PlayerSheet(
             },
             collapsedContent = {},
         ) {
+            if (immersiveVisible) return@BottomSheet
 
             // Alternate styles replace the player outright rather than drawing over it, so none
             // of the default composition - blur, morphing cover, controls - runs while one is
@@ -1756,7 +1770,9 @@ private fun PlayerSheet(
                 }
                 // with a youtube video on the cover, the full video mode goes on top unless it's already one of the four
                 val fullVideo = com.mochyy.mochymusic.ui.player.studio.PlayerMenuAction.FULL_VIDEO
-                val withVideo = if (videoShowing && fullVideo !in set) listOf(fullVideo) + set else set
+                val immersive = com.mochyy.mochymusic.ui.player.studio.PlayerMenuAction.IMMERSIVE
+                val menu = if (!onTv && immersive !in set) listOf(immersive) + set else set
+                val withVideo = if (videoShowing && fullVideo !in menu) listOf(fullVideo) + menu else menu
                 // the turntable's rotate button sits last, the way the other styles keep theirs at the end
                 if (isTurntable && styleCanTurn) withVideo + com.mochyy.mochymusic.ui.player.studio.PlayerMenuAction.ROTATE else withVideo
             },
@@ -1811,10 +1827,13 @@ private fun PlayerSheet(
             com.mochyy.mochymusic.ui.player.info.StreamInfoSheet(onDismiss = { showStreamInfo = false })
         }
 
+        if (immersiveVisible) ImmersivePlayer(onExit = { immersiveOpen = false })
+
         if (showActionMenu) {
             PlayerActionMenu(
                 fromLyrics = menuFromLyrics,
                 onFullVideo = enterVideoMode,
+                onImmersive = if (onTv) null else enterImmersive,
                 onEqualizer = openEqualizer,
                 onOpenRoute = { route ->
                     navController.navigate(route)

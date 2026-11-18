@@ -96,6 +96,7 @@ fun PlayerActionMenu(
     onReveal: ((Float) -> Unit)? = null,
     // turns the player into the full video mode; no row without it
     onFullVideo: (() -> Unit)? = null,
+    onImmersive: (() -> Unit)? = null,
     // opens the equalizer page; no row without it
     onEqualizer: (() -> Unit)? = null,
     // opens a page of the app for a module's row (its own page, a search)
@@ -318,8 +319,18 @@ fun PlayerActionMenu(
                     )
                 }
 
-                if (onFullVideo != null) {
+                if (onImmersive != null || onFullVideo != null) {
                     Spacer(modifier = Modifier.height(SectionGap))
+                }
+                if (onImmersive != null) {
+                    MenuRow(
+                        icon = R.drawable.fullscreen,
+                        title = stringResource(R.string.immersive_mode),
+                        onClick = { onDismiss(); onImmersive() },
+                    )
+                    if (onFullVideo != null) Spacer(modifier = Modifier.height(8.dp))
+                }
+                if (onFullVideo != null) {
                     MenuRow(
                         icon = R.drawable.fullscreen,
                         title = androidx.compose.ui.res.stringResource(R.string.video_mode),

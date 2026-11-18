@@ -798,7 +798,7 @@ fun ProfileScreen(navController: NavController) {
                         )
                         Spacer(Modifier.height(28.dp))
                         Text(stringResource(R.string.profile_settings_title), style = PageTitle.copy(fontSize = 15.sp), modifier = Modifier.padding(start = 2.dp, bottom = 10.dp))
-                        OpenSettingsRow(onClick = { navController.navigate("mochy_settings") })
+                        OpenSettingsRow(onClick = { navController.navigate(SettingsListRoute) { launchSingleTop = true } })
                         Spacer(Modifier.height(180.dp))
                     }
                     },

@@ -170,7 +170,7 @@ fun StudioSheets(
                 val current = menuLayout.actionAt(slot)
                 val used = (menuLayout.slots + menuLayout.side).toSet()
                 OptionSheet(if (slot == PlayerMenuLayout.SideSlot) stringResource(R.string.ps_studio_side_button) else stringResource(R.string.ps_studio_menu_button, slot + 1)) {
-                    PlayerMenuAction.entries.filter { it != PlayerMenuAction.ROTATE }.forEach { action ->
+                    PlayerMenuAction.entries.filter { it != PlayerMenuAction.ROTATE && it != PlayerMenuAction.IMMERSIVE }.forEach { action ->
                         OptionRow(
                             selected = action == current,
                             onClick = { menuLayout.assign(slot, action) },

@@ -7,6 +7,12 @@ inputs:
   signing:
     description: auto uses release secrets when complete; preview needs no secrets; release requires secrets.
     default: auto
+  artifact-label:
+    description: Label for the APK artifact from this workflow.
+    default: optimized
+  mapping-label:
+    description: Label for the R8 mapping artifact from this workflow.
+    default: r8-mapping
 runs:
   using: composite
   steps:
@@ -164,7 +170,7 @@ runs:
       id: apk
       uses: actions/upload-artifact@v4
       with:
-        name: pippo-${{ steps.configure.outputs.architecture }}-gms-${{ steps.configure.outputs.signing }}-optimized-${{ github.run_number }}
+        name: pippo-${{ steps.configure.outputs.architecture }}-gms-${{ steps.configure.outputs.signing }}-${{ inputs.artifact-label }}-${{ github.run_number }}
         path: app/build/outputs/apk/${{ steps.configure.outputs.flavor }}/release/*.apk
         if-no-files-found: error
         compression-level: 0
@@ -173,7 +179,7 @@ runs:
     - name: Upload R8 mapping for crash diagnosis
       uses: actions/upload-artifact@v4
       with:
-        name: pippo-${{ steps.configure.outputs.architecture }}-r8-mapping-${{ github.run_number }}
+        name: pippo-${{ steps.configure.outputs.architecture }}-${{ inputs.mapping-label }}-${{ github.run_number }}
         path: app/build/outputs/mapping/${{ steps.configure.outputs.flavor }}Release/mapping.txt
         if-no-files-found: error
         retention-days: 30
