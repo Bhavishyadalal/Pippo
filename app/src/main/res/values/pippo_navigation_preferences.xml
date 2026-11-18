@@ -12,9 +12,10 @@
     <string name="nav_motion_slide">Slide</string>
     <string name="nav_motion_fold">Fold</string>
     <string name="nav_motion_fade">Fade</string>
-    <string name="nav_motion_preview">Preview motion</string>
+    <string name="nav_motion_preview">Preview open and close</string>
+    <string name="nav_motion_preview_disabled">Turn on animations to preview these effects.</string>
     <string name="scroll_player_title">Scroll player</string>
-    <string name="scroll_player_description">Tuck away the tabs as you scroll down. Scroll back up to reveal them.</string>
+    <string name="scroll_player_description">Hide the tabs when scrolling down through music pages. Scroll up to show them again. Tap a style to preview it.</string>
     <string name="scroll_player_motion_disabled">Turn on animations to use scroll motion and previews.</string>
     <string name="scroll_player_flow">Flow</string>
     <string name="scroll_player_glide">Glide</string>

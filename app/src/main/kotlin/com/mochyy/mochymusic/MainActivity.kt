@@ -176,6 +176,7 @@ import com.mochyy.mochymusic.ui.component.BottomNavigationStyleKey
 import com.mochyy.mochymusic.ui.component.ScrollPlayerEnabledKey
 import com.mochyy.mochymusic.ui.component.ScrollPlayerMotion
 import com.mochyy.mochymusic.ui.component.ScrollPlayerMotionKey
+import com.mochyy.mochymusic.ui.component.navigationPlayerHideFraction
 import com.mochyy.mochymusic.ui.component.rememberScrollPlayerChrome
 import com.mochyy.mochymusic.ui.component.scrollPlayerFraction
 import com.mochyy.mochymusic.ui.component.applyNavigationMotion
@@ -771,13 +772,23 @@ class MainActivity : ComponentActivity() {
                 )
 
                 val scrollPlayerActive = scrollPlayerEnabled && shouldShowNavigationBar &&
+                    selectedTabRoute != Screens.Settings.route && currentRoute !in SubSettingsRoutes &&
                     !hideAppChrome.value && !isTelevision() &&
-                    com.mochyy.mochymusic.ui.utils.AppMotion.durationScale.scaleFactor > 0f &&
-                    playerBottomSheetState.isCollapsed && !playerBottomSheetState.isExpandedOrExpanding
+                    com.mochyy.mochymusic.ui.utils.AppMotion.durationScale.scaleFactor > 0f
                 val isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
-                val scrollChrome = rememberScrollPlayerChrome(navBackStackEntry, scrollPlayerActive)
+                val scrollChrome = rememberScrollPlayerChrome(navBackStackEntry, scrollPlayerActive) {
+                    !playerBottomSheetState.isExpandedOrExpanding &&
+                        (playerBottomSheetState.isCollapsed || playerBottomSheetState.isDismissed)
+                }
                 val scrollFold = scrollPlayerFraction(navBackStackEntry, scrollChrome, scrollMotion)
-                val scrollTabsHidden by remember(scrollFold) { derivedStateOf { scrollFold.value >= 1f } }
+                val playerCoversTabs by remember(playerBottomSheetState) {
+                    derivedStateOf { navigationPlayerHideFraction(playerBottomSheetState.progress) >= 1f }
+                }
+                LaunchedEffect(scrollChrome, playerCoversTabs) {
+                    // Reset under the open player so reverse scrolling can't flash the tabs
+                    // during expansion, and closing the player brings the bar back.
+                    if (playerCoversTabs) scrollChrome.reset()
+                }
 
                 PlayerSystemBarsSync(playerBottomSheetState)
 
@@ -1116,7 +1127,7 @@ class MainActivity : ComponentActivity() {
                                                         navMotion.value, playerBottomSheetState.progress, totalHeightPx,
                                                         routeOffset = hideOffset, scrim = true,
                                                     )
-                                                    if (wideBar == null && scrollFold.value > 0f) {
+                                                    if (wideBar == null || playerBottomSheetState.isDismissed) {
                                                         translationY += navPadding.toPx() * scrollFold.value
                                                     }
                                                 }
@@ -1140,8 +1151,11 @@ class MainActivity : ComponentActivity() {
                                                     routeOffset = hideOffset,
                                                 )
                                             }
+                                        val scrollTabsHidden by remember(scrollFold) {
+                                            derivedStateOf { scrollFold.value >= 1f }
+                                        }
                                         val scrollTabs = Modifier
-                                            .then(if (scrollTabsHidden) Modifier.clearAndSetSemantics {} else Modifier)
+                                            .then(if (scrollTabsHidden || playerCoversTabs) Modifier.clearAndSetSemantics {} else Modifier)
                                             .graphicsLayer {
                                                 scrollMotion.applyTo(
                                                     this, scrollFold.value, size.height,
@@ -1161,7 +1175,12 @@ class MainActivity : ComponentActivity() {
                                                 bar = wideBar,
                                                 withPlayer = withPlayerNow,
                                                 pureBlack = pureBlack,
-                                                modifier = barMotion.fillMaxWidth(),
+                                                modifier = barMotion.fillMaxWidth().graphicsLayer {
+                                                    scrollMotion.applyTo(
+                                                        this, scrollFold.value * (1f - withPlayer.value),
+                                                        size.height, rtl = isRtl,
+                                                    )
+                                                },
                                                 scrollFold = { scrollFold.value },
                                             )
                                         }

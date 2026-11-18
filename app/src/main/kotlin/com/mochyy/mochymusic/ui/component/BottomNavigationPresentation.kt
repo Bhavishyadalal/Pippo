@@ -40,7 +40,13 @@ enum class BottomNavigationMotion(@StringRes val label: Int) {
 val BottomNavigationStyleKey = stringPreferencesKey("bottomNavigationStyle")
 val BottomNavigationMotionKey = stringPreferencesKey("bottomNavigationMotion")
 
-/** The bar follows the sheet's existing progress. Its layout and insets stay fixed during a gesture. */
+// Keep the transition visible through most of the sheet's travel, and clear the buttons
+// before the full player's controls reach the bottom of the window.
+internal fun navigationPlayerHideFraction(progress: Float): Float =
+    if (AppMotion.durationScale.scaleFactor > 0f) (progress / .78f).coerceIn(0f, 1f)
+    else if (progress < .5f) 0f else 1f
+
+/** The bar follows the sheet without changing the layout or insets during a gesture. */
 internal fun GraphicsLayerScope.applyNavigationMotion(
     motion: BottomNavigationMotion,
     progress: Float,
@@ -48,19 +54,22 @@ internal fun GraphicsLayerScope.applyNavigationMotion(
     routeOffset: Float = 0f,
     scrim: Boolean = false,
 ) {
-    val p = progress.coerceIn(0f, 1f)
+    val hidden = navigationPlayerHideFraction(progress)
     transformOrigin = TransformOrigin(.5f, 1f)
-    val opacity = (1f - p / .6f).coerceIn(0f, 1f)
-    val animate = AppMotion.durationScale.scaleFactor > 0f
-    val visible = if (animate) opacity else if (p < .5f) 1f else 0f
-    val showSlide = motion == BottomNavigationMotion.SLIDE && animate
-    alpha = if (scrim && showSlide) 1f else visible
-    translationY = routeOffset + when {
-        showSlide -> travel * p
-        visible == 0f -> travel
-        motion == BottomNavigationMotion.FOLD -> travel * .34f * (1f - visible)
-        else -> 0f
+    if (hidden >= 1f) {
+        alpha = 0f
+        translationY = routeOffset + travel
+        return
     }
-    scaleX = if (!scrim && motion == BottomNavigationMotion.FOLD) .78f + .22f * visible else 1f
-    scaleY = if (!scrim && motion == BottomNavigationMotion.FOLD) .68f + .32f * visible else 1f
+    alpha = when (motion) {
+        BottomNavigationMotion.SLIDE -> 1f - hidden * hidden
+        BottomNavigationMotion.FOLD, BottomNavigationMotion.FADE -> 1f - hidden
+    }
+    translationY = routeOffset + travel * when (motion) {
+        BottomNavigationMotion.SLIDE -> hidden
+        BottomNavigationMotion.FOLD -> .5f * hidden
+        BottomNavigationMotion.FADE -> 0f
+    }
+    scaleX = if (!scrim && motion == BottomNavigationMotion.FOLD) 1f - .26f * hidden else 1f
+    scaleY = if (!scrim && motion == BottomNavigationMotion.FOLD) 1f - .42f * hidden else 1f
 }
