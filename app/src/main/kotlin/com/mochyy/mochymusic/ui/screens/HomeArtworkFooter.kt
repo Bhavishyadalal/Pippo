@@ -23,6 +23,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
@@ -160,7 +161,7 @@ internal fun HomeArtworkFooter(rotation: HomeArtworkRotation) {
                         )
                         val glow = Brush.radialGradient(
                             listOf(Color(0x55F7AC8B), Color.Transparent),
-                            center = center.copy(y = size.height * .83f),
+                            center = Offset(size.width * .5f, size.height * .83f),
                             radius = size.width * .42f,
                         )
                         val sceneSize = Size(size.width, size.width / 1.93f)

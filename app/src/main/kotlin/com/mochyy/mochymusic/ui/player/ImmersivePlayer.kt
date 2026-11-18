@@ -178,6 +178,7 @@ private fun ImmersiveContent(connection: PlayerConnection, onExit: () -> Unit) {
                 connection.seekToPrevious()
                 revealControls()
             }
+            else -> Unit
         }
     }
 
