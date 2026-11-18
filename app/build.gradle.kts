@@ -28,8 +28,8 @@ extensions.configure<ApplicationExtension> {
         resValue("string", "shortcut_target_package", "com.bhavishyadalal.pippo")
         minSdk = 24
         targetSdk = 37
-        versionCode = 73
-        versionName = "1.0.0"
+        versionCode = 74
+        versionName = "0.1.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
