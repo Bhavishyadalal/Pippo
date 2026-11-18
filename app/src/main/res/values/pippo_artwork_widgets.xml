@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_art_like">Like song</string>
+    <string name="widget_art_remove_like">Remove like</string>
+    <string name="widget_vinyl_collage">Vinyl Collage</string>
+    <string name="widget_vinyl_collage_description">A cutout record sleeve with a vinyl disc.</string>
+    <string name="widget_cloud_notes">Cloud Notes</string>
+    <string name="widget_cloud_notes_description">Song artwork framed by a soft blue cloud.</string>
+    <string name="widget_noir_sleeve">Noir Sleeve</string>
+    <string name="widget_noir_sleeve_description">A charcoal frame with full artwork.</string>
+    <string name="widget_amber_frame">Amber Frame</string>
+    <string name="widget_amber_frame_description">Full artwork with a warm amber edge.</string>
+    <string name="widget_coral_glow">Coral Glow</string>
+    <string name="widget_coral_glow_description">A coral glow around the current cover.</string>
+</resources>

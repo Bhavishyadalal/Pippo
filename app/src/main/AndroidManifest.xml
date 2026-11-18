@@ -516,6 +516,41 @@
                 android:resource="@xml/turntable_widget_info" />
         </receiver>
 
+        <receiver android:name=".widget.VinylCollageWidget" android:exported="false" android:label="@string/widget_vinyl_collage">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_vinyl_collage_info" />
+        </receiver>
+
+        <receiver android:name=".widget.CloudNotesWidget" android:exported="false" android:label="@string/widget_cloud_notes">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_cloud_notes_info" />
+        </receiver>
+
+        <receiver android:name=".widget.NoirSleeveWidget" android:exported="false" android:label="@string/widget_noir_sleeve">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_noir_sleeve_info" />
+        </receiver>
+
+        <receiver android:name=".widget.AmberFrameWidget" android:exported="false" android:label="@string/widget_amber_frame">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_amber_frame_info" />
+        </receiver>
+
+        <receiver android:name=".widget.CoralGlowWidget" android:exported="false" android:label="@string/widget_coral_glow">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_coral_glow_info" />
+        </receiver>
+
         <!-- Google Cast Options Provider -->
         <meta-data
             android:name="com.google.android.gms.cast.framework.OPTIONS_PROVIDER_CLASS_NAME"
