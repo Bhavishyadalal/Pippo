@@ -10,6 +10,7 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.GraphicsLayerScope
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
@@ -75,7 +76,7 @@ internal val ScrollPlayerEnabledKey = booleanPreferencesKey("scrollPlayerEnabled
 internal val ScrollPlayerMotionKey = stringPreferencesKey("scrollPlayerMotion")
 
 internal class ScrollPlayerChrome(
-    private val enabled: Boolean,
+    private val canScroll: () -> Boolean,
     private val threshold: Float,
 ) : NestedScrollConnection {
     private val folded = mutableStateOf(false)
@@ -83,8 +84,13 @@ internal class ScrollPlayerChrome(
 
     val isFolded: Boolean get() = folded.value
 
+    fun reset() {
+        folded.value = false
+        distance = 0f
+    }
+
     override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
-        if (!enabled || source != NestedScrollSource.UserInput) return Offset.Zero
+        if (!canScroll() || source != NestedScrollSource.UserInput) return Offset.Zero
 
         // Only fold on real content movement. A pull at the top still restores the tabs.
         val dy = if (isFolded && consumed.y >= 0f) consumed.y + available.y.coerceAtLeast(0f) else consumed.y
@@ -108,9 +114,16 @@ internal class ScrollPlayerChrome(
 }
 
 @Composable
-internal fun rememberScrollPlayerChrome(entry: NavBackStackEntry?, enabled: Boolean): ScrollPlayerChrome {
+internal fun rememberScrollPlayerChrome(
+    entry: NavBackStackEntry?,
+    enabled: Boolean,
+    canScroll: () -> Boolean,
+): ScrollPlayerChrome {
     val threshold = with(LocalDensity.current) { 28.dp.toPx() }
-    return remember(entry, enabled, threshold) { ScrollPlayerChrome(enabled, threshold) }
+    val currentCanScroll = rememberUpdatedState(canScroll)
+    return remember(entry, enabled, threshold) {
+        ScrollPlayerChrome(canScroll = { enabled && currentCanScroll.value() }, threshold = threshold)
+    }
 }
 
 @Composable
