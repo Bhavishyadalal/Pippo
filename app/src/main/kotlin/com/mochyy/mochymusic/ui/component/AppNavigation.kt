@@ -205,6 +205,7 @@ class TabOwnership(private val navigationItems: List<Screens>) {
 
 /** The bar itself, a stadium the mini player's 64dp matches. */
 internal val NavBarHeight = 64.dp
+internal val NavBarShape = RoundedCornerShape(50)
 
 /** How bright an unlit tab's icon is. */
 private const val UnlitIconAlpha = 0.7f
