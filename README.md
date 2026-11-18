@@ -20,7 +20,3 @@ The Kotlin namespace, library interfaces, and stored compatibility keys retain t
 
 See [NOTICE.md](NOTICE.md) for upstream attribution and [LICENSE](LICENSE) for the retained GNU GPL v3 license. Copyright notices and upstream history are preserved.
 
-
-## Preview beta v0.1.2
-
-The `preview-beta-v0.1.2` branch expands **Settings → Customisation** with navigation layouts/order/labels, accents and text controls, page motion and feedback, Home shelf visibility/order, Library spacing, mini-player options, character selection and named appearance presets with import/export/reset. Performance presets reuse the existing blur and animation controls. See [beta customization details](docs/PREVIEW-BETA-V0.1.2.md) for behavior and review limits. No APK or workflow was run while preparing this beta.

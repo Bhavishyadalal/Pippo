@@ -33,7 +33,6 @@ fun StreamFormatBadge(
     height: Dp = 20.dp,
     color: Color = Color.White.copy(alpha = 0.55f),
 ) {
-    if (com.mochyy.mochymusic.ui.customization.UiCustomizationState.options.hideQuality) return
     // the text is sized off the box, not the user's font scale, so the two never drift apart
     val fontSize = with(LocalDensity.current) { (height * 0.5f).toSp() }
     Box(

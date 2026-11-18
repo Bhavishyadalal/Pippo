@@ -106,7 +106,7 @@ private val CardPadding = 20.dp
 // past this the page stops widening, so a tablet reads like a wide phone
 private val PageMaxWidth = 680.dp
 
-private val PageTitleStyle get() = TextStyle(
+private val PageTitleStyle = TextStyle(
     fontFamily = InterFontFamily,
     fontWeight = FontWeight.Bold,
     fontSize = 34.sp,
@@ -119,14 +119,6 @@ fun GestureScreen(navController: NavController) = CustomisationScreen(navControl
 
 // the customize page's parts in order, with what a search or a settings result can find each one by
 private enum class CustomiseSection(@StringRes val titleRes: Int, val keys: List<String>, val words: String) {
-    HOME_LAYOUT(R.string.beta_home, listOf("Home shelves"), "home shelves order hide show recently played artists playlists videos history"),
-    PERFORMANCE(R.string.beta_performance, listOf("Performance presets"), "performance light balanced expressive fast battery smooth presets"),
-    NAVIGATION(R.string.beta_navigation, listOf("App navigation"), "navigation bottom tabs labels reorder icons pill flat outline indicator swipe"),
-    APPEARANCE(R.string.beta_appearance, listOf("Colors and text"), "accent palette custom color hex contrast font text size spacing corners shapes"),
-    MOTION_FEEDBACK(R.string.beta_motion, listOf("Transitions and feedback"), "transition fade scale instant duration press feedback haptics motion"),
-    CHARACTERS(R.string.beta_characters, listOf("Pippo characters"), "mascot character male female hidden random anime"),
-    PROFILES(R.string.beta_profiles, listOf("Saved presets"), "theme preset save restore reset export import json backup"),
-    MORE(R.string.beta_more, listOf("More customization"), "home opening tab library browse grid spacing mini player outline black badge settings descriptions"),
     ICONS(R.string.customise_icons, listOf("Icons", "App icon"), "icon icons app launcher home screen Pippo outline anime material you white black dark transparent"),
     ROUNDING(R.string.customise_cover_rounding, listOf("Cover rounding"), "cover rounding corner radius square rounded art"),
     PLAYLIST(R.string.customise_playlist_styles, listOf("Playlist styles"), "playlist styles flow classic minimal header"),
@@ -199,7 +191,7 @@ fun CustomisationScreen(navController: NavController) {
                 shown.forEachIndexed { index, section ->
                     if (index > 0) SectionRule()
                     Box(Modifier.highlightTarget(section.keys)) {
-                        CustomiseSectionContent(section, navController)
+                        CustomiseSectionContent(section)
                     }
                 }
             }
@@ -208,17 +200,9 @@ fun CustomisationScreen(navController: NavController) {
 }
 
 @Composable
-private fun CustomiseSectionContent(section: CustomiseSection, navController: NavController) {
+private fun CustomiseSectionContent(section: CustomiseSection) {
     val pagerBleed = Modifier.bleedHorizontally(CustomisePageMargin)
     when (section) {
-        CustomiseSection.HOME_LAYOUT -> BetaHomeSection()
-        CustomiseSection.PERFORMANCE -> BetaPerformanceSection()
-        CustomiseSection.NAVIGATION -> BetaNavigationSection()
-        CustomiseSection.APPEARANCE -> BetaAppearanceSection()
-        CustomiseSection.MOTION_FEEDBACK -> BetaMotionSection()
-        CustomiseSection.CHARACTERS -> BetaCharacterSection()
-        CustomiseSection.PROFILES -> BetaProfilesSection()
-        CustomiseSection.MORE -> BetaMoreSection(navController)
         CustomiseSection.ICONS -> IconsSection()
         CustomiseSection.ROUNDING -> {
             val (coverRadiusPx, onCoverRadiusChange) = rememberPreference(ThumbnailCornerRadiusKey, defaultValue = DefaultCoverRadius)

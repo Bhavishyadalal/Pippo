@@ -62,42 +62,19 @@ fun animationSpeedLabel(speed: Float): String {
 /** [transition], or no transition at all while animations are switched off */
 fun AnimatedContentTransitionScope<NavBackStackEntry>.motionEnter(
     transition: AnimatedContentTransitionScope<NavBackStackEntry>.() -> EnterTransition?,
-): EnterTransition? = if (AppMotion.enabled) selectedPageEnter { transition() } else EnterTransition.None
+): EnterTransition? = if (AppMotion.enabled) transition() else EnterTransition.None
 
 /** [transition], or no transition at all while animations are switched off */
 fun AnimatedContentTransitionScope<NavBackStackEntry>.motionExit(
     transition: AnimatedContentTransitionScope<NavBackStackEntry>.() -> ExitTransition?,
-): ExitTransition? = if (AppMotion.enabled) selectedPageExit { transition() } else ExitTransition.None
+): ExitTransition? = if (AppMotion.enabled) transition() else ExitTransition.None
 
 /** The NavHost's own defaults, which can't be null: [transition], or none while animations are off */
 fun AnimatedContentTransitionScope<NavBackStackEntry>.defaultMotionEnter(
     transition: AnimatedContentTransitionScope<NavBackStackEntry>.() -> EnterTransition,
-): EnterTransition = if (AppMotion.enabled) selectedPageEnter { transition() } ?: EnterTransition.None else EnterTransition.None
+): EnterTransition = if (AppMotion.enabled) transition() else EnterTransition.None
 
 /** The NavHost's own defaults, which can't be null: [transition], or none while animations are off */
 fun AnimatedContentTransitionScope<NavBackStackEntry>.defaultMotionExit(
     transition: AnimatedContentTransitionScope<NavBackStackEntry>.() -> ExitTransition,
-): ExitTransition = if (AppMotion.enabled) selectedPageExit { transition() } ?: ExitTransition.None else ExitTransition.None
-
-// Only navigation-owned transitions are changed; draggable player/sheet choreography stays intact.
-private fun selectedPageEnter(current: () -> EnterTransition?): EnterTransition? {
-    val ui = com.mochyy.mochymusic.ui.customization.UiCustomizationState.options
-    val spec = androidx.compose.animation.core.tween<Float>(ui.transitionDuration)
-    return when (ui.transition) {
-        com.mochyy.mochymusic.constants.UiTransition.DEFAULT -> current()
-        com.mochyy.mochymusic.constants.UiTransition.FADE -> androidx.compose.animation.fadeIn(spec)
-        com.mochyy.mochymusic.constants.UiTransition.SCALE -> androidx.compose.animation.fadeIn(spec) + androidx.compose.animation.scaleIn(spec, initialScale = .96f)
-        com.mochyy.mochymusic.constants.UiTransition.NONE -> EnterTransition.None
-    }
-}
-
-private fun selectedPageExit(current: () -> ExitTransition?): ExitTransition? {
-    val ui = com.mochyy.mochymusic.ui.customization.UiCustomizationState.options
-    val spec = androidx.compose.animation.core.tween<Float>(ui.transitionDuration)
-    return when (ui.transition) {
-        com.mochyy.mochymusic.constants.UiTransition.DEFAULT -> current()
-        com.mochyy.mochymusic.constants.UiTransition.FADE -> androidx.compose.animation.fadeOut(spec)
-        com.mochyy.mochymusic.constants.UiTransition.SCALE -> androidx.compose.animation.fadeOut(spec) + androidx.compose.animation.scaleOut(spec, targetScale = .98f)
-        com.mochyy.mochymusic.constants.UiTransition.NONE -> ExitTransition.None
-    }
-}
+): ExitTransition = if (AppMotion.enabled) transition() else ExitTransition.None

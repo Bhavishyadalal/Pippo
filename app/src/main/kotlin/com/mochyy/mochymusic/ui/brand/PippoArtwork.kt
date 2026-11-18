@@ -17,15 +17,7 @@ object PippoArtwork {
     private val wave = Random.nextBoolean()
 
     @DrawableRes
-    fun resource(pose: PippoPose): Int {
-        val choice = com.mochyy.mochymusic.ui.customization.UiCustomizationState.options.character
-        if (choice == com.mochyy.mochymusic.constants.UiCharacter.HIDDEN) return R.drawable.pippo_artwork_hidden
-        val male = when (choice) {
-            com.mochyy.mochymusic.constants.UiCharacter.MALE -> true
-            com.mochyy.mochymusic.constants.UiCharacter.FEMALE -> false
-            else -> this.male
-        }
-        return when (pose) {
+    fun resource(pose: PippoPose): Int = when (pose) {
         PippoPose.Welcome -> if (male) {
             if (wave) R.drawable.pippo_male_wave else R.drawable.pippo_male_welcome
         } else {
@@ -33,12 +25,11 @@ object PippoArtwork {
         }
         PippoPose.Listening -> if (male) R.drawable.pippo_male_listening else R.drawable.pippo_female_listening
         PippoPose.Thanks -> if (male) R.drawable.pippo_male_thanks else R.drawable.pippo_female_thanks
-        }
     }
 }
 
 @Composable
 fun PippoCharacter(pose: PippoPose, modifier: Modifier = Modifier) {
-    val artwork = PippoArtwork.resource(pose)
+    val artwork = remember(pose) { PippoArtwork.resource(pose) }
     AsyncImage(model = artwork, contentDescription = null, contentScale = ContentScale.Fit, modifier = modifier)
 }

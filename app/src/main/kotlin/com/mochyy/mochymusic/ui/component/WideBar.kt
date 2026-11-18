@@ -226,10 +226,10 @@ fun WideBarTabs(
                 .height(bar.height)
                 .padding(horizontal = NavRowPadding)
                 // the wide bar's tabs sit apart from its glass, so mochy draws this pill even when the look's glass draws the nav bar's
-                .navHighlight(pill, navigationItems.size) { com.mochyy.mochymusic.ui.customization.UiCustomizationState.options.navIndicator == com.mochyy.mochymusic.constants.UiNavIndicator.PILL }
-                .then(if (com.mochyy.mochymusic.ui.customization.UiCustomizationState.options.navSwipe) Modifier.navPillDrag(pill, navigationItems.size, selectedIndex) { index ->
+                .navHighlight(pill, navigationItems.size)
+                .navPillDrag(pill, navigationItems.size, selectedIndex) { index ->
                     navigationItems.getOrNull(index)?.let { onItemClick(it, index == selectedIndex) }
-                } else Modifier),
+                },
             verticalAlignment = Alignment.CenterVertically,
         ) {
             navigationItems.forEach { screen ->

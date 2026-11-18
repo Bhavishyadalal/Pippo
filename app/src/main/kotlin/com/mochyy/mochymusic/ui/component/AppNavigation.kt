@@ -2,21 +2,6 @@
 
 package com.mochyy.mochymusic.ui.component
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Column
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.selected
-import androidx.compose.ui.semantics.role
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.sp
-import com.mochyy.mochymusic.constants.*
-import com.mochyy.mochymusic.ui.customization.UiCustomizationState
-
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
@@ -234,9 +219,6 @@ fun AppNavigationBar(
     /** a second quick tap on Search: straight into typing */
     onSearchDoubleTap: (() -> Unit)? = null
 ) {
-    val ui = UiCustomizationState.options
-    val glassEnabled = ui.navStyle == UiNavStyle.CURRENT
-    val navShape = if (glassEnabled) NavBarShape else RoundedCornerShape(20.dp)
     val glassState = LocalGlassState.current ?: remember { GlassState() }
     val accentWash = rememberChromeAccentWash()
     val selectedIndex = navigationItems.indexOfFirst { it.route == selectedTabRoute }
@@ -254,34 +236,33 @@ fun AppNavigationBar(
             modifier = Modifier
                 .fillMaxWidth()
                 .windowInsetsPadding(WindowInsets.systemBars.only(WindowInsetsSides.Horizontal))
-                .padding(horizontal = if (ui.navStyle == UiNavStyle.FULL_WIDTH) 8.dp else 24.dp, vertical = 8.dp)
+                .padding(horizontal = 24.dp, vertical = 8.dp)
                 .align(Alignment.TopCenter)
                 .height(NavBarHeight)
                 .press3D(maxTilt = 4f, pressedScale = 0.985f)
-                .then(if (!glassEnabled || moduleGlass?.shadow == false) Modifier else Modifier.dropShadow(navShape, ChromeShadow))
-                .clip(navShape)
-                .then(if (ui.navStyle == UiNavStyle.OUTLINED) Modifier.border(1.dp, MaterialTheme.colorScheme.outline, navShape) else Modifier)
+                .then(if (moduleGlass?.shadow == false) Modifier else Modifier.dropShadow(NavBarShape, ChromeShadow))
+                .clip(NavBarShape)
                 .drawWithContent {
                     drawContent()
-                    if (glassEnabled && moduleGlass?.outline != false) drawChromeOutline(Offset.Zero, size, cornerRadius = size.height / 2f)
+                    if (moduleGlass?.outline != false) drawChromeOutline(Offset.Zero, size, cornerRadius = size.height / 2f)
                 }
         ) {
-            if (glassEnabled) FrostedChromeGlass(
+            FrostedChromeGlass(
                 state = glassState,
                 pureBlack = pureBlack,
                 accentWash = accentWash,
                 modifier = Modifier.fillMaxSize(),
-                pill = if (ui.navIndicator == UiNavIndicator.PILL) glassPill else null,
-            ) else Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surfaceContainer))
+                pill = glassPill,
+            )
 
             Row(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(horizontal = NavRowPadding)
-                    .navHighlight(pill, tabCount) { ui.navIndicator == UiNavIndicator.PILL && (!glassEnabled || moduleGlass?.drawsPill != true) }
-                    .then(if (ui.navSwipe) Modifier.navPillDrag(pill, tabCount, selectedIndex) { index ->
+                    .navHighlight(pill, tabCount) { moduleGlass?.drawsPill != true }
+                    .navPillDrag(pill, tabCount, selectedIndex) { index ->
                         navigationItems.getOrNull(index)?.let { onItemClick(it, index == selectedIndex) }
-                    } else Modifier),
+                    },
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 navigationItems.forEach { screen ->
@@ -326,7 +307,6 @@ internal fun RowScope.NavTab(
     onItemClick: (Screens, Boolean) -> Unit,
     onDoubleTap: (() -> Unit)?,
 ) {
-    val ui = UiCustomizationState.options
     val viewConfiguration = LocalViewConfiguration.current
     val interactionSource = remember { MutableInteractionSource() }
     val lastTap = remember { longArrayOf(0L) }
@@ -339,14 +319,12 @@ internal fun RowScope.NavTab(
     // Both icons stay loaded, so lighting a tab never shows an empty frame while its filled icon loads.
     val unlitIcon = coil3.compose.rememberAsyncImagePainter(model = screen.iconIdInactive)
     val litIcon = coil3.compose.rememberAsyncImagePainter(model = screen.iconIdActive)
-    val factor = when (ui.navIconSize) { UiNavIconSize.SMALL -> .85f; UiNavIconSize.NORMAL -> 1f; UiNavIconSize.LARGE -> 1.15f }
-    val iconSize = ((if (screen == Screens.Home || screen == Screens.Search) 22 else 24) * factor).dp
+    val iconSize = if (screen == Screens.Home || screen == Screens.Search) 22.dp else 24.dp
 
     Box(
         modifier = Modifier
             .weight(1f)
             .fillMaxHeight()
-            .semantics(mergeDescendants = true) { selected = isSelected; role = Role.Tab }
             .pressBounce(interactionSource, pressedScale = 0.85f)
             .clickable(
                 interactionSource = interactionSource,
@@ -359,27 +337,10 @@ internal fun RowScope.NavTab(
             ),
         contentAlignment = Alignment.Center
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Box(Modifier.size(30.dp), contentAlignment = Alignment.Center) {
-                if (screen == Screens.Library) {
-                    LibraryDownloadIcon { TabIcons(screen, unlitIcon, litIcon, iconSize) { lit.value } }
-                } else TabIcons(screen, unlitIcon, litIcon, iconSize) { lit.value }
-            }
-            if (ui.navLabels != UiNavLabels.OFF) {
-                Text(
-                    if (isSelected || ui.navLabels == UiNavLabels.ALL) stringResource(screen.titleId) else " ",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontSize = 10.sp,
-                    lineHeight = 12.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.clearAndSetSemantics {},
-                )
-            }
-        }
-        if (isSelected && ui.navIndicator == UiNavIndicator.DOT) {
-            Box(Modifier.align(Alignment.BottomCenter).padding(bottom = 3.dp).size(3.dp).background(MaterialTheme.colorScheme.primary, androidx.compose.foundation.shape.CircleShape))
+        if (screen == Screens.Library) {
+            LibraryDownloadIcon { TabIcons(screen, unlitIcon, litIcon, iconSize) { lit.value } }
+        } else {
+            TabIcons(screen, unlitIcon, litIcon, iconSize) { lit.value }
         }
     }
 }
