@@ -181,8 +181,9 @@ fun WideBarBackground(
                 .offset { IntOffset(lerp(bar.tabsAloneStart, bar.pillStart, withPlayer()).roundToPx(), bar.pillGap.roundToPx()) }
                 // the width is read while laying out, so the shrink onto the tabs never recomposes the bar
                 .layout { measurable, _ ->
-                    val joinedWidth = lerp(bar.tabsWidth, bar.pillWidth, withPlayer())
-                    val width = lerp(joinedWidth, bar.miniWidth, scrollFold()).roundToPx()
+                    val playerFraction = withPlayer()
+                    val joinedWidth = lerp(bar.tabsWidth, bar.pillWidth, playerFraction)
+                    val width = lerp(joinedWidth, bar.miniWidth, scrollFold() * playerFraction).roundToPx()
                     val height = bar.height.roundToPx()
                     val placeable = measurable.measure(Constraints.fixed(width, height))
                     layout(width, height) { placeable.place(0, 0) }

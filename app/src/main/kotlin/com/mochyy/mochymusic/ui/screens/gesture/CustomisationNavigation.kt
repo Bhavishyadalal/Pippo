@@ -81,56 +81,60 @@ internal fun BottomNavigationSection() {
     val (pureBlack) = rememberPreference(PureBlackKey, defaultValue = false)
     val animationsEnabled = AppMotion.durationScale.scaleFactor > 0f
 
-    NavigationCard {
-        Text(stringResource(R.string.nav_appearance_title), color = Color.White, style = CardLabelStyle)
-        NavigationPreview(style, pureBlack)
-        NavigationChoices(
-            BottomNavigationStyle.entries, style, { it.label },
-            swatch = { NavigationStyleSwatch(it, pureBlack) },
-            onSelect = setStyle,
-        )
-    }
-
-    NavigationCard {
-        val title = stringResource(R.string.scroll_player_title)
-        var replay by remember { mutableIntStateOf(0) }
-        val canPreview = scrollEnabled && animationsEnabled
-        val progress = rememberMotionPreview(scrollMotion, replay, canPreview)
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                Text(title, color = Color.White, style = CardLabelStyle)
-                NavigationCaption(stringResource(R.string.scroll_player_description))
-            }
-            AppSwitch(
-                checked = scrollEnabled,
-                onCheckedChange = setScrollEnabled,
-                modifier = Modifier.semantics { contentDescription = title },
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        NavigationCard {
+            Text(stringResource(R.string.nav_appearance_title), color = Color.White, style = CardLabelStyle)
+            NavigationPreview(style, pureBlack)
+            NavigationChoices(
+                BottomNavigationStyle.entries, style, { it.label },
+                swatch = { NavigationStyleSwatch(it, pureBlack) },
+                onSelect = setStyle,
             )
         }
-        NavigationPreview(style, pureBlack, progress, scrollMotion = scrollMotion)
-        NavigationChoices(ScrollPlayerMotion.entries, scrollMotion, { it.label }, enabled = scrollEnabled) {
-            setScrollMotion(it)
-            replay++
-        }
-        if (scrollEnabled && !animationsEnabled) {
-            NavigationCaption(stringResource(R.string.scroll_player_motion_disabled))
-        }
-        MotionPreviewButton(enabled = canPreview) { replay++ }
-    }
 
-    NavigationCard {
-        var replay by remember { mutableIntStateOf(0) }
-        val progress = rememberMotionPreview(openingMotion, replay, animationsEnabled)
-        Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
-            Text(stringResource(R.string.nav_motion_title), color = Color.White, style = CardLabelStyle)
-            NavigationCaption(stringResource(R.string.nav_motion_description))
+        NavigationCard {
+            val title = stringResource(R.string.scroll_player_title)
+            var replay by remember { mutableIntStateOf(0) }
+            val canPreview = scrollEnabled && animationsEnabled
+            val progress = rememberMotionPreview(scrollMotion, replay, canPreview)
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                    Text(title, color = Color.White, style = CardLabelStyle)
+                    NavigationCaption(stringResource(R.string.scroll_player_description))
+                }
+                AppSwitch(
+                    checked = scrollEnabled,
+                    onCheckedChange = setScrollEnabled,
+                    modifier = Modifier.semantics { contentDescription = title },
+                )
+            }
+            NavigationPreview(style, pureBlack, progress, scrollMotion = scrollMotion)
+            NavigationChoices(ScrollPlayerMotion.entries, scrollMotion, { it.label }, enabled = scrollEnabled) {
+                setScrollMotion(it)
+                replay++
+            }
+            if (scrollEnabled && !animationsEnabled) {
+                NavigationCaption(stringResource(R.string.scroll_player_motion_disabled))
+            }
         }
-        NavigationPreview(style, pureBlack, progress, openingMotion = openingMotion)
-        NavigationChoices(BottomNavigationMotion.entries, openingMotion, { it.label }) {
-            setOpeningMotion(it)
-            replay++
+
+        NavigationCard {
+            var replay by remember { mutableIntStateOf(0) }
+            val progress = rememberMotionPreview(openingMotion, replay, animationsEnabled)
+            Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                Text(stringResource(R.string.nav_motion_title), color = Color.White, style = CardLabelStyle)
+                NavigationCaption(stringResource(R.string.nav_motion_description))
+            }
+            NavigationPreview(style, pureBlack, progress, openingMotion = openingMotion)
+            NavigationChoices(BottomNavigationMotion.entries, openingMotion, { it.label }) {
+                setOpeningMotion(it)
+                replay++
+            }
+            if (!animationsEnabled) {
+                NavigationCaption(stringResource(R.string.nav_motion_preview_disabled))
+            }
+            MotionPreviewButton(enabled = animationsEnabled) { replay++ }
         }
-        MotionPreviewButton(enabled = animationsEnabled) { replay++ }
     }
 }
 
