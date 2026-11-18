@@ -123,6 +123,8 @@ private val LocalizedSettingsTitles = mapOf(
     "Playback" to R.string.settings_playback_category,
     "Now playing" to R.string.settings_now_playing,
     "Disable description on settings" to R.string.settings_hide_descriptions,
+    "True Black" to R.string.true_black_amoled,
+    "Bottom navigation" to R.string.nav_appearance_title,
     "Cover rounding" to R.string.customise_cover_rounding,
     "Playlist styles" to R.string.customise_playlist_styles,
     "Player styles" to R.string.customise_player_styles,
@@ -151,6 +153,8 @@ private val SettingsIndex = listOf(
     // Customisation
     SettingsEntry("Customisation", "Customisation", "customisation_settings", "customize cover rounding playlist player home styles gesture swipe blur animation lyrics"),
     SettingsEntry("Cover rounding", "Customisation", "customisation_settings", "square rounded corner radius px thumbnail art"),
+    SettingsEntry("True Black", "Customisation", "customisation_settings", "amoled oled pure black dark theme"),
+    SettingsEntry("Bottom navigation", "Customisation", "customisation_settings", "nav bar tabs fold fade slide capsule ribbon docked"),
     SettingsEntry("Playlist styles", "Customisation", "customisation_settings", "flow classic minimal header layout"),
     SettingsEntry("Player styles", "Customisation", "customisation_settings", "flagship turntable ipod poster timeline lyrics studio customize player cover"),
     SettingsEntry("Home styles", "Customisation", "customisation_settings", "Pippo listen now hop in hero layout grid"),

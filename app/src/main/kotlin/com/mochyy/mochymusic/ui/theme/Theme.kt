@@ -157,8 +157,17 @@ fun Bitmap.extractGradientColors(): List<Color> {
 
 fun ColorScheme.pureBlack(apply: Boolean) =
     if (apply) copy(
+        background = Color.Black,
         surface = Color.Black,
-        background = Color.Black
+        surfaceDim = Color.Black,
+        surfaceTint = Color.Transparent,
+        surfaceContainerLowest = Color.Black,
+        surfaceContainerLow = Color.Black,
+        surfaceContainer = Color.Black,
+        // Keep controls and elevated cards distinguishable from the page.
+        surfaceContainerHigh = Color(0xFF101012),
+        surfaceContainerHighest = Color(0xFF19191C),
+        surfaceVariant = Color(0xFF19191C),
     ) else this
 
 val ColorSaver = object : Saver<Color, Int> {

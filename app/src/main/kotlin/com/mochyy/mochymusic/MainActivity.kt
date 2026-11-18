@@ -165,6 +165,11 @@ import com.mochyy.mochymusic.constants.NavigationBarAnimationSpec
 import com.mochyy.mochymusic.constants.NavigationBarHeight
 import com.mochyy.mochymusic.constants.SlimNavBarHeight
 import com.mochyy.mochymusic.constants.SlimNavBarKey
+import com.mochyy.mochymusic.ui.component.BottomNavigationMotion
+import com.mochyy.mochymusic.ui.component.BottomNavigationMotionKey
+import com.mochyy.mochymusic.ui.component.BottomNavigationStyle
+import com.mochyy.mochymusic.ui.component.BottomNavigationStyleKey
+import com.mochyy.mochymusic.ui.component.applyNavigationMotion
 import com.mochyy.mochymusic.constants.StopMusicOnTaskClearKey
 
 import com.mochyy.mochymusic.core.updater.getAutoUpdateCheckSetting
@@ -637,6 +642,8 @@ class MainActivity : ComponentActivity() {
                         Screens.MainScreens
                 }
                 val (slimNav) = rememberPreference(SlimNavBarKey, defaultValue = false)
+                val (navStyle) = rememberEnumPreference(BottomNavigationStyleKey, BottomNavigationStyle.GLASS)
+                val navMotion = rememberEnumPreference(BottomNavigationMotionKey, BottomNavigationMotion.SLIDE)
                 // flipped in Experimental while the app is open: it starts (or stops) turning right away
                 val (landscapeUnlocked) = rememberPreference(com.mochyy.mochymusic.constants.LandscapeUnlockedKey, defaultValue = false)
                 LaunchedEffect(landscapeUnlocked) {
@@ -737,7 +744,7 @@ class MainActivity : ComponentActivity() {
                 }
 
                 // a phone on its side or a tablet: the mini player and the tabs share one pill along the bottom
-                val wideBar = if (isWideLayout()) {
+                val wideBar = if (isWideLayout() && navStyle == BottomNavigationStyle.GLASS) {
                     com.mochyy.mochymusic.ui.component.rememberWideBar(maxWidth, maxHeight, navigationItems.size)
                 } else null
                 val miniPill = when {
@@ -747,7 +754,7 @@ class MainActivity : ComponentActivity() {
                 }
 
                 // the row the tabs take along the bottom: the wide bar's shrinks with a short screen
-                val navRowHeight = wideBar?.rowHeight ?: NavigationBarHeight
+                val navRowHeight = wideBar?.rowHeight ?: if (navStyle == BottomNavigationStyle.GLASS) NavigationBarHeight else navStyle.barHeight + 16.dp
                 val navPadding = if (shouldShowNavigationBar) {
                     if (slimNav && wideBar == null) SlimNavBarHeight else navRowHeight
                 } else {
@@ -1071,7 +1078,7 @@ class MainActivity : ComponentActivity() {
 
                                     val detailAccent = LocalDetailAccentColor.current.value
                                     val navScrimTint by androidx.compose.animation.animateColorAsState(
-                                        targetValue = detailAccent ?: Color.Black,
+                                        targetValue = if (pureBlack) Color.Black else detailAccent ?: Color.Black,
                                         animationSpec = tween(500),
                                         label = "navScrimTint"
                                     )
@@ -1103,14 +1110,11 @@ class MainActivity : ComponentActivity() {
                                                     val navBarHeightPx = navigationBarHeight.toPx()
                                                     val totalHeightPx = navBarTotalHeight.toPx()
 
-                                                    translationY = if (navBarHeightPx == 0f) {
-                                                        totalHeightPx
-                                                    } else {
-                                                        val progress = playerBottomSheetState.progress.coerceIn(0f, 1f)
-                                                        val slideOffset = totalHeightPx * progress
-                                                        val hideOffset = totalHeightPx * (1 - navBarHeightPx / navRowHeight.toPx())
-                                                        slideOffset + hideOffset
-                                                    }
+                                                    val hideOffset = totalHeightPx * (1 - navBarHeightPx / navRowHeight.toPx())
+                                                    applyNavigationMotion(
+                                                        navMotion.value, playerBottomSheetState.progress, totalHeightPx,
+                                                        routeOffset = hideOffset, scrim = true,
+                                                    )
                                                 }
                                         )
 
@@ -1126,17 +1130,11 @@ class MainActivity : ComponentActivity() {
                                                 val navBarHeightPx = navigationBarHeight.toPx()
                                                 val totalHeightPx = navBarTotalHeight.toPx()
 
-                                                val progress = playerBottomSheetState.progress.coerceIn(0f, 1f)
-
-                                                translationY = if (navBarHeightPx == 0f) {
-                                                    totalHeightPx
-                                                } else {
-                                                    val slideOffset = totalHeightPx * progress
-                                                    val hideOffset = totalHeightPx * (1 - navBarHeightPx / navRowHeight.toPx())
-                                                    slideOffset + hideOffset
-                                                }
-
-                                                alpha = (1f - progress / 0.6f).coerceIn(0f, 1f)
+                                                val hideOffset = totalHeightPx * (1 - navBarHeightPx / navRowHeight.toPx())
+                                                applyNavigationMotion(
+                                                    navMotion.value, playerBottomSheetState.progress, totalHeightPx,
+                                                    routeOffset = hideOffset,
+                                                )
                                             }
                                         // the wide pill shrinks onto the tabs while nothing is playing, read while laying out
                                         val withPlayer = animateFloatAsState(
@@ -1183,11 +1181,10 @@ class MainActivity : ComponentActivity() {
                                         } else {
                                             AppNavigationBar(
                                                 navigationItems = navigationItems,
-                                                currentRoute = currentRoute,
                                                 selectedTabRoute = selectedTabRoute,
                                                 onItemClick = onNavItemClick,
                                                 pureBlack = pureBlack,
-                                                slimNav = slimNav,
+                                                style = navStyle,
                                                 onSearchDoubleTap = onSearchDoubleTap,
                                                 modifier = barMotion,
                                             )

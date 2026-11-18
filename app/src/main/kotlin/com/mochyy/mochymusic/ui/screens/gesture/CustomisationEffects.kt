@@ -10,6 +10,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -162,6 +163,38 @@ internal fun BlurSection(modifier: Modifier = Modifier) {
                 onStrength(next)
             },
             enabled = blurOn,
+        )
+    }
+}
+
+@Composable
+internal fun TrueBlackSection() {
+    val (enabled, setEnabled) = rememberPreference(com.mochyy.mochymusic.constants.PureBlackKey, defaultValue = false)
+    EffectCard(
+        title = stringResource(R.string.true_black_amoled),
+        checked = enabled,
+        onCheckedChange = setEnabled,
+        preview = {
+            val background = if (enabled) Color.Black else com.mochyy.mochymusic.ui.theme.PippoColors.Background
+            Column(
+                Modifier.fillMaxSize().background(background).padding(15.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                repeat(3) { index ->
+                    Box(
+                        Modifier.fillMaxWidth(if (index == 0) .62f else 1f)
+                            .height(if (index == 0) 5.dp else 17.dp)
+                            .clip(RoundedCornerShape(7.dp))
+                            .background(if (index == 0) Color(0xFFE5CBD2) else Color(0xFF25232A)),
+                    )
+                }
+            }
+        },
+    ) {
+        Text(
+            stringResource(R.string.true_black_amoled_description),
+            style = CaptionStyle,
+            color = Color.White.copy(alpha = .65f),
         )
     }
 }
