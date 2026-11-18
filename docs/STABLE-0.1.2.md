@@ -1,11 +1,11 @@
 # Pippo stable 0.1.2 preparation
 
 - Branch: `stable-0.1.2`.
-- Includes beta through `9014503`, with the Ribbon P icon collection, immersive player modes, Home artwork rotation, Settings Back fix, and five home-screen widgets.
+- Includes beta through `d6267e0`, including True Black AMOLED and the redesigned bottom navigation controls.
 - Version name: `0.1.2`, version code: `74` (previously `1.0.0`, code `73`). Android compares the increasing version code for installation upgrades.
 - Package remains `com.bhavishyadalal.pippo`; stored data and the existing preferences/schema are retained.
 
-Original customization controls remain. The added sections and appearance-profile system are removed. A one-time migration clears only their private `pippo.ui.*` preferences. See [the selective cleanup record](CUSTOMIZATION-CLEANUP.md) for backup references and preserved branch contents.
+The Bottom navigation section includes four bar styles, fifteen Scroll player presets, and a separate Open and close motion control. Each motion picker has a replayable preview. Scroll player motion applies while the mini player is visible and respects the app and Android animation settings.
 
 ## Optimized release configuration
 

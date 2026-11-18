@@ -107,12 +107,15 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.platform.createLifecycleAwareWindowRecomposer
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.font.FontWeight
@@ -166,6 +169,16 @@ import com.mochyy.mochymusic.constants.NavigationBarAnimationSpec
 import com.mochyy.mochymusic.constants.NavigationBarHeight
 import com.mochyy.mochymusic.constants.SlimNavBarHeight
 import com.mochyy.mochymusic.constants.SlimNavBarKey
+import com.mochyy.mochymusic.ui.component.BottomNavigationMotion
+import com.mochyy.mochymusic.ui.component.BottomNavigationMotionKey
+import com.mochyy.mochymusic.ui.component.BottomNavigationStyle
+import com.mochyy.mochymusic.ui.component.BottomNavigationStyleKey
+import com.mochyy.mochymusic.ui.component.ScrollPlayerEnabledKey
+import com.mochyy.mochymusic.ui.component.ScrollPlayerMotion
+import com.mochyy.mochymusic.ui.component.ScrollPlayerMotionKey
+import com.mochyy.mochymusic.ui.component.rememberScrollPlayerChrome
+import com.mochyy.mochymusic.ui.component.scrollPlayerFraction
+import com.mochyy.mochymusic.ui.component.applyNavigationMotion
 import com.mochyy.mochymusic.constants.StopMusicOnTaskClearKey
 
 import com.mochyy.mochymusic.core.updater.getAutoUpdateCheckSetting
@@ -619,6 +632,10 @@ class MainActivity : ComponentActivity() {
                         Screens.MainScreens
                 }
                 val (slimNav) = rememberPreference(SlimNavBarKey, defaultValue = false)
+                val (navStyle) = rememberEnumPreference(BottomNavigationStyleKey, BottomNavigationStyle.GLASS)
+                val navMotion = rememberEnumPreference(BottomNavigationMotionKey, BottomNavigationMotion.SLIDE)
+                val (scrollPlayerEnabled) = rememberPreference(ScrollPlayerEnabledKey, defaultValue = true)
+                val (scrollMotion) = rememberEnumPreference(ScrollPlayerMotionKey, ScrollPlayerMotion.FLOW)
                 // flipped in Experimental while the app is open: it starts (or stops) turning right away
                 val (landscapeUnlocked) = rememberPreference(com.mochyy.mochymusic.constants.LandscapeUnlockedKey, defaultValue = false)
                 LaunchedEffect(landscapeUnlocked) {
@@ -719,7 +736,7 @@ class MainActivity : ComponentActivity() {
                 }
 
                 // a phone on its side or a tablet: the mini player and the tabs share one pill along the bottom
-                val wideBar = if (isWideLayout()) {
+                val wideBar = if (isWideLayout() && navStyle == BottomNavigationStyle.GLASS) {
                     com.mochyy.mochymusic.ui.component.rememberWideBar(maxWidth, maxHeight, navigationItems.size)
                 } else null
                 val miniPill = when {
@@ -729,7 +746,7 @@ class MainActivity : ComponentActivity() {
                 }
 
                 // the row the tabs take along the bottom: the wide bar's shrinks with a short screen
-                val navRowHeight = wideBar?.rowHeight ?: NavigationBarHeight
+                val navRowHeight = wideBar?.rowHeight ?: if (navStyle == BottomNavigationStyle.GLASS) NavigationBarHeight else navStyle.barHeight + 16.dp
                 val navPadding = if (shouldShowNavigationBar) {
                     if (slimNav && wideBar == null) SlimNavBarHeight else navRowHeight
                 } else {
@@ -752,6 +769,15 @@ class MainActivity : ComponentActivity() {
                     },
                     expandedBound = maxHeight,
                 )
+
+                val scrollPlayerActive = scrollPlayerEnabled && shouldShowNavigationBar &&
+                    !hideAppChrome.value && !isTelevision() &&
+                    com.mochyy.mochymusic.ui.utils.AppMotion.durationScale.scaleFactor > 0f &&
+                    playerBottomSheetState.isCollapsed && !playerBottomSheetState.isExpandedOrExpanding
+                val isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+                val scrollChrome = rememberScrollPlayerChrome(navBackStackEntry, scrollPlayerActive)
+                val scrollFold = scrollPlayerFraction(navBackStackEntry, scrollChrome, scrollMotion)
+                val scrollTabsHidden by remember(scrollFold) { derivedStateOf { scrollFold.value >= 1f } }
 
                 PlayerSystemBarsSync(playerBottomSheetState)
 
@@ -1053,7 +1079,7 @@ class MainActivity : ComponentActivity() {
 
                                     val detailAccent = LocalDetailAccentColor.current.value
                                     val navScrimTint by androidx.compose.animation.animateColorAsState(
-                                        targetValue = detailAccent ?: Color.Black,
+                                        targetValue = if (pureBlack) Color.Black else detailAccent ?: Color.Black,
                                         animationSpec = tween(500),
                                         label = "navScrimTint"
                                     )
@@ -1085,13 +1111,13 @@ class MainActivity : ComponentActivity() {
                                                     val navBarHeightPx = navigationBarHeight.toPx()
                                                     val totalHeightPx = navBarTotalHeight.toPx()
 
-                                                    translationY = if (navBarHeightPx == 0f) {
-                                                        totalHeightPx
-                                                    } else {
-                                                        val progress = playerBottomSheetState.progress.coerceIn(0f, 1f)
-                                                        val slideOffset = totalHeightPx * progress
-                                                        val hideOffset = totalHeightPx * (1 - navBarHeightPx / navRowHeight.toPx())
-                                                        slideOffset + hideOffset
+                                                    val hideOffset = totalHeightPx * (1 - navBarHeightPx / navRowHeight.toPx())
+                                                    applyNavigationMotion(
+                                                        navMotion.value, playerBottomSheetState.progress, totalHeightPx,
+                                                        routeOffset = hideOffset, scrim = true,
+                                                    )
+                                                    if (wideBar == null && scrollFold.value > 0f) {
+                                                        translationY += navPadding.toPx() * scrollFold.value
                                                     }
                                                 }
                                         )
@@ -1108,17 +1134,19 @@ class MainActivity : ComponentActivity() {
                                                 val navBarHeightPx = navigationBarHeight.toPx()
                                                 val totalHeightPx = navBarTotalHeight.toPx()
 
-                                                val progress = playerBottomSheetState.progress.coerceIn(0f, 1f)
-
-                                                translationY = if (navBarHeightPx == 0f) {
-                                                    totalHeightPx
-                                                } else {
-                                                    val slideOffset = totalHeightPx * progress
-                                                    val hideOffset = totalHeightPx * (1 - navBarHeightPx / navRowHeight.toPx())
-                                                    slideOffset + hideOffset
-                                                }
-
-                                                alpha = (1f - progress / 0.6f).coerceIn(0f, 1f)
+                                                val hideOffset = totalHeightPx * (1 - navBarHeightPx / navRowHeight.toPx())
+                                                applyNavigationMotion(
+                                                    navMotion.value, playerBottomSheetState.progress, totalHeightPx,
+                                                    routeOffset = hideOffset,
+                                                )
+                                            }
+                                        val scrollTabs = Modifier
+                                            .then(if (scrollTabsHidden) Modifier.clearAndSetSemantics {} else Modifier)
+                                            .graphicsLayer {
+                                                scrollMotion.applyTo(
+                                                    this, scrollFold.value, size.height,
+                                                    rtl = isRtl,
+                                                )
                                             }
                                         // the wide pill shrinks onto the tabs while nothing is playing, read while laying out
                                         val withPlayer = animateFloatAsState(
@@ -1134,6 +1162,7 @@ class MainActivity : ComponentActivity() {
                                                 withPlayer = withPlayerNow,
                                                 pureBlack = pureBlack,
                                                 modifier = barMotion.fillMaxWidth(),
+                                                scrollFold = { scrollFold.value },
                                             )
                                         }
 
@@ -1142,7 +1171,12 @@ class MainActivity : ComponentActivity() {
                                                 state = playerBottomSheetState,
                                                 navController = navController,
                                                 pureBlack = pureBlack,
-                                                modifier = Modifier.launchRise(order = 3),
+                                                modifier = Modifier.launchRise(order = 3).then(
+                                                    if (wideBar != null) Modifier else Modifier.graphicsLayer {
+                                                        translationY = navPadding.toPx() * scrollFold.value *
+                                                            (1f - playerBottomSheetState.progress.coerceIn(0f, 1f))
+                                                    },
+                                                ),
                                             )
                                         }
 
@@ -1154,24 +1188,23 @@ class MainActivity : ComponentActivity() {
                                                 selectedTabRoute = selectedTabRoute,
                                                 onItemClick = onNavItemClick,
                                                 onSearchDoubleTap = onSearchDoubleTap,
-                                                modifier = barMotion.fillMaxWidth(),
+                                                modifier = barMotion.then(scrollTabs).fillMaxWidth(),
                                             )
                                             com.mochyy.mochymusic.ui.component.WideBarExtras(
                                                 bar = wideBar,
                                                 withPlayer = withPlayerNow,
                                                 shown = !playerBottomSheetState.isDismissed,
-                                                modifier = barMotion.fillMaxWidth(),
+                                                modifier = barMotion.then(scrollTabs).fillMaxWidth(),
                                             )
                                         } else {
                                             AppNavigationBar(
                                                 navigationItems = navigationItems,
-                                                currentRoute = currentRoute,
                                                 selectedTabRoute = selectedTabRoute,
                                                 onItemClick = onNavItemClick,
                                                 pureBlack = pureBlack,
-                                                slimNav = slimNav,
+                                                style = navStyle,
                                                 onSearchDoubleTap = onSearchDoubleTap,
-                                                modifier = barMotion,
+                                                modifier = barMotion.then(scrollTabs),
                                             )
                                         }
                                         }
@@ -1234,6 +1267,7 @@ class MainActivity : ComponentActivity() {
                                         Modifier
                                             .fillMaxSize()
                                             .windowInsetsPadding(WindowInsets.stableSystemBars.only(WindowInsetsSides.Horizontal))
+                                            .nestedScroll(scrollChrome)
                                             .glassRoot(glassState, isActive = { true })
                                     ) {
                                     if (settingsPane) {
