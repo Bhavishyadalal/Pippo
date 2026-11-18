@@ -3,6 +3,16 @@ package com.mochyy.mochymusic.utils
 import android.app.Activity
 import android.content.ComponentName
 import android.content.Context
+import android.content.ContextWrapper
+import android.content.SharedPreferences
+import androidx.annotation.StyleRes
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
@@ -24,29 +34,30 @@ class AppIcon private constructor(
     @DrawableRes val foreground: Int,
     @ColorRes val background: Int?,
     @StringRes val label: Int,
+    @StyleRes val splashTheme: Int,
 ) {
     companion object {
         val entries: List<AppIcon> = listOf(
-            AppIcon("Default", "IconDefault", AppIconFamily.Anime, R.drawable.pippo_icon_01, R.color.pippo_icon_bg_01, R.string.pippo_icon_label_01),
-            AppIcon("Pippo02", "PippoIcon02", AppIconFamily.Anime, R.drawable.pippo_icon_02, R.color.pippo_icon_bg_02, R.string.pippo_icon_label_02),
-            AppIcon("Pippo03", "PippoIcon03", AppIconFamily.Anime, R.drawable.pippo_icon_03, R.color.pippo_icon_bg_03, R.string.pippo_icon_label_03),
-            AppIcon("Pippo04", "PippoIcon04", AppIconFamily.Anime, R.drawable.pippo_icon_04, R.color.pippo_icon_bg_04, R.string.pippo_icon_label_04),
-            AppIcon("Pippo05", "PippoIcon05", AppIconFamily.Anime, R.drawable.pippo_icon_05, R.color.pippo_icon_bg_05, R.string.pippo_icon_label_05),
-            AppIcon("Pippo06", "PippoIcon06", AppIconFamily.Anime, R.drawable.pippo_icon_06, R.color.pippo_icon_bg_06, R.string.pippo_icon_label_06),
-            AppIcon("Pippo07", "PippoIcon07", AppIconFamily.Anime, R.drawable.pippo_icon_07, R.color.pippo_icon_bg_07, R.string.pippo_icon_label_07),
-            AppIcon("Pippo08", "PippoIcon08", AppIconFamily.Anime, R.drawable.pippo_icon_08, R.color.pippo_icon_bg_08, R.string.pippo_icon_label_08),
-            AppIcon("Pippo09", "PippoIcon09", AppIconFamily.Anime, R.drawable.pippo_icon_09, R.color.pippo_icon_bg_09, R.string.pippo_icon_label_09),
-            AppIcon("Pippo10", "PippoIcon10", AppIconFamily.Anime, R.drawable.pippo_icon_10, R.color.pippo_icon_bg_10, R.string.pippo_icon_label_10),
-            AppIcon("Pippo11", "PippoIcon11", AppIconFamily.Named, R.drawable.pippo_icon_11, R.color.pippo_icon_bg_11, R.string.pippo_icon_label_11),
-            AppIcon("Pippo12", "PippoIcon12", AppIconFamily.Named, R.drawable.pippo_icon_12, R.color.pippo_icon_bg_12, R.string.pippo_icon_label_12),
-            AppIcon("Pippo13", "PippoIcon13", AppIconFamily.Named, R.drawable.pippo_icon_13, R.color.pippo_icon_bg_13, R.string.pippo_icon_label_13),
-            AppIcon("Pippo14", "PippoIcon14", AppIconFamily.Named, R.drawable.pippo_icon_14, R.color.pippo_icon_bg_14, R.string.pippo_icon_label_14),
-            AppIcon("Pippo15", "PippoIcon15", AppIconFamily.Named, R.drawable.pippo_icon_15, R.color.pippo_icon_bg_15, R.string.pippo_icon_label_15),
-            AppIcon("Pippo16", "PippoIcon16", AppIconFamily.Named, R.drawable.pippo_icon_16, R.color.pippo_icon_bg_16, R.string.pippo_icon_label_16),
-            AppIcon("Pippo17", "PippoIcon17", AppIconFamily.Named, R.drawable.pippo_icon_17, R.color.pippo_icon_bg_17, R.string.pippo_icon_label_17),
-            AppIcon("Pippo18", "PippoIcon18", AppIconFamily.Named, R.drawable.pippo_icon_18, R.color.pippo_icon_bg_18, R.string.pippo_icon_label_18),
-            AppIcon("Pippo19", "PippoIcon19", AppIconFamily.Named, R.drawable.pippo_icon_19, R.color.pippo_icon_bg_19, R.string.pippo_icon_label_19),
-            AppIcon("Pippo20", "PippoIcon20", AppIconFamily.Named, R.drawable.pippo_icon_20, R.color.pippo_icon_bg_20, R.string.pippo_icon_label_20),
+            AppIcon("Default", "IconDefault", AppIconFamily.Anime, R.drawable.pippo_icon_01, R.color.pippo_icon_bg_01, R.string.pippo_icon_label_01, R.style.Theme_App_Starting_Pippo01),
+            AppIcon("Pippo02", "PippoIcon02", AppIconFamily.Anime, R.drawable.pippo_icon_02, R.color.pippo_icon_bg_02, R.string.pippo_icon_label_02, R.style.Theme_App_Starting_Pippo02),
+            AppIcon("Pippo03", "PippoIcon03", AppIconFamily.Anime, R.drawable.pippo_icon_03, R.color.pippo_icon_bg_03, R.string.pippo_icon_label_03, R.style.Theme_App_Starting_Pippo03),
+            AppIcon("Pippo04", "PippoIcon04", AppIconFamily.Anime, R.drawable.pippo_icon_04, R.color.pippo_icon_bg_04, R.string.pippo_icon_label_04, R.style.Theme_App_Starting_Pippo04),
+            AppIcon("Pippo05", "PippoIcon05", AppIconFamily.Anime, R.drawable.pippo_icon_05, R.color.pippo_icon_bg_05, R.string.pippo_icon_label_05, R.style.Theme_App_Starting_Pippo05),
+            AppIcon("Pippo06", "PippoIcon06", AppIconFamily.Anime, R.drawable.pippo_icon_06, R.color.pippo_icon_bg_06, R.string.pippo_icon_label_06, R.style.Theme_App_Starting_Pippo06),
+            AppIcon("Pippo07", "PippoIcon07", AppIconFamily.Anime, R.drawable.pippo_icon_07, R.color.pippo_icon_bg_07, R.string.pippo_icon_label_07, R.style.Theme_App_Starting_Pippo07),
+            AppIcon("Pippo08", "PippoIcon08", AppIconFamily.Anime, R.drawable.pippo_icon_08, R.color.pippo_icon_bg_08, R.string.pippo_icon_label_08, R.style.Theme_App_Starting_Pippo08),
+            AppIcon("Pippo09", "PippoIcon09", AppIconFamily.Anime, R.drawable.pippo_icon_09, R.color.pippo_icon_bg_09, R.string.pippo_icon_label_09, R.style.Theme_App_Starting_Pippo09),
+            AppIcon("Pippo10", "PippoIcon10", AppIconFamily.Anime, R.drawable.pippo_icon_10, R.color.pippo_icon_bg_10, R.string.pippo_icon_label_10, R.style.Theme_App_Starting_Pippo10),
+            AppIcon("Pippo11", "PippoIcon11", AppIconFamily.Named, R.drawable.pippo_icon_11, R.color.pippo_icon_bg_11, R.string.pippo_icon_label_11, R.style.Theme_App_Starting_Pippo11),
+            AppIcon("Pippo12", "PippoIcon12", AppIconFamily.Named, R.drawable.pippo_icon_12, R.color.pippo_icon_bg_12, R.string.pippo_icon_label_12, R.style.Theme_App_Starting_Pippo12),
+            AppIcon("Pippo13", "PippoIcon13", AppIconFamily.Named, R.drawable.pippo_icon_13, R.color.pippo_icon_bg_13, R.string.pippo_icon_label_13, R.style.Theme_App_Starting_Pippo13),
+            AppIcon("Pippo14", "PippoIcon14", AppIconFamily.Named, R.drawable.pippo_icon_14, R.color.pippo_icon_bg_14, R.string.pippo_icon_label_14, R.style.Theme_App_Starting_Pippo14),
+            AppIcon("Pippo15", "PippoIcon15", AppIconFamily.Named, R.drawable.pippo_icon_15, R.color.pippo_icon_bg_15, R.string.pippo_icon_label_15, R.style.Theme_App_Starting_Pippo15),
+            AppIcon("Pippo16", "PippoIcon16", AppIconFamily.Named, R.drawable.pippo_icon_16, R.color.pippo_icon_bg_16, R.string.pippo_icon_label_16, R.style.Theme_App_Starting_Pippo16),
+            AppIcon("Pippo17", "PippoIcon17", AppIconFamily.Named, R.drawable.pippo_icon_17, R.color.pippo_icon_bg_17, R.string.pippo_icon_label_17, R.style.Theme_App_Starting_Pippo17),
+            AppIcon("Pippo18", "PippoIcon18", AppIconFamily.Named, R.drawable.pippo_icon_18, R.color.pippo_icon_bg_18, R.string.pippo_icon_label_18, R.style.Theme_App_Starting_Pippo18),
+            AppIcon("Pippo19", "PippoIcon19", AppIconFamily.Named, R.drawable.pippo_icon_19, R.color.pippo_icon_bg_19, R.string.pippo_icon_label_19, R.style.Theme_App_Starting_Pippo19),
+            AppIcon("Pippo20", "PippoIcon20", AppIconFamily.Named, R.drawable.pippo_icon_20, R.color.pippo_icon_bg_20, R.string.pippo_icon_label_20, R.style.Theme_App_Starting_Pippo20),
         )
         val Default: AppIcon = entries.first()
         val presets: List<AppIcon> = entries
@@ -63,11 +74,35 @@ object AppIcons {
         return AppIcon.entries.firstOrNull { started.endsWith(".${it.alias}") }
     }
 
-    // Keep future system splashes aligned with the main-icon Compose handoff.
-    fun syncSplash(activity: Activity) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            runCatching { activity.splashScreen.setSplashScreenTheme(R.style.Theme_App_Starting) }
+    // Android 13+ can persist the selected theme for the next system-created splash.
+    fun syncSplash(context: Context) {
+        var owner = context
+        while (owner is ContextWrapper && owner !is Activity) {
+            val base = owner.baseContext
+            if (base === owner) return
+            owner = base
         }
+        val activity = owner as? Activity ?: return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            runCatching { activity.splashScreen.setSplashScreenTheme(current(activity).splashTheme) }
+        }
+    }
+
+    @Composable
+    fun rememberCurrent(): AppIcon {
+        val context = LocalContext.current.applicationContext
+        val preferences = remember(context) { prefs(context) }
+        var icon by remember(preferences) { mutableStateOf(current(context)) }
+        DisposableEffect(preferences) {
+            val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+                if (key == Key || key == null) icon = current(context)
+            }
+            preferences.registerOnSharedPreferenceChangeListener(listener)
+            // Close the gap between composition and listener registration.
+            icon = current(context)
+            onDispose { preferences.unregisterOnSharedPreferenceChangeListener(listener) }
+        }
+        return icon
     }
 
     @Synchronized

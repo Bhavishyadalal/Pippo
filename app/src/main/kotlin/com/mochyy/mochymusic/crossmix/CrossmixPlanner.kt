@@ -3,6 +3,7 @@ package com.mochyy.mochymusic.crossmix
 import com.mochyy.mochymusic.constants.CrossmixLength
 import com.mochyy.mochymusic.lyrics.LyricsUtils
 import kotlin.math.abs
+import kotlin.math.ceil
 import kotlin.math.ln
 import kotlin.math.max
 import kotlin.math.min
@@ -93,7 +94,7 @@ object CrossmixPlanner {
         val windowStart = (outgoing.durationMs - MaxLeadMs).coerceAtLeast(0L)
 
         // nothing to plan around: a plain fade, or with always mix on, a real blend counted in seconds
-        fun noPlan() = if (settings.alwaysMix) forcedBlend(outgoing, incoming, naturalEnd, out) else smoothFade(outgoing, incoming, naturalEnd)
+        fun noPlan() = if (settings.alwaysMix) forcedBlend(outgoing, incoming, naturalEnd, out, settings) else smoothFade(outgoing, incoming, naturalEnd)
         if (out == null || !out.isBeatReliable) return noPlan()
         val outGrid = out.localGrid((naturalEnd - 12_000L).coerceAtLeast(0L)) ?: return noPlan()
 
@@ -136,7 +137,6 @@ object CrossmixPlanner {
             val locked = tempo != null && (style.needsBeatMatch || !style.entersAtEnd)
             for (length in style.lengths) {
                 // overlaps stay short: long ones only for two calm songs that lock together, or when the listener asked for long
-                if (!style.entersAtEnd && !overlapFits(length, length * outGrid.periodMs, tempo != null, calmMatch, settings)) continue
                 val swap = style.swapAt(length)
                 for (exit in exits) {
                     // the hand-over sits on one of this song's bars, counted on the beats fitted around it, and the whole move fits in its last 30 s
@@ -148,6 +148,9 @@ object CrossmixPlanner {
                     val landing = pickLanding(style, out, inc, exit.swapMs, swap, period, tempo, locked, outVoice, inVoice, latestLanding) ?: continue
                     val match = if (locked) beatMatch(inc!!, landing.timeMs, tempo!!, period, maxSpeedUp) else null
                     if (style.needsBeatMatch && match == null) continue
+                    // Validate the actual local duration and the match that survived fitting, not
+                    // the song-wide tempo estimate which may later fail to beat-match.
+                    if (!style.entersAtEnd && !overlapFits(length, length * period, match != null, calmMatch, settings)) continue
                     val inBeat = match?.inBeatMs ?: period
                     // heard from the start of a blend, or from the hand-over for a drop; up to a bar of silent run-up before that, so the beat is locked before anyone hears it
                     val heardFrom = if (style.entersAtEnd) length.toFloat() else 0f
@@ -574,11 +577,17 @@ object CrossmixPlanner {
         incoming: CrossmixTrackInput,
         naturalEnd: Long,
         out: TrackAnalysis?,
+        settings: CrossmixSettings,
     ): CrossmixPlan {
         val style = CrossmixStyle.FilterSweep
-        val beats = 16
-        // the song's own count when it has one, even a shaky one, so the sweep moves with it; else 10 s over the 16
-        val beatMs = out?.bpm?.takeIf { it in 70f..180f }?.let { 60_000.0 / it } ?: (ForcedBlendMs / beats)
+        // Keep the approximate song beat, but cap even the no-candidate fallback. A fixed
+        // sixteen beats exceeded the unmatched limit on slow songs (and ignored length settings).
+        val nominalBeats = 16
+        val beatMs = out?.bpm?.takeIf { it in 70f..180f }?.let { 60_000.0 / it } ?: (ForcedBlendMs / nominalBeats)
+        val longest = max(AlwaysMixMinOverlapMs * 1.35, MaxUnmatchedOverlapMs * settings.length.scale)
+        val minBeats = ceil(AlwaysMixMinOverlapMs / beatMs).toInt()
+        val maxBeats = (longest / beatMs).toInt().coerceAtLeast(minBeats)
+        val beats = nominalBeats.coerceIn(minBeats, maxBeats)
         val lengthMs = (beatMs * beats).toLong()
         val lines = parseLines(outgoing.lyrics)
         val latestStart = (naturalEnd - lengthMs).coerceAtLeast(0L)

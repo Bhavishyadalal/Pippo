@@ -316,6 +316,9 @@ class CrossmixTest {
             CrossmixTrackInput("y", 0L, null, null),
         )
         assertTrue(plan.style.label, plan.style.blendsBoth)
+        val duration = plan.lengthBeats * plan.outBeatMs
+        assertTrue("Fallback blend is too long: $duration ms", duration <= 8_500.0)
+        assertTrue("Always-mix fallback is too short: $duration ms", duration >= 6_000.0)
         assertTrue(plan.outStartMs >= 240_000L - CrossmixPlanner.MaxLeadMs)
         assertTrue(plan.outMediaAt(plan.lengthBeats.toFloat()) <= 240_000.0)
     }

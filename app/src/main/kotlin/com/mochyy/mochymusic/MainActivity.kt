@@ -160,7 +160,6 @@ import com.mochyy.mochymusic.constants.GridItemSize
 import com.mochyy.mochymusic.constants.SwipeToSongKey
 import com.mochyy.mochymusic.constants.DisableScreenshotKey
 import com.mochyy.mochymusic.constants.DynamicThemeKey
-import com.mochyy.mochymusic.constants.EnableHighRefreshRateKey
 import com.mochyy.mochymusic.constants.MiniPlayerBottomSpacing
 import com.mochyy.mochymusic.constants.MiniPlayerHeight
 import com.mochyy.mochymusic.constants.NavigationBarAnimationSpec
@@ -412,6 +411,7 @@ class MainActivity : ComponentActivity() {
     @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
+        setTheme(com.mochyy.mochymusic.utils.AppIcons.current(this).splashTheme)
         installSplashScreen().handOffToLaunchIntro { introPlays }
         super.onCreate(savedInstanceState)
         lifecycleScope.launch(Dispatchers.IO) {
@@ -489,7 +489,6 @@ class MainActivity : ComponentActivity() {
         syncUtils: SyncUtils,
     ) {
         val enableDynamicTheme by rememberPreference(DynamicThemeKey, defaultValue = true)
-        val enableHighRefreshRate by rememberPreference(EnableHighRefreshRateKey, defaultValue = true)
         val context = LocalContext.current
 
         LaunchedEffect(Unit) {
@@ -521,33 +520,11 @@ class MainActivity : ComponentActivity() {
             onDispose { rootView.keepScreenOn = false }
         }
 
-        LaunchedEffect(enableHighRefreshRate) {
-            val window = this@MainActivity.window
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                val layoutParams = window.attributes
-                if (enableHighRefreshRate) {
-                    layoutParams.preferredDisplayModeId = highRefreshModeId()
-                } else {
-                    val modes = window.windowManager.defaultDisplay.supportedModes
-                    val mode60 = modes.firstOrNull { kotlin.math.abs(it.refreshRate - 60f) < 1f }
-                        ?: modes.minByOrNull { kotlin.math.abs(it.refreshRate - 60f) }
-
-                    if (mode60 != null) {
-                        layoutParams.preferredDisplayModeId = mode60.modeId
-                    }
-                }
-                window.attributes = layoutParams
-            } else {
-                val params = window.attributes
-                if (enableHighRefreshRate) {
-                    params.preferredRefreshRate = 0f
-                    params.preferredDisplayModeId = highRefreshModeId()
-                } else {
-                    params.preferredRefreshRate = 60f
-                    params.preferredDisplayModeId = 0
-                }
-                window.attributes = params
-            }
+        DisposableEffect(rootView) {
+            val automaticRefresh = com.mochyy.mochymusic.ui.utils.AutomaticRefreshRate(
+                this@MainActivity, rootView, this@MainActivity.lifecycle,
+            )
+            onDispose { automaticRefresh.close() }
         }
 
         val useDarkTheme = ForceDarkTheme
@@ -664,8 +641,8 @@ class MainActivity : ComponentActivity() {
                     val plays = introRequested && (tabOpenedFromShortcut ?: defaultOpenTab) == NavigationTab.HOME
                     introPlays = plays
                     if (introRequested && !plays) LaunchGate.skip()
-                    // Match the explicit main icon used by the system splash, including direct launches.
-                    val icon = com.mochyy.mochymusic.utils.AppIcon.Default
+                    // Use the saved selection even when opened from a stale launcher shortcut.
+                    val icon = com.mochyy.mochymusic.utils.AppIcons.current(this@MainActivity)
                     LaunchIntroState(plays, icon)
                 }
 
@@ -1410,21 +1387,6 @@ class MainActivity : ComponentActivity() {
 
                 }
             }
-        }
-    }
-
-    // fastest mode at the current screen size; android 15+ needs it too, left alone it kept lyrics and the turntable at 60hz on 120hz phones
-    @Suppress("DEPRECATION")
-    private fun highRefreshModeId(): Int {
-        return try {
-            val display = window.windowManager.defaultDisplay
-            val current = display.mode
-            display.supportedModes
-                .filter { it.physicalWidth == current.physicalWidth && it.physicalHeight == current.physicalHeight }
-                .maxByOrNull { it.refreshRate }
-                ?.modeId ?: 0
-        } catch (e: Exception) {
-            0
         }
     }
 

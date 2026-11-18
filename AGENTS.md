@@ -8,6 +8,10 @@
 - The owner removed the four experimental Cassette, Midnight Glass, Pippo Duo and CD Walkman player screens. Keep the existing player screens; do not reintroduce the removed designs unless requested.
 - Do not build or publish another APK, or launch GitHub Actions, until the owner explicitly asks for that again.
 
-- Stable retains version 0.1.2/code 74 and its release optimization settings. Main remains at bd58eae8. Do not merge branches, build an APK or run Actions unless requested.
+- The tested design-system pass was merged into main at bd58eae8 at the owner's request. Current customization work belongs on `preview-beta-v0.1.2`; preserve main and the backup branch, and merge only when requested.
 
-- The owner clarified that the entire first customization expansion (bb0a4fef), including its extra settings and backing behavior, must be removed from beta and stable. Preserve each branch's later independent work. Do not restore a whole old repository snapshot or reintroduce the removed settings sections. Beta's later playback/Bluetooth, module URL copying, automatic refresh-rate and icon preview changes remain on beta; do not implicitly promote them to stable. Main remains untouched.
+- Latest authorized work: playback/network/Bluetooth reliability and module URL copying on `preview-beta-v0.1.2`. The owner explicitly authorized logic/function testing for these fixes. Keep main, stable and backup untouched unless requested. Preserve the restored design; do not reintroduce the reverted mini-player or cozy-settings redesigns.
+
+- The owner clarified that the ENTIRE first customization expansion (bb0a4fef), including its extra settings and backing behavior, must be removed from beta and stable. Preserve later playback/Bluetooth fixes, module URL copying, automatic refresh-rate work, startup changes and icon-preview files. Do not restore a whole old repository snapshot or reintroduce the removed settings sections. Main remains untouched.
+
+- Latest requested beta work: the startup portrait and Home badge must match the selected app icon; do not restore the equalizer morph. Preserve existing Home design while correcting scroll-state capture and forced recommendation-row resets. The owner subsequently requested merging beta into stable for testing. Keep stable version 0.1.2 and its release configuration. Do not move main, run tests, build an APK or start Actions unless requested.

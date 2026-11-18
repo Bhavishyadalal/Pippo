@@ -22,4 +22,4 @@ See [NOTICE.md](NOTICE.md) for upstream attribution and [LICENSE](LICENSE) for t
 
 ## Stable 0.1.2 testing branch
 
-`stable-0.1.2` retains version **0.1.2** / code **74**, its release optimization settings and main-icon startup handoff. The first customization expansion and later rejected redesigns are removed; original customization controls remain. See [stable preparation notes](docs/STABLE-0.1.2.md) and [the selective cleanup record](docs/CUSTOMIZATION-CLEANUP.md). Main is unchanged. No APK or workflow was run for this cleanup.
+`stable-0.1.2` includes the latest beta changes for testing with version **0.1.2** and version code **74**. This update brings in playback and Bluetooth fixes, automatic refresh rate, module URL copying, and the selected icon and scroll fixes for Home. See the [stable testing notes](docs/STABLE-0.1.2.md).

@@ -94,6 +94,13 @@ class AudioPass(context: Context, private val outputs: AudioOutputs) {
         bump()
     }
 
+    /** Device changes can alter eligibility without changing any preference. */
+    @Synchronized
+    fun onOutputRouteChanged() {
+        failed.clear()
+        bump()
+    }
+
     /** asks for usb access again, from the page's button */
     fun requestUsbPermission() = usb.requestPermission()
 
@@ -122,6 +129,9 @@ class AudioPass(context: Context, private val outputs: AudioOutputs) {
     // why this song can't go to the exclusive output right now, null when it can
     private fun skipFor(format: Format, source: Format?, requester: Any): Skip? {
         if (owner != null && owner !== requester) return Skip.Busy
+        val kind = outputs.activeDevice()?.let { AudioOutputs.kindOf(it.type) }
+        val expected = if (mode == AudioPassMode.EXCLUSIVE_DAC) AudioOutputs.Kind.WIRED else AudioOutputs.Kind.USB
+        if (kind != expected) return Skip.NoDac
         if (format.sampleMimeType != MimeTypes.AUDIO_RAW || format.channelCount !in 1..2 || format.sampleRate <= 0) return Skip.Format
         if (format.pcmEncoding !in PassPcm.Encodings) return Skip.Format
         if (!takesLossy && !isLossless(source)) return Skip.Lossy

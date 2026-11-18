@@ -2,6 +2,12 @@
 
 package com.mochyy.mochymusic.ui.screens.settings.modules
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import androidx.compose.ui.platform.LocalContext
+import com.mochyy.mochymusic.module.ServerListModule
+import com.mochyy.mochymusic.modules.moduleCopyLink
+
 import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -122,9 +128,29 @@ internal fun InfoCard(entry: ModuleEntry, onRaise: () -> Unit) {
         InfoLine(stringResource(R.string.module_info_version), info.version)
         info.author?.takeIf { it.isNotBlank() }?.let { InfoLine(stringResource(R.string.module_info_author), it) }
         InfoLine(stringResource(R.string.module_info_status), moduleStatus(entry))
+        ModuleCopyUrl(entry)
         GlassNote(entry)
         CoveredNote(entry, onRaise)
     }
+}
+
+/** Uses the page's existing card and pill treatment; no browser or network request is needed. */
+@Composable
+private fun ModuleCopyUrl(entry: ModuleEntry) {
+    val url = moduleCopyLink(entry.id, entry.source?.link, (entry.origin as? ModuleOrigin.Web)?.base,
+        (entry.module as? ServerListModule)?.servers.orEmpty().map { it.url }, entry.module.info.sourceUrl ?: entry.module.signIn?.startUrl) ?: return
+    val context = LocalContext.current
+    Spacer(Modifier.height(12.dp))
+    Text(url, fontFamily = InterFontFamily, fontSize = 12.sp, color = PageSoftText,
+        maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+    Spacer(Modifier.height(10.dp))
+    PillButton(text = stringResource(R.string.module_copy_url), icon = R.drawable.content_copy, onClick = {
+        val clipboard = context.getSystemService(ClipboardManager::class.java)
+        clipboard.setPrimaryClip(ClipData.newPlainText(context.getString(R.string.module_copy_url), url))
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            android.widget.Toast.makeText(context, R.string.module_url_copied, android.widget.Toast.LENGTH_SHORT).show()
+        }
+    })
 }
 
 /** a look that's on but sits under another one bringing the same things says which, and can go back on top */

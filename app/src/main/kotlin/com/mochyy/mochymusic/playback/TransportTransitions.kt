@@ -74,6 +74,9 @@ class TransportTransitions(
     // the buttons' meaning while a fade runs (the player only catches up once it's over); null follows the player
     private val _playIntent = MutableStateFlow<Boolean?>(null)
     val playIntent: StateFlow<Boolean?> = _playIntent.asStateFlow()
+    /** Explicit pause requests invalidate delayed recovery, even when the player is already paused. */
+    var pauseGeneration: Long = 0
+        private set
 
     private enum class Phase { Idle, Pausing, Skipping, Resuming }
 
@@ -96,6 +99,7 @@ class TransportTransitions(
     }
 
     fun pause() {
+        pauseGeneration++
         val player = host.player
         if (phase == Phase.Pausing) {
             // a second press means now

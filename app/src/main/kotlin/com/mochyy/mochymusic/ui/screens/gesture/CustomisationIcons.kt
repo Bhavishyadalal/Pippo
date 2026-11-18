@@ -62,6 +62,7 @@ internal fun IconsSection() {
             try {
                 withContext(Dispatchers.IO) { AppIcons.apply(context.applicationContext, icon) }
                 picked = icon
+                AppIcons.syncSplash(context)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {

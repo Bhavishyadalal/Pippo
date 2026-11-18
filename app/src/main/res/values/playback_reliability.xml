@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="module_copy_url">Copy module URL</string>
+    <string name="module_url_copied">Module URL copied</string>
+    <string name="stream_retry_connected">Stream interrupted. Retrying…</string>
+    <string name="stream_retry_offline">Connection unavailable. Waiting to retry…</string>
+    <string name="audio_output_reconnect">Audio output failed. Reconnect your audio device and try again.</string>
+</resources>

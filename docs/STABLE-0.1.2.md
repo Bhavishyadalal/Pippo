@@ -1,10 +1,9 @@
 # Pippo stable 0.1.2 preparation
 
 - Branch: `stable-0.1.2`.
-- The first customization expansion has now been selectively removed; the main-icon startup handoff is retained. Previously rejected mini-player and cozy-settings redesigns remain removed.
+- Includes beta through `7d74a25`, with playback and Bluetooth fixes, automatic refresh rate, module URL copying, and the matching startup and Home icon with Home scroll fixes.
 - Version name: `0.1.2`, version code: `74` (previously `1.0.0`, code `73`). Android compares the increasing version code for installation upgrades.
 - Package remains `com.bhavishyadalal.pippo`; stored data and the existing preferences/schema are retained.
-- Main, `preview-beta-v0.1.2` and the backup branch are preserved. No merge or release tag/publication is performed.
 
 Original customization controls remain. The added sections and appearance-profile system are removed. A one-time migration clears only their private `pippo.ui.*` preferences. See [the selective cleanup record](CUSTOMIZATION-CLEANUP.md) for backup references and preserved branch contents.
 
@@ -22,4 +21,4 @@ Auto signing uses the private key when all signing secrets are supplied. With no
 
 ## Review limits
 
-Source/diff review only. No tests, check scripts, Gradle configuration/compilation, APK builds or GitHub Actions were run. The stable branch name/version is for the owner's testing; rendering, device performance, accessibility and stability are not certified. No runtime verification was performed for the selective cleanup.
+Source/diff review only. No tests, check scripts, Gradle configuration/compilation, APK builds or GitHub Actions were run. The stable branch name/version is for the owner's testing; rendering, device performance, accessibility and stability are not certified. The merged code still needs testing on a phone.
