@@ -192,7 +192,8 @@ private fun ImmersiveContent(connection: PlayerConnection, onExit: () -> Unit) {
         ),
     ) {
         BoxWithConstraints(Modifier.fillMaxSize().background(SceneBase)) {
-            val dockMaxHeight = maxHeight * .48f
+            val screenHeight = maxHeight
+            val dockMaxHeight = screenHeight * .48f
             ImmersiveBackdrop(selectedStyle, track.thumbnailUrl)
             Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.displayCutout)) {
                 Row(
@@ -270,7 +271,7 @@ private fun ImmersiveContent(connection: PlayerConnection, onExit: () -> Unit) {
                             ImmersiveSongTitle(track, Modifier.align(Alignment.BottomStart).padding(24.dp))
                         resumed && !pickerOpen -> LyricsScreen(
                             onClose = onExit,
-                            screenHeight = maxHeight,
+                            screenHeight = screenHeight,
                             contentBottomInset = 0.dp,
                             showHeader = false,
                             immersivePresentation = true,
