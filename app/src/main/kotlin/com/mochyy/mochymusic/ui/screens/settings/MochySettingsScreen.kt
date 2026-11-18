@@ -156,7 +156,7 @@ private val SettingsIndex = listOf(
     SettingsEntry("Customisation", "Customisation", "customisation_settings", "customize cover rounding playlist player home styles gesture swipe blur animation lyrics"),
     SettingsEntry("Cover rounding", "Customisation", "customisation_settings", "square rounded corner radius px thumbnail art"),
     SettingsEntry("True Black", "Customisation", "customisation_settings", "amoled oled pure black dark theme"),
-    SettingsEntry("Bottom navigation", "Customisation", "customisation_settings", "nav bar tabs fold fade slide capsule ribbon docked"),
+    SettingsEntry("Bottom navigation", "Customisation", "customisation_settings", "nav bar tabs fold fade slide capsule ribbon docked scroll player motion animations"),
     SettingsEntry("Playlist styles", "Customisation", "customisation_settings", "flow classic minimal header layout"),
     SettingsEntry("Player styles", "Customisation", "customisation_settings", "flagship turntable ipod poster timeline lyrics studio customize player cover"),
     SettingsEntry("Home styles", "Customisation", "customisation_settings", "Pippo listen now hop in hero layout grid"),
