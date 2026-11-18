@@ -248,6 +248,7 @@ private fun VideoModeScreen(actions: StyleActions, modifier: Modifier) {
                             onAddToPlaylist = { showAddToPlaylist = true },
                             onSongInfo = { state.songInfoOpen = true },
                             onPickVideo = { songForVideo = track },
+                            onImmersive = actions.onImmersive,
                         )
                     }
                     if (state.songInfoOpen) {

@@ -38,7 +38,9 @@ enum class PlayerMenuAction(val label: String, @param:StringRes val labelRes: In
     ADD_TO_PLAYLIST("Add to playlist", R.string.ps_action_add_to_playlist, R.drawable.playlist_add),
 
     // the turntable's own rotate button, added by the player rather than picked in the editor
-    ROTATE("Rotate", R.string.player_rotate, R.drawable.screen_rotation);
+    ROTATE("Rotate", R.string.player_rotate, R.drawable.screen_rotation),
+    // Built in to the quick menu without taking an editable slot.
+    IMMERSIVE("Immersive mode", R.string.immersive_mode, R.drawable.fullscreen);
 
     companion object {
         val DefaultSlots = listOf(OTHER_MENU, SLEEP_TIMER, SEE_VIDEO, REPEAT)
