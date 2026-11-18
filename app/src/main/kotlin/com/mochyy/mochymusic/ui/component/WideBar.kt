@@ -169,6 +169,7 @@ fun WideBarBackground(
     withPlayer: () -> Float,
     pureBlack: Boolean,
     modifier: Modifier = Modifier,
+    scrollFold: () -> Float,
 ) {
     val glassState = LocalGlassState.current ?: remember { GlassState() }
     val accentWash = rememberChromeAccentWash()
@@ -180,7 +181,8 @@ fun WideBarBackground(
                 .offset { IntOffset(lerp(bar.tabsAloneStart, bar.pillStart, withPlayer()).roundToPx(), bar.pillGap.roundToPx()) }
                 // the width is read while laying out, so the shrink onto the tabs never recomposes the bar
                 .layout { measurable, _ ->
-                    val width = lerp(bar.tabsWidth, bar.pillWidth, withPlayer()).roundToPx()
+                    val joinedWidth = lerp(bar.tabsWidth, bar.pillWidth, withPlayer())
+                    val width = lerp(joinedWidth, bar.miniWidth, scrollFold()).roundToPx()
                     val height = bar.height.roundToPx()
                     val placeable = measurable.measure(Constraints.fixed(width, height))
                     layout(width, height) { placeable.place(0, 0) }

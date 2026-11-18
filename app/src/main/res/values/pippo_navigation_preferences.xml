@@ -13,4 +13,22 @@
     <string name="nav_motion_fold">Fold</string>
     <string name="nav_motion_fade">Fade</string>
     <string name="nav_motion_preview">Preview motion</string>
+    <string name="scroll_player_title">Scroll player</string>
+    <string name="scroll_player_description">Tuck away the tabs as you scroll down. Scroll back up to reveal them.</string>
+    <string name="scroll_player_motion_disabled">Turn on animations to use scroll motion and previews.</string>
+    <string name="scroll_player_flow">Flow</string>
+    <string name="scroll_player_glide">Glide</string>
+    <string name="scroll_player_lift">Lift</string>
+    <string name="scroll_player_soft_fade">Soft Fade</string>
+    <string name="scroll_player_elastic">Elastic</string>
+    <string name="scroll_player_zephyr">Zephyr</string>
+    <string name="scroll_player_cascade">Cascade</string>
+    <string name="scroll_player_focus">Focus</string>
+    <string name="scroll_player_snap">Snap</string>
+    <string name="scroll_player_bloom">Bloom</string>
+    <string name="scroll_player_sweep">Sweep</string>
+    <string name="scroll_player_float">Float</string>
+    <string name="scroll_player_compress">Compress</string>
+    <string name="scroll_player_unfold">Unfold</string>
+    <string name="scroll_player_settle">Settle</string>
 </resources>
