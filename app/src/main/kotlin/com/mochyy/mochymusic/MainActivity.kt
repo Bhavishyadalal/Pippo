@@ -411,6 +411,7 @@ class MainActivity : ComponentActivity() {
     @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
+        setTheme(com.mochyy.mochymusic.utils.AppIcons.current(this).splashTheme)
         installSplashScreen().handOffToLaunchIntro { introPlays }
         super.onCreate(savedInstanceState)
         lifecycleScope.launch(Dispatchers.IO) {
@@ -640,8 +641,8 @@ class MainActivity : ComponentActivity() {
                     val plays = introRequested && (tabOpenedFromShortcut ?: defaultOpenTab) == NavigationTab.HOME
                     introPlays = plays
                     if (introRequested && !plays) LaunchGate.skip()
-                    // Match the explicit main icon used by the system splash, including direct launches.
-                    val icon = com.mochyy.mochymusic.utils.AppIcon.Default
+                    // Use the saved selection even when opened from a stale launcher shortcut.
+                    val icon = com.mochyy.mochymusic.utils.AppIcons.current(this@MainActivity)
                     LaunchIntroState(plays, icon)
                 }
 

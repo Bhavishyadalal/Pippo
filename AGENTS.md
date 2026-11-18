@@ -13,3 +13,5 @@
 - Latest authorized work: playback/network/Bluetooth reliability and module URL copying on `preview-beta-v0.1.2`. The owner explicitly authorized logic/function testing for these fixes. Keep main, stable and backup untouched unless requested. Preserve the restored design; do not reintroduce the reverted mini-player or cozy-settings redesigns.
 
 - The owner clarified that the ENTIRE first customization expansion (bb0a4fef), including its extra settings and backing behavior, must be removed from beta and stable. Preserve later playback/Bluetooth fixes, module URL copying, automatic refresh-rate work, startup changes and icon-preview files. Do not restore a whole old repository snapshot or reintroduce the removed settings sections. Main remains untouched.
+
+- Latest requested beta work: the startup portrait and Home badge must match the selected app icon; do not restore the equalizer morph. Preserve existing Home design while correcting scroll-state capture and forced recommendation-row resets. Main and stable remain untouched for this work; no APK/Actions/tests are authorized by the edit request.
