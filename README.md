@@ -20,12 +20,6 @@ The Kotlin namespace, library interfaces, and stored compatibility keys retain t
 
 See [NOTICE.md](NOTICE.md) for upstream attribution and [LICENSE](LICENSE) for the retained GNU GPL v3 license. Copyright notices and upstream history are preserved.
 
-
-## Preview beta v0.1.2
-
-The `preview-beta-v0.1.2` branch expands **Settings → Customisation** with navigation layouts/order/labels, accents and text controls, page motion and feedback, Home shelf visibility/order, Library spacing, mini-player options, character selection and named appearance presets with import/export/reset. Performance presets reuse the existing blur and animation controls. See [beta customization details](docs/PREVIEW-BETA-V0.1.2.md) for behavior and review limits. No APK or workflow was run while preparing this beta.
-
-
 ## Stable 0.1.2 testing branch
 
-`stable-0.1.2` contains the customization and startup changes through commit `1e17d0b8`; later mini-player and cozy-settings redesigns have been reverted, with application version **0.1.2** / code **74**. Main and beta are preserved. Use **Optimized Release APK**, choose `stable-0.1.2` in **Run workflow → Branch**, and select ARM64 or Universal as appropriate. The release configuration enables R8 optimization/resource shrinking, excludes debugging/profiling, and retains the existing baseline profile. This branch was prepared without running builds, tests or Actions; device stability and smoothness remain unverified. See [stable preparation notes](docs/STABLE-0.1.2.md).
+`stable-0.1.2` retains version **0.1.2** / code **74**, its release optimization settings and main-icon startup handoff. The first customization expansion and later rejected redesigns are removed; original customization controls remain. See [stable preparation notes](docs/STABLE-0.1.2.md) and [the selective cleanup record](docs/CUSTOMIZATION-CLEANUP.md). Main is unchanged. No APK or workflow was run for this cleanup.

@@ -36,7 +36,7 @@ fun Modifier.press3D(
 
     origin: TransformOrigin = TransformOrigin.Center,
 ): Modifier = composed {
-    if (!enabled || !com.mochyy.mochymusic.ui.customization.UiCustomizationState.options.pressEffects || !com.mochyy.mochymusic.ui.utils.AppMotion.enabled) return@composed this
+    if (!enabled) return@composed this
 
     val scope = rememberCoroutineScope()
     val press = remember { Animatable(0f) }

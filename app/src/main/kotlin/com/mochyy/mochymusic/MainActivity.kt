@@ -2,6 +2,8 @@
 
 package com.mochyy.mochymusic
 
+import com.mochyy.mochymusic.utils.removeCustomizationExpansionPreferences
+
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.PendingIntent
@@ -412,6 +414,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen().handOffToLaunchIntro { introPlays }
         super.onCreate(savedInstanceState)
+        lifecycleScope.launch(Dispatchers.IO) {
+            applicationContext.removeCustomizationExpansionPreferences()
+        }
         // a tv that opens the phone app from an old shortcut gets the big-screen one instead
         if (savedInstanceState == null && intent?.action == Intent.ACTION_MAIN && isTelevision()) {
             startActivity(Intent(this, com.mochyy.mochymusic.ui.tv.TvActivity::class.java))
@@ -633,9 +638,8 @@ class MainActivity : ComponentActivity() {
                 val navBackStackEntry by navController.currentBackStackEntryAsState()
                 val (previousTab, setPreviousTab) = rememberSaveable { mutableStateOf("home") }
 
-                val navOrder = com.mochyy.mochymusic.ui.customization.UiCustomizationState.options.navOrder
-                val navigationItems = remember(navOrder) {
-                    com.mochyy.mochymusic.ui.customization.UiCustomization.ordered(Screens.MainScreens, navOrder) { it.route }
+                val navigationItems = remember {
+                        Screens.MainScreens
                 }
                 val (slimNav) = rememberPreference(SlimNavBarKey, defaultValue = false)
                 // flipped in Experimental while the app is open: it starts (or stops) turning right away
@@ -1507,12 +1511,10 @@ class MainActivity : ComponentActivity() {
                         speed = prefs[com.mochyy.mochymusic.constants.AnimationSpeedKey] ?: 1f,
                         elementBlur = prefs[com.mochyy.mochymusic.constants.ElementBlurKey] ?: true,
                         coverRadius = prefs[com.mochyy.mochymusic.constants.ThumbnailCornerRadiusKey] ?: 25f,
-                        customization = com.mochyy.mochymusic.ui.customization.UiCustomization.from(prefs),
                     )
                 }
                 .distinctUntilChanged()
                 .collect { look ->
-                    com.mochyy.mochymusic.ui.customization.UiCustomizationState.options = look.customization
                     com.mochyy.mochymusic.ui.utils.AppMotion.enabled = look.animations
                     com.mochyy.mochymusic.ui.utils.AppMotion.speed = look.speed
                     com.mochyy.mochymusic.ui.utils.AppMotion.elementBlur = look.elementBlur
@@ -1524,7 +1526,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private data class LookSettings(val animations: Boolean, val speed: Float, val elementBlur: Boolean, val coverRadius: Float, val customization: com.mochyy.mochymusic.ui.customization.UiCustomization)
+    private data class LookSettings(val animations: Boolean, val speed: Float, val elementBlur: Boolean, val coverRadius: Float)
 
     // people who had the old lyrics shader switch off land on the matching shaderless lyric style, once
     private fun moveOffOldLyricsShaderSwitch() {

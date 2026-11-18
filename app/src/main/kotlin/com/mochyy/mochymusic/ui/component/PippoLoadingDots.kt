@@ -43,8 +43,7 @@ fun PippoLoadingDots(modifier: Modifier = Modifier) {
     val lifecycle by LocalLifecycleOwner.current.lifecycle.currentStateFlow.collectAsState()
     val obscured = LocalAppContentObscured.current
     val animate = lifecycle.isAtLeast(Lifecycle.State.STARTED) && !obscured.value &&
-        AppMotion.enabled && AppMotion.durationScale.scaleFactor > 0f &&
-        com.mochyy.mochymusic.ui.customization.UiCustomizationState.options.loadingMotion
+        AppMotion.enabled && AppMotion.durationScale.scaleFactor > 0f
     val description = stringResource(R.string.please_wait)
     Row(
         modifier = modifier.semantics {

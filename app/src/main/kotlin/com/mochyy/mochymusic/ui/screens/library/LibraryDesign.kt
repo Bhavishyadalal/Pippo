@@ -447,11 +447,7 @@ fun LibraryListRow(
         ),
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = SearchHorizontalPadding, vertical = when (com.mochyy.mochymusic.ui.customization.UiCustomizationState.options.libraryRows) {
-                com.mochyy.mochymusic.constants.UiSpacing.COMPACT -> 0.dp
-                com.mochyy.mochymusic.constants.UiSpacing.COMFORTABLE -> 3.dp
-                com.mochyy.mochymusic.constants.UiSpacing.ROOMY -> 8.dp
-            }),
+            .padding(horizontal = SearchHorizontalPadding, vertical = 3.dp),
     )
 }
 

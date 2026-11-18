@@ -1,18 +1,18 @@
 # Pippo stable 0.1.2 preparation
 
 - Branch: `stable-0.1.2`.
-- App code restored to beta commit `1e17d0b8` at the owner's request; subsequent mini-player and cozy-settings redesigns are removed.
+- The first customization expansion has now been selectively removed; the main-icon startup handoff is retained. Previously rejected mini-player and cozy-settings redesigns remain removed.
 - Version name: `0.1.2`, version code: `74` (previously `1.0.0`, code `73`). Android compares the increasing version code for installation upgrades.
 - Package remains `com.bhavishyadalal.pippo`; stored data and the existing preferences/schema are retained.
 - Main, `preview-beta-v0.1.2` and the backup branch are preserved. No merge or release tag/publication is performed.
 
-Includes the customization controls and main-icon startup handoff present at `1e17d0b8`. Later mini-player choices and cozy settings refinements have been reverted. Internal resource identifiers and helper names containing `beta` are retained for compatibility; they do not add a beta suffix to the installed version.
+Original customization controls remain. The added sections and appearance-profile system are removed. A one-time migration clears only their private `pippo.ui.*` preferences. See [the selective cleanup record](CUSTOMIZATION-CLEANUP.md) for backup references and preserved branch contents.
 
 ## Optimized release configuration
 
 Retains R8 minification/optimization with `proguard-android-optimize.txt`, resource shrinking, the existing app baseline profile and release Compose source-information stripping. Release explicitly disables both debugging and profiling. The separate profileable development variant still enables profiling. Compose inspection tooling is debug-only; runtime trace tooling is profileable-only. Release does not plant the debug Timber tree.
 
-These are production build settings, not evidence of measured performance. No existing visual preferences are forcibly reset and no additional effects are enabled by promotion. The Light preset remains available for devices that benefit from fewer effects.
+These are production build settings, not evidence of measured performance. Original visual preferences remain intact; only the withdrawn expansion’s private settings are removed. Existing blur and animation controls remain available.
 
 ## Manual APK build later
 
@@ -22,4 +22,4 @@ Auto signing uses the private key when all signing secrets are supplied. With no
 
 ## Review limits
 
-Source/diff review only. No tests, check scripts, Gradle configuration/compilation, APK builds or GitHub Actions were run. The stable branch name/version is for the owner's testing; rendering, device performance, accessibility and stability are not certified. Existing beta feature notes document remaining device-review needs.
+Source/diff review only. No tests, check scripts, Gradle configuration/compilation, APK builds or GitHub Actions were run. The stable branch name/version is for the owner's testing; rendering, device performance, accessibility and stability are not certified. No runtime verification was performed for the selective cleanup.

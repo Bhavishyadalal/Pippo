@@ -76,7 +76,7 @@ import kotlin.math.PI
 import kotlin.math.sin
 import com.mochyy.mochymusic.ui.utils.stableStatusBars
 
-private val PagePadding get() = PippoSpacing.Page
+private val PagePadding = PippoSpacing.Page
 private val BackButtonSize = PippoSize.TouchTarget
 
 private val HeaderTopPadding = 16.dp

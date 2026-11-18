@@ -2,14 +2,6 @@
 
 package com.mochyy.mochymusic.ui.theme
 
-import com.mochyy.mochymusic.ui.customization.UiCustomizationState
-import com.mochyy.mochymusic.constants.UiFont
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.hapticfeedback.HapticFeedback
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.text.font.FontFamily
-
 import android.graphics.Bitmap
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -50,11 +42,10 @@ fun MochyTheme(
     content: @Composable () -> Unit,
 ) {
     val context = LocalContext.current
-    val ui = UiCustomizationState.options
 
     // Dynamic (Material You) colour is deliberately not used - the app ships its own palette.
     // The branch is gone rather than dead-but-present: dynamic*ColorScheme is API 31.
-    val baseColorScheme = remember(darkTheme, ui.accent, ui.customAccent, ui.highContrast) {
+    val baseColorScheme = remember(darkTheme) {
 
         if (darkTheme) {
             darkColorScheme(
@@ -124,23 +115,17 @@ fun MochyTheme(
         }
     }
 
-    val font = LookFont.family ?: when (ui.font) {
-        UiFont.INTER -> InterFontFamily
-        UiFont.SYSTEM -> FontFamily.Default
-        UiFont.SERIF -> FontFamily.Serif
-        UiFont.MONOSPACE -> FontFamily.Monospace
-    }
-    val typography = remember(font, ui.textScale) { appTypography(font, ui.textScale) }
-    val shapes = remember(ui.corners) { PippoShapes }
-    val haptics = if (ui.haptics) LocalHapticFeedback.current else SilentUiHaptics
+    val font = InterFontFamily
+    val typography = remember(font) { appTypography(font) }
     MaterialTheme(
         colorScheme = colorScheme,
         typography = typography,
-        shapes = shapes,
+        shapes = PippoShapes,
     ) {
-        CompositionLocalProvider(LocalHapticFeedback provides haptics) {
-            ProvideTextStyle(value = typography.bodyLarge, content = content)
-        }
+        ProvideTextStyle(
+            value = typography.bodyLarge,
+            content = content
+        )
     }
 }
 
@@ -179,8 +164,4 @@ fun ColorScheme.pureBlack(apply: Boolean) =
 val ColorSaver = object : Saver<Color, Int> {
     override fun restore(value: Int): Color = Color(value)
     override fun SaverScope.save(value: Color): Int = value.toArgb()
-}
-
-private object SilentUiHaptics : HapticFeedback {
-    override fun performHapticFeedback(hapticFeedbackType: HapticFeedbackType) = Unit
 }

@@ -30,19 +30,14 @@ object LookFont {
 }
 
 // read through a state, so text set in it follows a look's font turning on or off
-val InterFontFamily: FontFamily get() = LookFont.family ?: when (com.mochyy.mochymusic.ui.customization.UiCustomizationState.options.font) {
-    com.mochyy.mochymusic.constants.UiFont.INTER -> Inter
-    com.mochyy.mochymusic.constants.UiFont.SYSTEM -> FontFamily.Default
-    com.mochyy.mochymusic.constants.UiFont.SERIF -> FontFamily.Serif
-    com.mochyy.mochymusic.constants.UiFont.MONOSPACE -> FontFamily.Monospace
-}
+val InterFontFamily: FontFamily get() = LookFont.family ?: Inter
 
 /** Headings are compact; paragraphs and small labels keep normal reading space. */
-fun appTypography(font: FontFamily, scale: Float = 1f): Typography {
+fun appTypography(font: FontFamily): Typography {
     fun style(size: Int, height: Int, weight: FontWeight, tracking: Float) = TextStyle(
         fontFamily = font,
-        fontSize = (size * scale).sp,
-        lineHeight = (height * scale).sp,
+        fontSize = size.sp,
+        lineHeight = height.sp,
         fontWeight = weight,
         letterSpacing = tracking.em,
     )

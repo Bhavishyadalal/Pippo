@@ -8,4 +8,6 @@
 - The owner removed the four experimental Cassette, Midnight Glass, Pippo Duo and CD Walkman player screens. Keep the existing player screens; do not reintroduce the removed designs unless requested.
 - Do not build or publish another APK, or launch GitHub Actions, until the owner explicitly asks for that again.
 
-- Main remains at the tested design-system commit bd58eae8. The owner explicitly requested `stable-0.1.2` for stable-version testing, then requested restoring both beta and stable app code to 1e17d0b8. Stable retains version 0.1.2/code 74 and release optimization settings. Preserve main and the backup branch; keep beta at the restored code unless the owner requests further changes. Do not merge, build an APK or run Actions unless requested.
+- Stable retains version 0.1.2/code 74 and its release optimization settings. Main remains at bd58eae8. Do not merge branches, build an APK or run Actions unless requested.
+
+- The owner clarified that the entire first customization expansion (bb0a4fef), including its extra settings and backing behavior, must be removed from beta and stable. Preserve each branch's later independent work. Do not restore a whole old repository snapshot or reintroduce the removed settings sections. Beta's later playback/Bluetooth, module URL copying, automatic refresh-rate and icon preview changes remain on beta; do not implicitly promote them to stable. Main remains untouched.

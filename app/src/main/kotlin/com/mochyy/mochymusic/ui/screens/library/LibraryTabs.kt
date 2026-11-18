@@ -61,7 +61,7 @@ enum class LibraryTab(val labelRes: Int, val shelf: LibraryShelfKind? = null) {
 
 private val ChipTrack = PippoColors.Surface
 private val Chip = PippoColors.SurfaceRaised
-private val ChipSelected get() = PippoColors.Accent
+private val ChipSelected = PippoColors.Accent
 
 private val ChipTrackPadding = 3.dp
 private val ChipGap = 4.dp

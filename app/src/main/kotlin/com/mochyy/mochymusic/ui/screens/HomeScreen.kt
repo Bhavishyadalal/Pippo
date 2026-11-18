@@ -1125,10 +1125,7 @@ fun HomeScreen(
         )
     }
 
-    val (customHomeOrder) = rememberPreference(com.mochyy.mochymusic.constants.UiHomeOrderKey, "")
-    val (customHomeHidden) = rememberPreference(com.mochyy.mochymusic.constants.UiHomeHiddenKey, "")
-    val hiddenShelves = remember(customHomeHidden) { customHomeHidden.take(512).split(',').toSet() }
-    val homeSections by remember(customHomeOrder, hiddenShelves) {
+    val homeSections by remember {
         derivedStateOf {
             val list = mutableListOf<HomeSection>()
 
@@ -1174,9 +1171,7 @@ fun HomeScreen(
                 list.add(HomeSection.HomePageSection(index, section.title))
             }
 
-            val visible = list.filter { it.id !in hiddenShelves }
-            if (customHomeOrder.isBlank()) visible
-            else com.mochyy.mochymusic.ui.customization.UiCustomization.ordered(visible, customHomeOrder) { it.id }
+            list
         }
     }
 
