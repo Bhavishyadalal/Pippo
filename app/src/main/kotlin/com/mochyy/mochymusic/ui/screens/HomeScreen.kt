@@ -76,6 +76,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.snapshotFlow
@@ -751,6 +752,9 @@ fun HomeScreen(
     val scope = rememberCoroutineScope()
 
     val lazylistState = rememberLazyListState()
+    val artworkRotation = rememberSaveable(saver = HomeArtworkRotation.Saver) { HomeArtworkRotation() }
+    val showArtworkFooter = !launchHold && !isFirstLoad
+    FollowHomeArtworkScroll(lazylistState, artworkRotation, showArtworkFooter)
 
     val carouselHeightDp = com.mochyy.mochymusic.ui.component.heroHeight()
     val collapseDistancePx = with(LocalDensity.current) {
@@ -1692,6 +1696,12 @@ fun HomeScreen(
                                 Spacer(modifier = Modifier.height(34.dp))
                             }
                         }
+                    }
+                }
+
+                if (showArtworkFooter) {
+                    item(key = HomeArtworkKey, contentType = "home_artwork") {
+                        HomeArtworkFooter(artworkRotation)
                     }
                 }
 
