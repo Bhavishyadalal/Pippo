@@ -25,7 +25,7 @@ enum class BottomNavigationStyle(@StringRes val label: Int) {
         CAPSULE, RIBBON -> 56.dp
     }
     internal val barShape get() = when (this) {
-        GLASS, CAPSULE -> RoundedCornerShape(50)
+        GLASS, CAPSULE -> NavBarShape
         DOCKED -> RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp)
         RIBBON -> RoundedCornerShape(16.dp)
     }
