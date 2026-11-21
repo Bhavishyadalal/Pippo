@@ -76,6 +76,7 @@ import com.mochyy.mochymusic.ui.player.PlayerVolumeBarHeight
 import com.mochyy.mochymusic.ui.player.SeamBlur
 import com.mochyy.mochymusic.ui.player.SeekBarLift
 import com.mochyy.mochymusic.ui.player.TransportGapAboveRow
+import com.mochyy.mochymusic.ui.player.info.ProviderMarkRoom
 import com.mochyy.mochymusic.ui.player.TurntableControls
 import com.mochyy.mochymusic.ui.player.TurntableControlsLift
 import com.mochyy.mochymusic.ui.player.flagship.FlagshipBarHeight
@@ -161,17 +162,23 @@ internal fun FlagshipPreview(
     turntable: Boolean = false,
     // the new flagship: its own background and bar, its buttons, the cover melting into its colours
     flagship: Boolean = false,
+    artworkFrame: Boolean = false,
 ) {
     val connection = LocalPlayerConnection.current ?: return
     val track by connection.uiState.trackInfo.collectAsState()
     val transport by connection.uiState.transportState.collectAsState()
     val queue by connection.uiState.queueState.collectAsState()
     val flagshipCover by rememberEnumPreference(PlayerCoverStyleKey, DefaultPlayerCoverStyle)
-    val coverStyle = if (turntable) PlayerCoverStyle.TURNTABLE else flagshipCover
-    val backgroundStyle by rememberEnumPreference(
+    val coverStyle = when {
+        turntable -> PlayerCoverStyle.TURNTABLE
+        artworkFrame -> PlayerCoverStyle.SQUARED
+        else -> flagshipCover
+    }
+    val savedBackground by rememberEnumPreference(
         if (flagship) FlagshipBackgroundStyleKey else PlayerBackgroundStyleKey,
         if (flagship) PlayerBackgroundStyle.AMBIENT else PlayerBackgroundStyle.COVER_GRADIENT,
     )
+    val backgroundStyle = if (artworkFrame) PlayerBackgroundStyle.COVER_GRADIENT else savedBackground
     // the Turntable is built on the new flagship, so it shares the new bottom bar, as on the live player
     val newBottomBar = flagship || turntable
     val barStyle by rememberEnumPreference(
@@ -257,12 +264,13 @@ internal fun FlagshipPreview(
             val drawShift = if (edgeToEdge) ControlsDrawShift else 0.dp
             val transportGap = (maxHeight * 0.19f - 37.dp - belowControls + TransportGapAboveRow + drawShift) / 2f
             val transportSpacer = (transportGap - SeekBarLift - drawShift).coerceAtLeast(0.dp)
-            val buttonsLift = (transportSpacer + SeekBarLift + drawShift - transportGap.coerceAtLeast(0.dp)) / 2f
+            val bottomGap = transportGap.coerceAtLeast(if (flagship) ProviderMarkRoom else 0.dp)
+            val buttonsLift = (transportSpacer + SeekBarLift + drawShift - bottomGap) / 2f
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
-                    .padding(bottom = belowControls + transportGap.coerceAtLeast(0.dp)),
+                    .padding(bottom = belowControls + bottomGap),
             ) {
                 Column(modifier = Modifier.offset(y = -drawShift)) {
                     Spacer(Modifier.height(20.dp))

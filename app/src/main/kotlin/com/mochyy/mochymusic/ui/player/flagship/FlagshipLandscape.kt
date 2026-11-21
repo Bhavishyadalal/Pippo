@@ -152,6 +152,7 @@ internal fun FlagshipLandscape(
     modifier: Modifier = Modifier,
     // the Turntable: its record runs in from the left edge the way the poster's circle does, its arm still the seek bar
     turntable: Boolean = false,
+    preferSquare: Boolean = false,
 ) {
     val connection = LocalPlayerConnection.current ?: return
     val track by connection.uiState.trackInfo.collectAsState()
@@ -166,7 +167,7 @@ internal fun FlagshipLandscape(
     val look = when {
         onTv -> if (tvSquare) CoverLook.TV_SQUARE else CoverLook.FULL
         turntable -> CoverLook.RECORD
-        fullCover -> CoverLook.FULL
+        fullCover && !preferSquare -> CoverLook.FULL
         else -> CoverLook.SQUARE
     }
     // beside the square or the record the seek bar stays over the buttons; with the full cover it moves onto the cover under the lyrics

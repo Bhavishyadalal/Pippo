@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -96,7 +97,7 @@ fun ForceProviderSheet(currentProviderId: String?, onDismiss: () -> Unit) {
         }
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.fillMaxWidth().navigationBarsPadding(),
+            modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).navigationBarsPadding(),
         ) {
             InfoColumn(modifier = Modifier.widthIn(max = 600.dp)) {
                 InfoSheetTitle(stringResource(R.string.pc_force_title))

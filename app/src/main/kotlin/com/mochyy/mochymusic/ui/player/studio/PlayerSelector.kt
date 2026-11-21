@@ -348,6 +348,7 @@ fun PlayerSelectorOverlay(
                         when (style) {
                             PlayerStyle.FLAGSHIP -> FlagshipPreview(flagship = true)
                             PlayerStyle.CLASSIC -> FlagshipPreview()
+                            PlayerStyle.ARTWORK_FRAME -> FlagshipPreview(flagship = true, artworkFrame = true)
                             PlayerStyle.TURNTABLE -> FlagshipPreview(turntable = true)
                             else -> AlternatePlayerStyle(style = style, actions = previewActions, preview = true, modifier = Modifier.fillMaxSize())
                         }
