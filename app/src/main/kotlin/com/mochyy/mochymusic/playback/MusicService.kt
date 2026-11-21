@@ -580,7 +580,7 @@ class MusicService :
     // the providers picked by hand in stream info, by song; they win over the order until they stop having it
     private val forcedRoutes = java.util.concurrent.ConcurrentHashMap<String, ForcedRoute>()
     private class ProviderHandoff(val target: ProviderSwitch.Target, val route: ForcedRoute) {
-        val ready = CompletableDeferred<Boolean>()
+        val ready = CompletableDeferred<ProviderSwitch.HandoffResult>()
         @Volatile var resolvedFrom: PlayingFrom? = null
         @Volatile var facts: StreamFacts? = null
         @Volatile var youtube: YTPlayerUtils.PlaybackData? = null
@@ -596,6 +596,11 @@ class MusicService :
     private val _playingFrom = MutableStateFlow<Map<String, PlayingFrom>>(emptyMap())
     /** where each song played from, for stream info's provider row */
     val playingFrom = _playingFrom.asStateFlow()
+    fun setPlaybackProviderEnabled(providerId: String, enabled: Boolean) {
+        sourceModules.setEnabled(providerId, enabled)
+        if (!enabled) providerSwitch.cancelIfSelecting(providerId)
+    }
+
     /** Resolves the replacement while the current provider plays. */
     val providerSwitch by lazy { ProviderSwitch({ scope }, providerHandoffHost) }
     /** what each song is playing as, by media id, for the player's format badge */
@@ -1492,7 +1497,7 @@ class MusicService :
                         if (format != null && tracks.isTypeSupported(C.TRACK_TYPE_AUDIO, true)) {
                             handoff.facts = playbackFacts(handoff.facts, format)
                         } else if (tracks.containsType(C.TRACK_TYPE_AUDIO) && !tracks.isTypeSupported(C.TRACK_TYPE_AUDIO, true)) {
-                            handoff.ready.complete(false)
+                            handoff.ready.complete(ProviderSwitch.HandoffResult.Failed(getString(R.string.pc_force_unsupported_audio)))
                         }
                     }
                     return
@@ -3159,15 +3164,22 @@ class MusicService :
         player: Player,
         events: Player.Events,
     ) {
-        if (events.containsAny(Player.EVENT_PLAYBACK_STATE_CHANGED, Player.EVENT_IS_PLAYING_CHANGED,
-                Player.EVENT_PLAY_WHEN_READY_CHANGED, Player.EVENT_TRACKS_CHANGED) &&
-            player.playbackState == Player.STATE_READY && (player.isPlaying || !player.playWhenReady)
+        if (player === this.player && player.playbackState == Player.STATE_READY &&
+            events.containsAny(Player.EVENT_PLAYBACK_STATE_CHANGED, Player.EVENT_TRACKS_CHANGED, Player.EVENT_TIMELINE_CHANGED)
         ) {
             providerHandoff?.let { handoff ->
-                if (providerHandoffHost.currentTarget() == handoff.target) {
-                    val compatible = TrackMatcher.isDurationCompatible(handoff.route.expectedDurationMs, player.duration)
-                    handoff.ready.complete(handoff.resolvedFrom != null && handoff.stream != null &&
-                        compatible && StreamFacts.selectedAudio(player.currentTracks) != null)
+                // READY can also describe the old source while Media3 updates the track groups.
+                // Wait for the prepared replacement and its selected decoder before committing.
+                val decoded = StreamFacts.selectedAudio(player.currentTracks)
+                if (providerHandoffHost.currentTarget() == handoff.target &&
+                    handoff.resolvedFrom != null && handoff.stream != null && decoded != null
+                ) {
+                    if (TrackMatcher.isDurationCompatible(handoff.route.expectedDurationMs, player.duration)) {
+                        handoff.facts = playbackFacts(handoff.facts, decoded)
+                        handoff.ready.complete(ProviderSwitch.HandoffResult.Ready)
+                    } else {
+                        handoff.ready.complete(ProviderSwitch.HandoffResult.Failed(getString(R.string.pc_force_wrong_recording)))
+                    }
                 }
             }
         }
@@ -3425,7 +3437,9 @@ class MusicService :
 
         providerHandoff?.let { handoff ->
             if (providerHandoffHost.currentTarget() == handoff.target) {
-                handoff.ready.complete(false)
+                handoff.ready.complete(ProviderSwitch.HandoffResult.Failed(
+                    getString(R.string.pc_force_player_error, error.errorCodeName)
+                ))
                 return
             }
         }
@@ -4303,7 +4317,7 @@ class MusicService :
             if (saved != null && !savedIsUsable) forcedRoutes.remove(mediaId, saved)
             val forced = handoff != null || savedIsUsable
             val offline = com.mochyy.mochymusic.utils.OfflineMode.isOn
-            val stream = (if (!forced || offline) deviceStream(mediaItem) else null) ?: routeStream(mediaId)
+            val stream = (if (!forced || offline) deviceStream(mediaItem) else null) ?: routeStream(mediaItem)
             currentCoroutineContext().ensureActive()
             // A prepare may survive the change of queue occurrence. Resolve it again against
             // the current route instead of leaving its source without a timeline.
@@ -5233,7 +5247,8 @@ class MusicService :
         return null
     }
 
-    private suspend fun routeStream(mediaId: String): com.mochyy.mochymusic.playback.custom.CustomStreamResult? {
+    private suspend fun routeStream(mediaItem: MediaItem): com.mochyy.mochymusic.playback.custom.CustomStreamResult? {
+        val mediaId = mediaItem.mediaId
         // offline: no provider is asked; the song plays if it's cached, and is skipped if not.
         // An imported file is never looked for online, even one whose file has gone missing.
         if (com.mochyy.mochymusic.utils.OfflineMode.isOn || mediaId.startsWith("LOCAL_")) return null
@@ -5245,7 +5260,7 @@ class MusicService :
             val stream = if (forced.providerId == youtubeId) {
                 forcedYouTubeStream(mediaId, forced)
             } else {
-                forcedModuleStream(mediaId, forced)
+                forcedModuleStream(mediaItem, forced)
             }
             currentCoroutineContext().ensureActive()
             if (!isCurrentForcedRoute(mediaId, forced)) continue
@@ -5266,7 +5281,7 @@ class MusicService :
         // songs that only YouTube has (and the common case of YouTube first) need no lookup
         val first = sourceModules.order.value.firstOrNull { it !in skip && sourceModules.isUsable(it) }
         if (first == com.mochyy.mochymusic.modules.SourceModules.YouTubeId) return youTubeRoute(mediaId)
-        val track = trackQueryOf(mediaId)
+        val track = trackQueryOf(mediaId, mediaItem.metadata)
         val route = sourceModules.route(track, skip) { id, passed ->
             if (!decoderNotices.containsKey(mediaId)) noteMissingDecoder(mediaId, passed.codec?.uppercase(), passed.sampleRateHz, from = id)
         }
@@ -5317,6 +5332,7 @@ class MusicService :
             mediaId, module.info.id, stream.headers,
             stream.matched.id, stream.format.name, stream.codec, stream.sampleRateHz?.toString(),
             stream.qualityLabel, selectedQuality,
+            stream.url.toUri().host,
         )
         val facts = StreamFacts(codec = stream.codec, sampleRate = stream.sampleRateHz, fromModule = true)
         if (publish) streamFacts.update { it + (mediaId to facts) }
@@ -5363,33 +5379,35 @@ class MusicService :
         _playingFrom.update { if (it[mediaId] == from) it else it + (mediaId to from) }
     }
 
-    /** the song as a module looks for it: its saved row, or the queue's own copy for a song played straight from search that isn't saved yet */
-    private suspend fun trackQueryOf(mediaId: String): com.mochyy.mochymusic.module.TrackQuery? {
-        database.song(mediaId).first()?.let {
+    /** Use the queue entry the source actually opens, just as a module diagnostic uses its selected result. */
+    private suspend fun trackQueryOf(
+        mediaId: String,
+        queued: com.mochyy.mochymusic.models.MediaMetadata?,
+    ): com.mochyy.mochymusic.module.TrackQuery? {
+        if (queued != null && queued.title.isNotBlank() && queued.artists.isNotEmpty()) {
             return com.mochyy.mochymusic.module.TrackQuery(
-                title = it.song.title,
-                artists = it.artists.map { a -> a.name },
-                album = it.song.albumName ?: it.album?.title,
-                durationMs = it.song.duration.takeIf { d -> d > 0 }?.times(1000L),
+                title = queued.title,
+                artists = queued.artists.map { it.name },
+                album = queued.album?.title,
+                durationMs = queued.duration.takeIf { it > 0 }?.times(1000L),
             )
         }
-        // only the youtube path saves a new song, so without this every module was passed over for it
-        val queued = withContext(Dispatchers.Main) { player.findNextMediaItemById(mediaId)?.metadata } ?: return null
+        val saved = database.song(mediaId).first() ?: return null
         return com.mochyy.mochymusic.module.TrackQuery(
-            title = queued.title,
-            artists = queued.artists.map { it.name },
-            album = queued.album?.title,
-            durationMs = queued.duration.takeIf { it > 0 }?.times(1000L),
+            title = saved.song.title,
+            artists = saved.artists.map { it.name },
+            album = saved.song.albumName ?: saved.album?.title,
+            durationMs = saved.song.duration.takeIf { it > 0 }?.times(1000L),
         )
     }
 
     /** one ask of [module] for the song, passing over a stream this phone has no decoder for */
     private suspend fun resolveModuleRoute(
         module: com.mochyy.mochymusic.module.SourceModule,
-        mediaId: String,
+        mediaItem: MediaItem,
         option: Pair<String, String>?,
     ): ProviderSwitch.Resolution {
-        val track = trackQueryOf(mediaId) ?: return ProviderSwitch.Resolution.Rejected()
+        val track = trackQueryOf(mediaItem.mediaId, mediaItem.metadata) ?: return ProviderSwitch.Resolution.Rejected()
         val picks = sourceModules.playbackPicks(module.info.id, module, option)
         return when (val result = module.resolve(track, picks)) {
             is com.mochyy.mochymusic.module.ResolveResult.Found -> {
@@ -5415,9 +5433,10 @@ class MusicService :
         }
     }
 
-    private suspend fun forcedModuleStream(mediaId: String, forced: ForcedRoute): com.mochyy.mochymusic.playback.custom.CustomStreamResult? {
+    private suspend fun forcedModuleStream(mediaItem: MediaItem, forced: ForcedRoute): com.mochyy.mochymusic.playback.custom.CustomStreamResult? {
+        val mediaId = mediaItem.mediaId
         val module = sourceModules.module(forced.providerId) ?: return null
-        val resolved = if (forced.freshStream != null) forced else reopenModuleRoute(module, mediaId, forced.option)
+        val resolved = if (forced.freshStream != null) forced else reopenModuleRoute(module, mediaItem, forced.option)
         currentCoroutineContext().ensureActive()
         if (!isCurrentForcedRoute(mediaId, forced)) return null
         if (resolved == null) return null
@@ -5427,13 +5446,13 @@ class MusicService :
 
     private suspend fun reopenModuleRoute(
         module: com.mochyy.mochymusic.module.SourceModule,
-        mediaId: String,
+        mediaItem: MediaItem,
         option: Pair<String, String>?,
     ): ForcedRoute? {
         // Wait separately so a provider that blocks after cancellation cannot stall the queue.
         val lookup = scope.async(Dispatchers.IO) {
             try {
-                (resolveModuleRoute(module, mediaId, option) as? ProviderSwitch.Resolution.Found)?.route
+                (resolveModuleRoute(module, mediaItem, option) as? ProviderSwitch.Resolution.Found)?.route
             } catch (e: Exception) {
                 currentCoroutineContext().ensureActive()
                 Timber.tag(TAG).w(e, "Previously selected provider could not reopen the stream")
@@ -5519,13 +5538,21 @@ class MusicService :
                 return ProviderSwitch.Resolution.Found(ForcedRoute(providerId, option = option, youtubeQuality = tier, freshYouTube = playback))
             }
             val module = sourceModules.module(providerId) ?: return ProviderSwitch.Resolution.Rejected()
-            return resolveModuleRoute(module, target.mediaId, option)
+            val mediaItem = withContext(Dispatchers.Main) {
+                player.currentMediaItem?.takeIf { currentTarget() == target }
+            } ?: return ProviderSwitch.Resolution.Rejected()
+            return resolveModuleRoute(module, mediaItem, option)
         }
 
-        override suspend fun switchTo(target: ProviderSwitch.Target, route: ForcedRoute): Boolean {
-            if (currentTarget() != target || isCrossfading || crossmixDirector.isTransitioning ||
-                com.mochyy.mochymusic.utils.OfflineMode.isOn || !sourceModules.isUsable(route.providerId)
-            ) return false
+        override suspend fun switchTo(target: ProviderSwitch.Target, route: ForcedRoute): ProviderSwitch.HandoffResult {
+            val transitionFinished = withTimeoutOrNull(5_000L) {
+                while (currentTarget() == target && (isCrossfading || crossmixDirector.isTransitioning)) delay(100L)
+                true
+            } == true
+            if (!transitionFinished) return ProviderSwitch.HandoffResult.Failed(getString(R.string.pc_force_transition_busy))
+            if (currentTarget() != target || com.mochyy.mochymusic.utils.OfflineMode.isOn ||
+                !sourceModules.isUsable(route.providerId)
+            ) return ProviderSwitch.HandoffResult.Failed()
             val mediaId = target.mediaId
             val position = player.currentPosition
             val handoff = ProviderHandoff(target, route)
@@ -5535,8 +5562,11 @@ class MusicService :
                 val latestSafePosition = route.freshStream?.matched?.durationMs?.takeIf { it > 1_000 }
                     ?.minus(1_000)?.let { position.coerceAtMost(it) } ?: position
                 reload(target, latestSafePosition)
-                success = withTimeoutOrNull(20_000L) { handoff.ready.await() } == true &&
-                    currentTarget() == target && player.playbackState == Player.STATE_READY && player.playerError == null
+                val outcome = withTimeoutOrNull(20_000L) { handoff.ready.await() }
+                    ?: ProviderSwitch.HandoffResult.Failed(getString(R.string.pc_force_open_timeout))
+                success = outcome == ProviderSwitch.HandoffResult.Ready && currentTarget() == target &&
+                    player.playerError == null && sourceModules.isUsable(route.providerId) &&
+                    !com.mochyy.mochymusic.utils.OfflineMode.isOn
                 if (success) {
                     forcedRoutes[mediaId] = route.copy(freshStream = null, freshYouTube = null)
                     resolvedSourceIds[mediaId] = route.providerId
@@ -5555,7 +5585,8 @@ class MusicService :
                     failedSources.remove(mediaId)
                     failedSourcesAt.remove(mediaId)
                 }
-                return success
+                return if (success || outcome is ProviderSwitch.HandoffResult.Failed) outcome
+                else ProviderSwitch.HandoffResult.Failed()
             } finally {
                 if (providerHandoff === handoff) {
                     providerHandoff = null

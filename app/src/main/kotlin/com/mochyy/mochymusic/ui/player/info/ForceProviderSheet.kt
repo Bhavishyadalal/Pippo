@@ -43,6 +43,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -51,6 +53,7 @@ import com.mochyy.mochymusic.LocalPlayerConnection
 import com.mochyy.mochymusic.R
 import com.mochyy.mochymusic.constants.AudioQuality
 import com.mochyy.mochymusic.constants.AudioQualityKey
+import com.mochyy.mochymusic.module.ModuleFeature
 import com.mochyy.mochymusic.module.StreamOption
 import com.mochyy.mochymusic.modules.SourceModules
 import com.mochyy.mochymusic.playback.ProviderSwitchState
@@ -59,6 +62,7 @@ import com.mochyy.mochymusic.ui.player.menu.MenuRowSurface
 import com.mochyy.mochymusic.ui.player.menu.MenuSheetSurface
 import com.mochyy.mochymusic.utils.rememberPreference
 import kotlinx.coroutines.delay
+import com.mochyy.mochymusic.ui.component.AppSwitch
 import com.mochyy.mochymusic.ui.component.RemoteFocus
 
 private val YouTubeQualities = listOf(AudioQuality.AUTO, AudioQuality.HIGH, AudioQuality.MEDIUM, AudioQuality.LOW)
@@ -80,8 +84,9 @@ fun ForceProviderSheet(currentProviderId: String?, currentOption: String? = null
     val entries by modules.entries.collectAsState()
     val state by service.providerSwitch.state.collectAsState()
     val (youTubeQuality) = rememberPreference(AudioQualityKey, AudioQuality.AUTO.name)
-    // only what's switched on (and signed in) is offered: a provider that's off couldn't play it anyway
-    val providers = remember(order, youTubeOn, entries) { order.filter { modules.isUsable(it) } }
+    val audioEntries = entries.filter { ModuleFeature.AudioSource in it.module.adds }
+        .associateBy { it.id }
+    val providers = order.filter { it == SourceModules.YouTubeId || it in audioEntries }
 
     LaunchedEffect(Unit) { modules.refresh() }
     DisposableEffect(Unit) { onDispose { service.providerSwitch.acknowledge() } }
@@ -111,12 +116,17 @@ fun ForceProviderSheet(currentProviderId: String?, currentOption: String? = null
                 SwitchStatus(state, nameOf = modules::nameOf, onCancel = service.providerSwitch::cancel)
                 providers.forEach { id ->
                     val module = modules.module(id)
+                    val enabled = if (id == SourceModules.YouTubeId) youTubeOn else audioEntries[id]?.enabled == true
+                    val available = enabled && modules.isUsable(id)
                     val choice = module?.let(modules::qualityChoice)
                     val picked = choice?.let { c -> modules.picks(id)[c.id] ?: c.options.firstOrNull()?.id }
                     ProviderChoiceRow(
                         providerId = id,
                         name = modules.nameOf(id),
                         isCurrent = id == currentProviderId,
+                        enabled = enabled,
+                        available = available,
+                        onEnabledChange = { service.setPlaybackProviderEnabled(id, it) },
                         options = when {
                             choice != null -> choice.options
                             id == SourceModules.YouTubeId -> YouTubeQualities.map { StreamOption(it.name, stringResource(qualityLabelRes(it)), "") }
@@ -173,7 +183,11 @@ private fun SwitchStatus(state: ProviderSwitchState, nameOf: (String) -> String,
                 is ProviderSwitchState.Failed -> {
                     Text(stringResource(R.string.pc_force_unavailable), color = Color(0xFFFF7A7A), fontSize = 14.sp, fontWeight = FontWeight.Bold)
                     Text(
-                        state.reason ?: stringResource(R.string.pc_force_failed, nameOf(state.providerId), state.attempts),
+                        state.reason ?: if (state.opening) {
+                            stringResource(R.string.pc_force_open_failed, nameOf(state.providerId))
+                        } else {
+                            stringResource(R.string.pc_force_lookup_failed, nameOf(state.providerId))
+                        },
                         color = InfoMuted,
                         fontSize = 12.sp,
                     )
@@ -192,6 +206,9 @@ private fun ProviderChoiceRow(
     providerId: String,
     name: String,
     isCurrent: Boolean,
+    enabled: Boolean,
+    available: Boolean,
+    onEnabledChange: (Boolean) -> Unit,
     options: List<StreamOption>,
     selectedOption: String?,
     /** null when the row itself was tapped, keeping the quality as it is */
@@ -202,25 +219,41 @@ private fun ProviderChoiceRow(
             .fillMaxWidth()
             .clip(RoundedCornerShape(18.dp))
             .background(MenuRowSurface)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = RemoteFocus,
-            ) { onPick(null) }
             .padding(horizontal = 14.dp, vertical = 12.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            ProviderLogo(providerId, name, 44.dp)
-            Spacer(Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(text = name, color = Color.White, fontSize = 15.sp, lineHeight = 19.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Text(
-                    text = stringResource(if (isCurrent) R.string.pc_force_playing_here else R.string.pc_force_tap_here),
-                    color = InfoMuted,
-                    fontSize = 12.sp,
-                )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f).clickable(
+                    enabled = available,
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = RemoteFocus,
+                    onClick = { onPick(null) },
+                ),
+            ) {
+                ProviderLogo(providerId, name, 44.dp)
+                Spacer(Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(text = name, color = Color.White, fontSize = 15.sp, lineHeight = 19.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    val status = when {
+                        !enabled && isCurrent -> R.string.pc_provider_off_current
+                        !enabled -> R.string.pc_provider_off
+                        !available -> R.string.pc_provider_unavailable
+                        isCurrent -> R.string.pc_force_playing_here
+                        else -> R.string.pc_force_tap_here
+                    }
+                    Text(stringResource(status), color = InfoMuted, fontSize = 12.sp)
+                }
             }
+            Spacer(Modifier.width(12.dp))
+            val switchLabel = stringResource(R.string.pc_provider_toggle, name)
+            AppSwitch(
+                checked = enabled,
+                onCheckedChange = onEnabledChange,
+                modifier = Modifier.semantics { contentDescription = switchLabel },
+            )
         }
-        if (options.size > 1) {
+        if (available && options.size > 1) {
             Spacer(Modifier.height(10.dp))
             Row(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),

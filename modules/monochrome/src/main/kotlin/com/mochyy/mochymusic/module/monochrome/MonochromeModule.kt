@@ -55,8 +55,8 @@ class MonochromeModule : SourceModule, ServerListModule {
 
     private lateinit var host: ModuleHost
     private val json = Json { ignoreUnknownKeys = true }
-    private val matches = ConcurrentHashMap<String, CatalogTrack>()
-    private val misses = ConcurrentHashMap<String, Long>()
+    private val matches = ConcurrentHashMap<Pair<String, TrackQuery>, CatalogTrack>()
+    private val misses = ConcurrentHashMap<Pair<String, TrackQuery>, Long>()
 
     // the servers people added, tried before the built-in one since they were added for a reason
     @Volatile
@@ -114,7 +114,7 @@ class MonochromeModule : SourceModule, ServerListModule {
     }
 
     private fun resolveOn(server: Server, track: TrackQuery, report: (DiagnosticStep) -> Unit): ResolveResult {
-        val key = "${server.url}|${track.title}|${track.artists.joinToString(",")}"
+        val key = server.url to track
         val missedAt = misses[key]
         if (missedAt != null && System.currentTimeMillis() - missedAt < MissMemoryMs) {
             report(DiagnosticStep("Find the song", false, "Not on ${server.name}"))
@@ -174,7 +174,7 @@ class MonochromeModule : SourceModule, ServerListModule {
                     title = found.title,
                     artist = found.artist,
                     album = found.album,
-                    durationMs = found.durationMs,
+                    durationMs = info.durationMs ?: found.durationMs,
                     confidence = TrackMatcher.score(track, found),
                 ),
             )
@@ -264,8 +264,8 @@ class MonochromeModule : SourceModule, ServerListModule {
         added = added.filterNot { it.url == url }
         saveServers()
         clearDown(url)
-        matches.keys.removeIf { it.startsWith("$url|") }
-        misses.keys.removeIf { it.startsWith("$url|") }
+        matches.keys.removeIf { it.first == url }
+        misses.keys.removeIf { it.first == url }
     }
 
     // which kind of server answers a search at this link, if either does
@@ -352,7 +352,7 @@ class MonochromeModule : SourceModule, ServerListModule {
     }
 
     /** what a FLAC file's STREAMINFO says: its bit depth and sample rate */
-    internal class FlacInfo(val bitsPerSample: Int, val sampleRate: Int) {
+    internal class FlacInfo(val bitsPerSample: Int, val sampleRate: Int, val durationMs: Long? = null) {
         val hiRes: Boolean get() = bitsPerSample > 16 || sampleRate > 48_000
         private val rate: String get() = if (sampleRate % 1000 == 0) "${sampleRate / 1000}" else String.format("%.1f", sampleRate / 1000.0)
         val shortLabel: String get() = if (hiRes) "Hi-Res FLAC" else "FLAC"
@@ -369,7 +369,9 @@ class MonochromeModule : SourceModule, ServerListModule {
         val b = bytes.copyOfRange(8, 26).map { it.toInt() and 0xff }
         val sampleRate = (b[10] shl 12) or (b[11] shl 4) or (b[12] shr 4)
         val bits = (((b[12] and 0x01) shl 4) or (b[13] shr 4)) + 1
-        return if (sampleRate in 8_000..768_000 && bits in 8..32) FlacInfo(bits, sampleRate) else FlacInfo(16, 44_100)
+        if (sampleRate !in 8_000..768_000 || bits !in 8..32) return FlacInfo(16, 44_100)
+        val totalSamples = b.drop(14).fold((b[13] and 0x0f).toLong()) { count, byte -> (count shl 8) or byte.toLong() }
+        return FlacInfo(bits, sampleRate, totalSamples.takeIf { it > 0 }?.let { it * 1_000 / sampleRate })
     }
 
     private fun JsonObject.string(name: String): String? = (this[name] as? JsonPrimitive)?.contentOrNull

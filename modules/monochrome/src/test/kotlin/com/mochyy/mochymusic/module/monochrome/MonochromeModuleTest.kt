@@ -9,9 +9,11 @@ import com.mochyy.mochymusic.module.ModuleStorage
 import com.mochyy.mochymusic.module.ResolveResult
 import com.mochyy.mochymusic.module.ServerProblem
 import com.mochyy.mochymusic.module.StreamFormat
+import com.mochyy.mochymusic.module.TrackMatcher
 import com.mochyy.mochymusic.module.TrackQuery
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -78,6 +80,16 @@ class MonochromeModuleTest {
         assertEquals("FLAC", stream.codec)
         // searched as the web app does: artist first
         assertTrue(host.requests.first().url.contains("q=benny%20blanco%20eastside"))
+    }
+
+    @Test
+    fun `a longer music video still matches the full FLAC but a preview does not`() = runBlocking {
+        val (module, _) = module()
+        val video = eastside.copy(durationMs = 270_000)
+        val stream = (module.resolve(video, emptyMap()) as ResolveResult.Found).stream
+        assertEquals(0x74f3bfL * 1_000 / 44_100, stream.matched.durationMs)
+        assertTrue(TrackMatcher.isCompatible(video, stream.matched))
+        assertFalse(TrackMatcher.isCompatible(video, stream.matched.copy(durationMs = 30_000)))
     }
 
     @Test
