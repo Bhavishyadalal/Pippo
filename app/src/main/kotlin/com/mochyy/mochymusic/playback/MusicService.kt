@@ -549,6 +549,7 @@ class MusicService :
         val target = player
         val mediaId = target.currentMediaItem?.mediaId ?: return
         val occurrence = providerOccurrence
+        val pauseGeneration = transport.pauseGeneration
         routeRefreshJob = scope.launch {
             delay(400) // Android may announce a headset before its media route has settled.
             // A route can arrive during a brief buffering period. Give that period time to
@@ -559,6 +560,7 @@ class MusicService :
                 ) delay(100)
             }
             if (player !== target || providerOccurrence != occurrence || lastAudioRoute != route ||
+                transport.pauseGeneration != pauseGeneration ||
                 !mayResumeRecovery(mediaId, target.currentMediaItem?.mediaId, target.playWhenReady,
                     castConnectionHandler?.isCasting?.value == true) || handoffFor(mediaId) != null ||
                 target.playbackState != Player.STATE_READY || transport.isFading || isCrossfading || crossmixDirector.isTransitioning) return@launch
@@ -1121,7 +1123,7 @@ class MusicService :
 
         currentSong.debounce(1000).collect(scope) { song ->
             updateNotification()
-            updateWidgetUI(player.isPlaying)
+            updateWidgetUI()
         }
 
         combine(
@@ -1777,14 +1779,14 @@ class MusicService :
 
         retryJob?.cancel()
         val target = player
-        val failedMediaId = target.currentMediaItem?.mediaId
+        val occurrence = providerOccurrence
         retryJob = scope.launch {
 
             val delayMs = minOf(3000L * (1 shl retryCount), 30000L)
             Timber.tag(TAG).d("Waiting ${delayMs}ms before retry attempt ${retryCount + 1}/$MAX_RETRY_COUNT")
             delay(delayMs)
 
-            if (player !== target || target.currentMediaItem?.mediaId != failedMediaId) return@launch
+            if (player !== target || providerOccurrence != occurrence) return@launch
             if (isNetworkConnected.value && waitingForNetworkConnection.value) {
                 triggerRetry()
             }
@@ -1793,20 +1795,20 @@ class MusicService :
 
     private fun triggerRetry() {
         if (!waitingForNetworkConnection.value) return
-        retryCount++
+        val target = player
+        val mediaId = target.currentMediaItem?.mediaId ?: return
+        if (target.playbackState != Player.STATE_IDLE || handoffFor(mediaId) != null) return
+
         waitingForNetworkConnection.value = false
         retryJob?.cancel()
-
-        if (player.currentMediaItem != null) {
-
-            if (retryCount > 3) {
-                Timber.tag(TAG).d("Retry count > 3, attempting to refresh stream URL")
-                val currentPosition = player.currentPosition
-                player.seekTo(player.currentMediaItemIndex, currentPosition)
-            }
-            player.prepare()
-
+        if (!target.playWhenReady || castConnectionHandler?.isCasting?.value == true) return
+        retryCount++
+        if (retryCount > 3) {
+            Timber.tag(TAG).d("Retry count > 3, attempting to refresh stream URL")
+            songUrlCache.remove(mediaId)
+            target.seekTo(target.currentMediaItemIndex, target.currentPosition)
         }
+        target.prepare()
     }
 
     /** Moves past a stream that never came back, unless it has failed too many times in a row. */
@@ -1892,7 +1894,7 @@ class MusicService :
     }
 
     /** A failed stream the player has given up on: says so, and skips after the timeout unless that's turned off. */
-    private fun failStream() {
+    private fun failStream(allowAutoRecovery: Boolean = true) {
         val target = player
         val occurrence = providerOccurrence
         val pauseGeneration = transport.pauseGeneration
@@ -1900,9 +1902,11 @@ class MusicService :
         target.pause()
         announceStreamFailure()
         clearStreamFailure()
-        if (!wasPlaying) return
+        if (!wasPlaying || !allowAutoRecovery) return
         fun canRecover(): Boolean = player === target && providerOccurrence == occurrence &&
-            transport.pauseGeneration == pauseGeneration && castConnectionHandler?.isCasting?.value != true
+            transport.pauseGeneration == pauseGeneration && !target.playWhenReady &&
+            target.currentMediaItem?.mediaId?.let(::handoffFor) == null &&
+            castConnectionHandler?.isCasting?.value != true
         if (dataStore.get(DontSkipOnFailureKey, false)) {
             // staying on it means trying it again every few seconds until it plays: loading it
             // again ends this job, and a failure starts the next wait
@@ -3195,28 +3199,45 @@ class MusicService :
             if (target.playbackState == Player.STATE_READY) bufferingRecoveredOccurrence = -1L
             return
         }
-        val mediaId = target.currentMediaItem?.mediaId ?: return
+        val mediaItem = target.currentMediaItem ?: return
+        val mediaId = mediaItem.mediaId
         val occurrence = providerOccurrence
+        val pauseGeneration = transport.pauseGeneration
         if (bufferingRecoveryJob?.isActive == true) return
+        fun isStillStalled() = player === target && providerOccurrence == occurrence &&
+            target.playWhenReady && transport.pauseGeneration == pauseGeneration &&
+            target.playbackState == Player.STATE_BUFFERING &&
+            target.playbackSuppressionReason == Player.PLAYBACK_SUPPRESSION_REASON_NONE &&
+            handoffFor(mediaId) == null && castConnectionHandler?.isCasting?.value != true &&
+            !waitingForNetworkConnection.value
+
         bufferingRecoveryJob = scope.launch {
             delay(25_000L)
-            bufferingRecoveryJob = null
-            if (player !== target || providerOccurrence != occurrence || !target.playWhenReady ||
-                target.playbackState != Player.STATE_BUFFERING ||
-                target.playbackSuppressionReason != Player.PLAYBACK_SUPPRESSION_REASON_NONE ||
-                handoffFor(mediaId) != null ||
-                castConnectionHandler?.isCasting?.value == true || waitingForNetworkConnection.value
-            ) return@launch
+            if (!isStillStalled()) return@launch
 
             if (bufferingRecoveredOccurrence == occurrence) {
-                if (!connectivityObserver.isCurrentlyConnected()) {
+                val onDevice = withContext(Dispatchers.IO) { playsOffline(mediaItem) }
+                if (!isStillStalled()) return@launch
+                val offlineMode = com.mochyy.mochymusic.utils.OfflineMode.isOn
+                if (offlineMode || !connectivityObserver.isCurrentlyConnected()) {
+                    val next = nextOfflineIndex()
+                    if (next != C.INDEX_UNSET) {
+                        playOfflineSong(next)
+                        return@launch
+                    }
+                    if (!onDevice && !offlineMode) {
+                        target.stop()
+                        waitOnNetworkError()
+                        return@launch
+                    }
+                }
+                bufferingRecoveryJob = null
+                if (onDevice || offlineMode || !forceFallBack(mediaId, includeYouTube = true, announce = false)) {
                     target.stop()
-                    waitOnNetworkError()
-                } else if (!forceFallBack(mediaId, includeYouTube = true, announce = false)) {
                     lastPlaybackError = PlaybackException(
                         getString(R.string.pippo_playback_stalled), null, PlaybackException.ERROR_CODE_TIMEOUT,
                     )
-                    failStream()
+                    failStream(allowAutoRecovery = !offlineMode)
                 }
                 return@launch
             }
@@ -3226,6 +3247,7 @@ class MusicService :
             bufferingRecoveredOccurrence = occurrence
             val position = target.contentPosition.coerceAtLeast(0L)
             songUrlCache.remove(mediaId)
+            bufferingRecoveryJob = null
             target.stop()
             target.seekTo(index, position)
             target.prepare()
@@ -3286,16 +3308,17 @@ class MusicService :
         }
 
         if (events.containsAny(Player.EVENT_IS_PLAYING_CHANGED)) {
-            updateWidgetUI(player.isPlaying)
+            updateWidgetUI()
             if (player.isPlaying) {
                 startWidgetUpdates()
             } else {
                 stopWidgetUpdates()
             }
-        } else if (events.contains(Player.EVENT_MEDIA_ITEM_TRANSITION) ||
+        } else if (events.containsAny(Player.EVENT_MEDIA_ITEM_TRANSITION, Player.EVENT_PLAY_WHEN_READY_CHANGED,
+                Player.EVENT_PLAYBACK_STATE_CHANGED) ||
             (!player.isPlaying && events.contains(EVENT_POSITION_DISCONTINUITY))
         ) {
-            updateWidgetUI(player.isPlaying)
+            updateWidgetUI()
         }
 
         if (events.containsAny(
@@ -4661,6 +4684,10 @@ class MusicService :
         providerSwitch.cancel()
 
         routeRefreshJob?.cancel()
+        bufferingRecoveryJob?.cancel()
+        retryJob?.cancel()
+        clearStreamFailure()
+        stopWidgetUpdates()
         audioManager.unregisterAudioDeviceCallback(audioDeviceCallback)
         audioOutputs.release()
         audioPass.release()
@@ -4711,22 +4738,22 @@ class MusicService :
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             MusicWidgetReceiver.ACTION_PLAY_PAUSE -> {
-                if (player.isPlaying) player.pause() else player.play()
-                updateWidgetUI(player.isPlaying)
+                transport.togglePlayPause()
+                updateWidgetUI()
             }
             MusicWidgetReceiver.ACTION_LIKE -> {
                 toggleLike()
             }
             MusicWidgetReceiver.ACTION_NEXT -> {
                 player.seekToNext()
-                updateWidgetUI(player.isPlaying)
+                updateWidgetUI()
             }
             MusicWidgetReceiver.ACTION_PREVIOUS -> {
                 player.seekToPrevious()
-                updateWidgetUI(player.isPlaying)
+                updateWidgetUI()
             }
             MusicWidgetReceiver.ACTION_UPDATE_WIDGET -> {
-                updateWidgetUI(player.isPlaying)
+                updateWidgetUI()
             }
         }
 
@@ -4735,7 +4762,7 @@ class MusicService :
 
     private val powerManager by lazy { getSystemService(android.os.PowerManager::class.java) }
 
-    private fun updateWidgetUI(isPlaying: Boolean, progressOnly: Boolean = false) {
+    private fun updateWidgetUI(progressOnly: Boolean = false) {
         scope.launch {
             try {
                 val queued = player.currentMetadata
@@ -4750,7 +4777,8 @@ class MusicService :
                     title = songTitle,
                     artist = artistName,
                     artworkUri = queued?.thumbnailUrl ?: song?.thumbnailUrl,
-                    isPlaying = isPlaying,
+                    isPlaying = transport.playIntent.value ?:
+                        (player.playWhenReady && player.playbackState != Player.STATE_ENDED),
                     isLiked = isLiked,
                     duration = if (player.duration != C.TIME_UNSET) player.duration else 0,
                     currentPosition = player.currentPosition,
@@ -4775,7 +4803,7 @@ class MusicService :
             while (isActive && widgetManager.hasTickingWidgets) {
                 // nobody sees a widget with the screen off, and redrawing it every second there was all cost
                 if (player.isPlaying && powerManager?.isInteractive != false) {
-                    updateWidgetUI(true, progressOnly = true)
+                    updateWidgetUI(progressOnly = true)
                 }
                 // the widget's progress bar moves in whole seconds anyway; more often only cost
                 // frames in the app
