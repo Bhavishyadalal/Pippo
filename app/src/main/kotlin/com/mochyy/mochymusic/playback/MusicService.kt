@@ -205,6 +205,7 @@ import com.mochyy.mochymusic.lyrics.LyricsHelper
 import com.mochyy.mochymusic.models.PersistPlayerState
 import com.mochyy.mochymusic.models.PersistQueue
 import com.mochyy.mochymusic.models.toMediaMetadata
+import com.mochyy.mochymusic.playback.audio.PlatformOutputMonitor
 import com.mochyy.mochymusic.playback.audio.SilenceDetectorAudioProcessor
 import com.mochyy.mochymusic.playback.audio.HapticAudioProcessor
 import com.mochyy.mochymusic.playback.audio.CrossmixClockSink
@@ -384,6 +385,7 @@ class MusicService :
     val passBlockers: StateFlow<Set<PassBlocker>> = _passBlockers.asStateFlow()
     // each player's stats for nerds; weak like the spectra, so a released player takes its own along
     private val playerInspectors = java.util.WeakHashMap<Player, StreamInspector>()
+    private val platformOutputs = java.util.WeakHashMap<Player, PlatformOutputMonitor>()
 
     /** what [player]'s song really is on its way out, for stream info */
     fun inspectorOf(player: Player): StreamInspector? = playerInspectors[player]
@@ -528,49 +530,142 @@ class MusicService :
     }
 
     private var lastAudioRoute: AudioRouteIdentity? = null
-    private var bluetoothRouteWasMissing = false
+    private var lastPreferredRouteId: Int? = null
+    private var externalRouteWasMissing = false
+    private var outputRouteGeneration = 0L
     private var routeRefreshJob: Job? = null
+    private var outputMonitorJob: Job? = null
+    private var lastOutputRecovery: Pair<Long, Long>? = null
 
-    // Update every live sink; re-open a stale Android AudioTrack after a settled Bluetooth handover.
-    private fun applyOutputRoute(device: AudioDeviceInfo?) {
+    private fun applyOutputRoute(device: AudioDeviceInfo?, refreshPass: Boolean = false) {
         val players = (playerCrossmixProcessors.keys.toList().mapNotNull { it as? ExoPlayer } +
             listOfNotNull(if (::player.isInitialized) player else null, secondaryPlayer, fadingPlayer)).distinct()
-        players.forEach { it.setPreferredAudioDevice(device) }
-        audioPass.onOutputRouteChanged()
+        val preferenceChanged = lastPreferredRouteId != device?.id
+        lastPreferredRouteId = device?.id
+        if (preferenceChanged) players.forEach { it.setPreferredAudioDevice(device) }
+
         val active = audioOutputs.activeDevice()
-        val route = active?.let { AudioRouteIdentity(it.id,
-            com.mochyy.mochymusic.playback.audio.AudioOutputs.kindOf(it.type) == com.mochyy.mochymusic.playback.audio.AudioOutputs.Kind.BLUETOOTH) }
+        val route = active?.let {
+            val kind = com.mochyy.mochymusic.playback.audio.AudioOutputs.kindOf(it.type)
+            AudioRouteIdentity(
+                it.id,
+                bluetooth = kind == com.mochyy.mochymusic.playback.audio.AudioOutputs.Kind.BLUETOOTH,
+                usb = kind == com.mochyy.mochymusic.playback.audio.AudioOutputs.Kind.USB,
+            )
+        }
+        val previous = lastAudioRoute
+        val changed = preferenceChanged || previous != route || externalRouteWasMissing
+        if (refreshPass || (route != null && changed) || (route == null && !externalRouteWasMissing && previous?.external == true)) {
+            audioPass.onOutputRouteChanged()
+        }
         if (route == null) {
-            bluetoothRouteWasMissing = lastAudioRoute?.bluetooth == true
+            if (!externalRouteWasMissing && previous?.external == true) {
+                externalRouteWasMissing = true
+                outputRouteGeneration++
+            }
             routeRefreshJob?.cancel()
+            outputMonitorJob?.cancel()
+            outputMonitorJob = null
             return
         }
-        val changed = needsBluetoothRouteRefresh(lastAudioRoute, route) ||
-            (bluetoothRouteWasMissing && route.bluetooth)
-        bluetoothRouteWasMissing = false
+        val needsRefresh = needsBluetoothRouteRefresh(previous, route) || needsUsbRouteRefresh(previous, route) ||
+            (externalRouteWasMissing && route.external) ||
+            (preferenceChanged && (previous?.external == true || route.external))
+        externalRouteWasMissing = false
         lastAudioRoute = route
-        if (!changed || !::player.isInitialized) return
-        routeRefreshJob?.cancel()
+        if (changed) {
+            outputRouteGeneration++
+            outputMonitorJob?.cancel()
+            outputMonitorJob = null
+            routeRefreshJob?.cancel()
+        }
+        if (!::player.isInitialized) return
         val target = player
-        val mediaId = target.currentMediaItem?.mediaId ?: return
-        val occurrence = providerOccurrence
-        val pauseGeneration = transport.pauseGeneration
-        routeRefreshJob = scope.launch {
-            delay(400) // Android may announce a headset before its media route has settled.
-            // A route can arrive during a brief buffering period. Give that period time to
-            // settle while the same queue entry still owns this recovery.
-            withTimeoutOrNull(2_000L) {
-                while (player === target && providerOccurrence == occurrence && lastAudioRoute == route &&
-                    (target.playbackState == Player.STATE_BUFFERING || handoffFor(mediaId) != null)
-                ) delay(100)
+        if (needsRefresh) {
+            val mediaId = target.currentMediaItem?.mediaId ?: return
+            val occurrence = providerOccurrence
+            val pauseGeneration = transport.pauseGeneration
+            val generation = outputRouteGeneration
+            routeRefreshJob = scope.launch {
+                delay(450)
+                withTimeoutOrNull(2_500L) {
+                    while (player === target && providerOccurrence == occurrence && outputRouteGeneration == generation &&
+                        (target.playbackState == Player.STATE_BUFFERING || handoffFor(mediaId) != null)
+                    ) delay(100)
+                }
+                if (player !== target || providerOccurrence != occurrence || outputRouteGeneration != generation ||
+                    transport.pauseGeneration != pauseGeneration || !target.playWhenReady ||
+                    !canRefreshPlatformOutput(target, mediaId)
+                ) return@launch
+                target.seekTo(target.currentMediaItemIndex, target.contentPosition.coerceAtLeast(0L))
             }
-            if (player !== target || providerOccurrence != occurrence || lastAudioRoute != route ||
-                transport.pauseGeneration != pauseGeneration ||
-                !mayResumeRecovery(mediaId, target.currentMediaItem?.mediaId, target.playWhenReady,
-                    castConnectionHandler?.isCasting?.value == true) || handoffFor(mediaId) != null ||
-                target.playbackState != Player.STATE_READY || transport.isFading || isCrossfading || crossmixDirector.isTransitioning) return@launch
-            // Flush AudioTrack without replacing the queue or forcing playback.
-            target.seekTo(target.currentMediaItemIndex, target.currentPosition.coerceAtLeast(0L))
+        }
+        watchPlatformOutput(target)
+    }
+
+    private fun canRefreshPlatformOutput(target: Player, mediaId: String): Boolean =
+        target.playbackState == Player.STATE_READY && target.currentMediaItem?.mediaId == mediaId &&
+            target.currentMediaItemIndex != C.INDEX_UNSET &&
+            target.playbackSuppressionReason == Player.PLAYBACK_SUPPRESSION_REASON_NONE &&
+            castConnectionHandler?.isCasting?.value != true && handoffFor(mediaId) == null &&
+            audioPass.status.value !is AudioPass.Status.Playing &&
+            !transport.isFading && !isCrossfading && !crossmixDirector.isTransitioning
+
+    private fun watchPlatformOutput(target: Player) {
+        if (target !== player) return
+        if (!target.isPlaying) {
+            outputMonitorJob?.cancel()
+            outputMonitorJob = null
+            return
+        }
+        val route = lastAudioRoute?.takeIf { it.external && !externalRouteWasMissing } ?: return
+        val mediaId = target.currentMediaItem?.mediaId ?: return
+        val monitor = platformOutputs[target] ?: return
+        val occurrence = providerOccurrence
+        val generation = outputRouteGeneration
+        val attempt = occurrence to generation
+        val pauseGeneration = transport.pauseGeneration
+        if (lastOutputRecovery == attempt || outputMonitorJob?.isActive == true) return
+        val compareRoute = lastPreferredRouteId != null || Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+
+        outputMonitorJob = scope.launch {
+            var previous: PlatformOutputMonitor.Sample? = null
+            var stalled = 0
+            var wrongRoute = 0
+            while (player === target && providerOccurrence == occurrence && outputRouteGeneration == generation &&
+                target.isPlaying && transport.pauseGeneration == pauseGeneration
+            ) {
+                delay(1_000)
+                if (player !== target || providerOccurrence != occurrence || outputRouteGeneration != generation ||
+                    !target.isPlaying || transport.pauseGeneration != pauseGeneration
+                ) return@launch
+                val sample = monitor.sample()
+                if (sample == null || !target.currentTracks.isTypeSelected(C.TRACK_TYPE_AUDIO) ||
+                    !canRefreshPlatformOutput(target, mediaId) || routeRefreshJob?.isActive == true
+                ) {
+                    previous = null
+                    stalled = 0
+                    wrongRoute = 0
+                    continue
+                }
+                val prior = previous
+                val sameTrack = prior?.track === sample.track
+                stalled = if (sameTrack && prior?.frames == sample.frames) stalled + 1 else 0
+                wrongRoute = if (compareRoute && sample.deviceId != null && sample.deviceId != route.id) {
+                    if (sameTrack) wrongRoute + 1 else 1
+                } else 0
+                previous = sample
+                if (stalled < 3 && wrongRoute < 3) continue
+
+                lastOutputRecovery = attempt
+                val index = target.currentMediaItemIndex
+                val position = target.contentPosition.coerceAtLeast(0L)
+                Timber.tag(TAG).w("Reopening audio output after a stalled or mismatched route")
+                target.stop()
+                target.seekTo(index, position)
+                target.prepare()
+                return@launch
+            }
         }
     }
 
@@ -877,7 +972,7 @@ class MusicService :
                     setSmallIcon(R.drawable.mochy_notification)
                 },
         )
-        audioOutputs.onRouteChanged = ::applyOutputRoute
+        audioOutputs.onRouteChanged = { applyOutputRoute(it, refreshPass = true) }
         audioOutputs.preferUsb = dataStore.get(PreferUsbDacKey, false)
         audioOutputs.passthrough = dataStore.get(UsbPassthroughKey, false)
         audioOutputs.resampler = dataStore.get(HiFiResamplerKey, false)
@@ -1371,6 +1466,11 @@ class MusicService :
         val crossmixProcessor = CrossmixTransitionAudioProcessor()
         val spectrum = com.mochyy.mochymusic.playback.audio.AudioSpectrum()
         val inspector = StreamInspector()
+        val platformOutput = PlatformOutputMonitor { output ->
+            if (::player.isInitialized && platformOutputs[player] === output) {
+                applyOutputRoute(audioOutputs.preferredDevice())
+            }
+        }
 
         val hapticVibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             val vibratorManager = getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
@@ -1431,7 +1531,7 @@ class MusicService :
 
         val player = ExoPlayer.Builder(this)
             .setMediaSourceFactory(createMediaSourceFactory())
-            .setRenderersFactory(createRenderersFactory(eqProcessor, fxProcessors, silenceProcessor, hapticAudioProcessor, crossmixProcessor, replayGain, spectrum, inspector))
+            .setRenderersFactory(createRenderersFactory(eqProcessor, fxProcessors, silenceProcessor, hapticAudioProcessor, crossmixProcessor, replayGain, spectrum, inspector, platformOutput))
             .setHandleAudioBecomingNoisy(true)
             .setWakeMode(C.WAKE_MODE_NETWORK)
             .setAudioAttributes(
@@ -1483,6 +1583,7 @@ class MusicService :
         playerSpectra[player] = spectrum
         playerEqProcessors[player] = eqProcessor
         playerInspectors[player] = inspector
+        platformOutputs[player] = platformOutput
         player.addAnalyticsListener(inspector)
         player.setPreferredAudioDevice(audioOutputs.preferredDevice())
 
@@ -3088,6 +3189,8 @@ class MusicService :
         bufferingRecoveryJob = null
         moduleEndRecoveryJob?.cancel()
         moduleEndRecoveryJob = null
+        outputMonitorJob?.cancel()
+        outputMonitorJob = null
         providerOccurrence++
         providerSwitch.onMediaChanged()
         // A recovery belongs to the old item; it must not prepare or skip a newly selected song.
@@ -3409,6 +3512,11 @@ class MusicService :
         }
         if (events.containsAny(EVENT_TIMELINE_CHANGED, EVENT_POSITION_DISCONTINUITY)) {
             currentMediaMetadata.value = player.currentMetadata
+        }
+
+        if (events.containsAny(Player.EVENT_IS_PLAYING_CHANGED, Player.EVENT_MEDIA_ITEM_TRANSITION,
+                Player.EVENT_POSITION_DISCONTINUITY)) {
+            watchPlatformOutput(player)
         }
 
         if (events.containsAny(Player.EVENT_IS_PLAYING_CHANGED)) {
@@ -4464,6 +4572,7 @@ class MusicService :
         replayGain: com.mochyy.mochymusic.eq.audio.ReplayGainTags,
         spectrum: com.mochyy.mochymusic.playback.audio.AudioSpectrum,
         inspector: StreamInspector,
+        platformOutput: PlatformOutputMonitor,
     ) =
         object : DefaultRenderersFactory(this) {
             // the renderer below tells it which file each song comes from, so it can tell a lossless song from a lossy one
@@ -4475,6 +4584,10 @@ class MusicService :
                 enableAudioTrackPlaybackParams: Boolean,
             ) = CrossmixClockSink(PassRouterSink(com.mochyy.mochymusic.playback.audio.PrecisionSink(DefaultAudioSink
                 .Builder(this@MusicService)
+                .setAudioTrackProvider { config, attributes, sessionId ->
+                    DefaultAudioSink.AudioTrackProvider.DEFAULT.getAudioTrack(config, attributes, sessionId)
+                        .also(platformOutput::attach)
+                }
                 // float is only ever let through by PrecisionSink, while nothing it would skip is on
                 .setEnableFloatOutput(true)
                 // speed and pitch go to the audio track: through sonic, every change drained and flushed every processor in front of it (equalizer, effects, crossmix), a cut in the sound each time and a crash when a slider was dragged
@@ -4653,6 +4766,7 @@ class MusicService :
         providerSwitch.cancel()
 
         routeRefreshJob?.cancel()
+        outputMonitorJob?.cancel()
         bufferingRecoveryJob?.cancel()
         moduleEndRecoveryJob?.cancel()
         retryJob?.cancel()

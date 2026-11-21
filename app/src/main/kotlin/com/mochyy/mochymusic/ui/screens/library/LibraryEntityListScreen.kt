@@ -21,6 +21,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
+import com.mochyy.mochymusic.ui.theme.LocalPureBlack
 import com.mochyy.mochymusic.LocalPlayerAwareWindowInsets
 import com.mochyy.mochymusic.LocalPlayerConnection
 import com.mochyy.mochymusic.ui.component.GlassState
@@ -47,7 +48,7 @@ fun <T> LibraryEntityListScreen(
     onClick: (T) -> Unit,
     onLongClick: (T) -> Unit,
     modifier: Modifier = Modifier,
-    pureBlack: Boolean = false,
+    pureBlack: Boolean = LocalPureBlack.current,
     // the id of the playing song, for lists of songs: its row shows the playing indicator
     playingIdOf: ((T) -> String)? = null,
     // artists: round pictures

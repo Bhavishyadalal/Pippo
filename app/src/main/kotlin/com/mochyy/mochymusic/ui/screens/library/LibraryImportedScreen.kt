@@ -7,6 +7,7 @@ package com.mochyy.mochymusic.ui.screens.library
 
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import com.mochyy.mochymusic.ui.theme.LocalPureBlack
 import com.mochyy.mochymusic.R
 import com.mochyy.mochymusic.ui.screens.search.AvatarSize
 import androidx.compose.runtime.Composable
@@ -31,7 +32,7 @@ import com.mochyy.mochymusic.viewmodels.LibraryImportedViewModel
 fun LibraryImportedScreen(
     navController: NavController,
     modifier: Modifier = Modifier,
-    pureBlack: Boolean = false,
+    pureBlack: Boolean = LocalPureBlack.current,
 ) {
     val viewModel: LibraryImportedViewModel = hiltViewModel()
     val songs by viewModel.songs.collectAsState()

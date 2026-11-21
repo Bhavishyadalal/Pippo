@@ -1,10 +1,15 @@
 package com.mochyy.mochymusic.playback
 
-internal data class AudioRouteIdentity(val id: Int, val bluetooth: Boolean)
+internal data class AudioRouteIdentity(val id: Int, val bluetooth: Boolean, val usb: Boolean = false) {
+    val external: Boolean get() = bluetooth || usb
+}
 
 /** Only a real Bluetooth handover needs this workaround, not startup or a repeated device notification. */
 internal fun needsBluetoothRouteRefresh(previous: AudioRouteIdentity?, current: AudioRouteIdentity?): Boolean =
     previous != null && current != null && previous != current && (previous.bluetooth || current.bluetooth)
+
+internal fun needsUsbRouteRefresh(previous: AudioRouteIdentity?, current: AudioRouteIdentity): Boolean =
+    previous != null && previous != current && (previous.usb || current.usb)
 
 /** Delayed recovery belongs to one song and must never restart a paused song or local audio during casting. */
 internal fun mayResumeRecovery(expectedId: String?, currentId: String?, wantsPlayback: Boolean, casting: Boolean,

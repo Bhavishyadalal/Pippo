@@ -11,6 +11,8 @@ import androidx.compose.material3.ProvideTextStyle
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.SaverScope
@@ -34,6 +36,8 @@ val DefaultThemeColor = Color(0xFF8E8E8E)
  * switch instead of being decided independently at every call site.
  */
 const val ForceDarkTheme = true
+
+val LocalPureBlack = staticCompositionLocalOf { false }
 
 @Composable
 fun MochyTheme(
@@ -122,10 +126,9 @@ fun MochyTheme(
         typography = typography,
         shapes = PippoShapes,
     ) {
-        ProvideTextStyle(
-            value = typography.bodyLarge,
-            content = content
-        )
+        CompositionLocalProvider(LocalPureBlack provides (darkTheme && pureBlack)) {
+            ProvideTextStyle(value = typography.bodyLarge, content = content)
+        }
     }
 }
 
