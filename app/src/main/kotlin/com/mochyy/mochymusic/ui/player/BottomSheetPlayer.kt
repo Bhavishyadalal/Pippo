@@ -98,7 +98,6 @@ import com.mochyy.mochymusic.ui.player.flagship.FlagshipPillMorphSurface
 import com.mochyy.mochymusic.ui.player.flagship.FlagshipTransportRow
 import com.mochyy.mochymusic.ui.player.info.ForceProviderSheet
 import com.mochyy.mochymusic.ui.player.info.PlayerProviderMark
-import com.mochyy.mochymusic.ui.player.info.ProviderMarkRoom
 import com.mochyy.mochymusic.ui.player.info.rememberTrackProvider
 import com.mochyy.mochymusic.ui.player.flagship.ControlsShade
 import com.mochyy.mochymusic.ui.player.flagship.CoverFrost
@@ -1430,7 +1429,7 @@ private fun PlayerSheet(
             // the buttons sit halfway between the seek bar and the bottom part: once the spacer above runs out they'd sit low, so they're lifted by half the difference
             val gapAboveButtons = transportSpacer + SeekBarLift + controlsDrawShift
             val hasProviderMark = isFlagship && !onTv
-            val gapBelowButtons = transportGap.coerceAtLeast(if (hasProviderMark) ProviderMarkRoom else 0.dp)
+            val gapBelowButtons = transportGap.coerceAtLeast(0.dp)
             val buttonsLift = (gapAboveButtons - gapBelowButtons) / 2f
             // how far the editor's hold may move the controls, and pull the card taller
             androidx.compose.runtime.SideEffect {
@@ -1721,6 +1720,18 @@ private fun PlayerSheet(
                             onEndTimePlaced = { if (!studio.editing) studioAnchors.capture(studioAnchors.endTime, it) },
                             seekBarModifier = Modifier.studioPiece(studioPieces, com.mochyy.mochymusic.ui.player.studio.StudioPieces.SEEK_BAR),
                             endTimeModifier = Modifier.studioPiece(studioPieces, com.mochyy.mochymusic.ui.player.studio.StudioPieces.END_TIME),
+                            centerLabel = if (hasProviderMark) {
+                                {
+                                    if (state.isExpanded && !studioEngaged && transition.page == PlayerPage.NONE) {
+                                        PlayerProviderMark(
+                                            mediaId = trackInfo.mediaId,
+                                            animate = !showProviderSwitch && !showStreamInfo && !showExpandMenu &&
+                                                !showActionMenu && !showSongDetails && !showDeviceOutput && !showPlaybackSpeed,
+                                            onClick = { showProviderSwitch = true },
+                                        )
+                                    }
+                                }
+                            } else null,
                         )
                     }
                 }
@@ -1746,16 +1757,6 @@ private fun PlayerSheet(
                 } else {
                     PlayerTransportRow(modifier = transportModifier, flagshipGlyph = isTurntable)
                 }
-            }
-
-            if (hasProviderMark && state.isExpanded && !studioEngaged && transition.page == PlayerPage.NONE) {
-                PlayerProviderMark(
-                    mediaId = trackInfo.mediaId,
-                    animate = !showProviderSwitch && !showStreamInfo && !showExpandMenu && !showActionMenu,
-                    onClick = { showProviderSwitch = true },
-                    modifier = Modifier.align(Alignment.BottomCenter)
-                        .padding(bottom = belowControls + 2.dp, start = 24.dp, end = 24.dp),
-                )
             }
 
             // The Turntable's own controls, as its frame lays them out, above the card. They give

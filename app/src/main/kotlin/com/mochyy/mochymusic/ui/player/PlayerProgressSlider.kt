@@ -22,10 +22,12 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.BasicText
@@ -60,6 +62,7 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.res.stringResource
@@ -100,6 +103,7 @@ fun PlayerProgressSlider(
     /** On the bar and the end time themselves: the editor lifts them off to edit them. */
     seekBarModifier: Modifier = Modifier,
     endTimeModifier: Modifier = Modifier,
+    centerLabel: (@Composable () -> Unit)? = null,
 ) {
     val playerConnection = LocalPlayerConnection.current ?: return
     val generation by remember(playerConnection) {
@@ -109,7 +113,7 @@ fun PlayerProgressSlider(
     key(playerConnection, generation) {
         PlaybackProgressContent(
             playerConnection, generation, modifier, active,
-            onSeekBarPlaced, onEndTimePlaced, seekBarModifier, endTimeModifier,
+            onSeekBarPlaced, onEndTimePlaced, seekBarModifier, endTimeModifier, centerLabel,
         )
     }
 }
@@ -126,6 +130,7 @@ private fun PlaybackProgressContent(
     onEndTimePlaced: ((androidx.compose.ui.layout.LayoutCoordinates) -> Unit)?,
     seekBarModifier: Modifier,
     endTimeModifier: Modifier,
+    centerLabel: (@Composable () -> Unit)?,
 ) {
     val endTimestamp by com.mochyy.mochymusic.utils.rememberEnumPreference(
         com.mochyy.mochymusic.constants.PlayerEndTimestampKey,
@@ -310,43 +315,81 @@ private fun PlaybackProgressContent(
         )
     }
 
-    Row(
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = PlayerHorizontalPadding + 4.dp)
-    ) {
-        val timeStyle = MaterialTheme.typography.labelMedium
-        val restColor = Color.White.copy(alpha = TimeRestAlpha)
-        AnimatedContent(
-            targetState = if (failureLabel != null) FailureKey else if (showLoading) LoadingKey else null,
-            transitionSpec = { fadeIn(tween(220)) togetherWith fadeOut(tween(160)) },
-            label = "seekTimeLoading",
-            modifier = Modifier.timeLift(expand, pivotX = 0f) { minOf(stretch.floatValue, 0f) },
-        ) { state ->
-            if (state == LoadingKey) {
-                LoadingLabel(style = timeStyle, color = restColor)
-            } else if (state == FailureKey) {
-                Text(
-                    text = failureLabel ?: stringResource(R.string.error_title),
-                    style = timeStyle,
-                    color = StreamFailureRed,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            } else {
-                TimeText(text = elapsedText, style = timeStyle, color = timeColor)
+    val timeStyle = MaterialTheme.typography.labelMedium
+    val restColor = Color.White.copy(alpha = TimeRestAlpha)
+    ProgressTimeRow(
+        centerLabel = centerLabel,
+        elapsed = {
+            AnimatedContent(
+                targetState = if (failureLabel != null) FailureKey else if (showLoading) LoadingKey else null,
+                transitionSpec = { fadeIn(tween(220)) togetherWith fadeOut(tween(160)) },
+                label = "seekTimeLoading",
+                modifier = Modifier.timeLift(expand, pivotX = 0f) { minOf(stretch.floatValue, 0f) },
+            ) { state ->
+                if (state == LoadingKey) {
+                    LoadingLabel(style = timeStyle, color = restColor)
+                } else if (state == FailureKey) {
+                    Text(
+                        text = failureLabel ?: stringResource(R.string.error_title),
+                        style = timeStyle,
+                        color = StreamFailureRed,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                } else {
+                    TimeText(text = elapsedText, style = timeStyle, color = timeColor)
+                }
             }
+        },
+        end = {
+            TimeText(
+                text = endText,
+                style = timeStyle,
+                color = timeColor,
+                modifier = (onEndTimePlaced?.let { Modifier.onGloballyPositioned(it) } ?: Modifier)
+                    .then(endTimeModifier)
+                    .timeLift(expand, pivotX = 1f) { maxOf(stretch.floatValue, 0f) },
+            )
+        },
+    )
+}
+
+@Composable
+private fun ProgressTimeRow(
+    centerLabel: (@Composable () -> Unit)?,
+    elapsed: @Composable () -> Unit,
+    end: @Composable () -> Unit,
+) {
+    val modifier = Modifier.fillMaxWidth().padding(horizontal = PlayerHorizontalPadding + 4.dp)
+    if (centerLabel == null) {
+        Row(modifier, horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            elapsed()
+            end()
         }
-        TimeText(
-            text = endText,
-            style = timeStyle,
-            color = timeColor,
-            modifier = (onEndTimePlaced?.let { Modifier.onGloballyPositioned(it) } ?: Modifier)
-                .then(endTimeModifier)
-                .timeLift(expand, pivotX = 1f) { maxOf(stretch.floatValue, 0f) },
-        )
+        return
+    }
+
+    Layout(
+        modifier = modifier.heightIn(min = 28.dp),
+        content = {
+            Box { elapsed() }
+            Box { centerLabel() }
+            Box { end() }
+        },
+    ) { children, constraints ->
+        val childConstraints = constraints.copy(minWidth = 0, minHeight = 0)
+        val timeConstraints = childConstraints.copy(maxWidth = constraints.maxWidth / 3)
+        val start = children[0].measure(timeConstraints)
+        val finish = children[2].measure(timeConstraints)
+        // Give the same room to both timestamps so the provider stays centered as they change.
+        val sideSpace = maxOf(start.width, finish.width) + 4.dp.roundToPx()
+        val center = children[1].measure(childConstraints.copy(maxWidth = (constraints.maxWidth - 2 * sideSpace).coerceAtLeast(0)))
+        val height = constraints.minHeight.coerceAtLeast(maxOf(start.height, center.height, finish.height))
+        layout(constraints.maxWidth, height) {
+            start.placeRelative(0, (height - start.height) / 2)
+            center.placeRelative((constraints.maxWidth - center.width) / 2, (height - center.height) / 2)
+            finish.placeRelative(constraints.maxWidth - finish.width, (height - finish.height) / 2)
+        }
     }
 }
 
