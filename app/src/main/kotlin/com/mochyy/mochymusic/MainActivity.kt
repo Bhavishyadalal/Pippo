@@ -95,7 +95,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import com.airbnb.lottie.compose.LottieAnimation
@@ -1106,23 +1106,21 @@ class MainActivity : ComponentActivity() {
                                                 .launchRise(order = 3)
                                                 .fillMaxWidth()
                                                 .height(bottomInset + navPadding + 40.dp)
-                                                // the tint fades over 500 ms, read it while drawing so the bar doesn't recompose
-                                                .drawBehind {
+                                                .drawWithCache {
                                                     val artworkCoverage = if (currentRoute == Screens.Home.route) {
                                                         homeArtworkChrome.value?.invoke() ?: 0f
                                                     } else 0f
                                                     val strength = 1f - .67f * artworkCoverage
                                                     val tint = navScrimTint
-                                                    drawRect(
-                                                        androidx.compose.ui.graphics.Brush.verticalGradient(
-                                                            colors = listOf(
-                                                                Color.Transparent,
-                                                                tint.copy(alpha = 0.5f * strength),
-                                                                tint.copy(alpha = 0.9f * strength),
-                                                                tint.copy(alpha = strength)
-                                                            )
-                                                        )
+                                                    val gradient = androidx.compose.ui.graphics.Brush.verticalGradient(
+                                                        colors = listOf(
+                                                            Color.Transparent,
+                                                            tint.copy(alpha = 0.5f * strength),
+                                                            tint.copy(alpha = 0.9f * strength),
+                                                            tint.copy(alpha = strength),
+                                                        ),
                                                     )
+                                                    onDrawBehind { drawRect(gradient) }
                                                 }
                                                 .graphicsLayer {
                                                     val navBarHeightPx = navigationBarHeight.toPx()

@@ -554,12 +554,20 @@ class CrossmixDirector(
             if (ended || outgoing.currentPosition >= plan.outReleaseMs) break
             delay(200)
         }
-        if (session.released) return
+        if (running !== session || session.released) return
         session.outProcessor.fadeOutNow()
         delay(90)
+        if (running !== session || session.released) return
         session.released = true
         host.release(outgoing)
         host.onMixingChanged(false)
+        // If its clock never reached the swap, the incoming deck would stay silent after release.
+        val incoming = session.inProcessor
+        val beat = incoming.currentBeat
+        if (!incoming.idle && (beat.isNaN() || beat < plan.swapBeat)) {
+            android.util.Log.w(Tag, "Incoming Crossmix track still waiting at beat $beat after outgoing release")
+            incoming.finish()
+        }
         report("Mixed with ${plan.style.label}")
         finishSession(session)
     }

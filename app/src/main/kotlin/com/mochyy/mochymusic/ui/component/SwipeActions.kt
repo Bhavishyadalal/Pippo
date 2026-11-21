@@ -189,14 +189,18 @@ fun SwipeActionsBox(
     var startNeed by remember { mutableFloatStateOf(0f) }
     var endNeed by remember { mutableFloatStateOf(0f) }
 
-    val baseThreshold = with(density) { (rowSize.width * 0.3f).coerceIn(100.dp.toPx(), 150.dp.toPx()) }
+    val minThreshold = with(density) { 100.dp.toPx() }
+    val maxThreshold = with(density) { 150.dp.toPx() }
     // the pill's width is the travel less this: its gap to the row and to the screen edge
     val pillRoom = with(density) { (PillEdgeInset + PillGap - SlabInset).toPx() }
     val deadSideLimit = with(density) { 22.dp.toPx() }
     val hysteresis = with(density) { 4.dp.toPx() }
 
-    fun thresholdFor(direction: Float): Float =
-        maxOf(baseThreshold, (if (direction > 0f) startNeed else endNeed) + pillRoom)
+    // Read rowSize during the gesture so the first measurement doesn't recompose every row.
+    fun thresholdFor(direction: Float): Float {
+        val base = (rowSize.width * 0.3f).coerceIn(minThreshold, maxThreshold)
+        return maxOf(base, (if (direction > 0f) startNeed else endNeed) + pillRoom)
+    }
 
     fun resisted(raw: Float): Float {
         val allowed = if (raw > 0f) start != null else end != null
@@ -217,11 +221,13 @@ fun SwipeActionsBox(
         return if (distance <= line) shown else sign(shown) * (line + (distance - line) / SwipeResistance)
     }
 
-    LaunchedEffect(enabled) {
-        if (!enabled) {
+    if (!enabled) {
+        LaunchedEffect(Unit) {
+            settle[0]?.cancel()
             offset = 0f
             travel = 0f
             armed = 0
+            fired = 0
         }
     }
 
