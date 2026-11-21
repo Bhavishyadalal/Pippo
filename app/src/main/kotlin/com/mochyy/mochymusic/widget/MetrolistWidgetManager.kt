@@ -13,7 +13,6 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Shader
-import android.os.Bundle
 import android.widget.RemoteViews
 import coil3.ImageLoader
 import coil3.request.ImageRequest
@@ -22,7 +21,6 @@ import coil3.request.crossfade
 import coil3.toBitmap
 import com.mochyy.mochymusic.MainActivity
 import com.mochyy.mochymusic.R
-import com.mochyy.mochymusic.db.MusicDatabase
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.withLock
@@ -33,7 +31,6 @@ import javax.inject.Singleton
 @Singleton
 class MochyWidgetManager @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val database: MusicDatabase
 ) {
     private val imageLoader by lazy {
         ImageLoader.Builder(context)
@@ -42,6 +39,9 @@ class MochyWidgetManager @Inject constructor(
     }
 
     private val artworkWidgets = ArtworkWidgets(context)
+    private var fullLegacyIds = IntArray(0)
+    @Volatile var hasTickingWidgets = true
+        private set
 
     private var cachedArtworkUri: String? = null
     private var cachedAlbumArt: Bitmap? = null
@@ -89,8 +89,21 @@ class MochyWidgetManager @Inject constructor(
         val placedArtwork = artworkWidgets.placed()
         if (progressOnly) {
             placedArtwork.forEach { (_, ids) -> artworkWidgets.updateProgress(ids, duration, currentPosition) }
+            val activeLegacyIds = fullLegacyIds.filter { it in widgetIds }.toIntArray()
+            hasTickingWidgets = activeLegacyIds.isNotEmpty() || placedArtwork.isNotEmpty()
+            if (activeLegacyIds.isNotEmpty()) {
+                val progress = RemoteViews(context.packageName, R.layout.widget_music_player)
+                progress.setLegacyProgress(duration, currentPosition)
+                appWidgetManager.partiallyUpdateAppWidget(activeLegacyIds, progress)
+            }
+            return
         }
-        if (widgetIds.isEmpty() && turntableWidgetIds.isEmpty() && (progressOnly || placedArtwork.isEmpty())) return
+        val sizes = widgetIds.asIterable().associateWith { id ->
+            widgetSize(context, appWidgetManager.getAppWidgetOptions(id), WidgetSize(230, 138))
+        }
+        fullLegacyIds = widgetIds.filter { sizes.getValue(it).legacyLayout() == R.layout.widget_music_player }.toIntArray()
+        hasTickingWidgets = fullLegacyIds.isNotEmpty() || placedArtwork.isNotEmpty()
+        if (widgetIds.isEmpty() && turntableWidgetIds.isEmpty() && placedArtwork.isEmpty()) return
 
         val albumArt: Bitmap?
         val circularAlbumArt: Bitmap?
@@ -109,9 +122,8 @@ class MochyWidgetManager @Inject constructor(
 
         if (widgetIds.isNotEmpty()) {
             widgetIds.forEach { widgetId ->
-                val options = appWidgetManager.getAppWidgetOptions(widgetId)
                 val views = createRemoteViewsForSize(
-                    options,
+                    sizes.getValue(widgetId),
                     title,
                     artist,
                     albumArt,
@@ -124,17 +136,14 @@ class MochyWidgetManager @Inject constructor(
             }
         }
 
-        if (!progressOnly) {
-            placedArtwork.forEach { (style, ids) ->
-                artworkWidgets.update(style, ids, title, artist, albumArt, isPlaying, isLiked, duration, currentPosition)
-            }
+        placedArtwork.forEach { (style, ids) ->
+            artworkWidgets.update(style, ids, title, artist, albumArt, isPlaying, isLiked, duration, currentPosition)
         }
 
         if (turntableWidgetIds.isNotEmpty()) {
             val turntableViews = createTurntableRemoteViews(
                 circularAlbumArt,
                 isPlaying,
-                isLiked
             )
             turntableWidgetIds.forEach { widgetId ->
                 appWidgetManager.updateAppWidget(widgetId, turntableViews)
@@ -142,33 +151,56 @@ class MochyWidgetManager @Inject constructor(
         }
     }
 
+    internal fun updateEmpty(manager: AppWidgetManager, ids: IntArray, turntable: Boolean = false) {
+        ids.forEach { id ->
+            val views = if (turntable) createTurntableRemoteViews(null, false) else {
+                createRemoteViewsForSize(
+                    widgetSize(context, manager.getAppWidgetOptions(id), WidgetSize(230, 138)),
+                    context.getString(R.string.no_song_playing),
+                    context.getString(R.string.tap_to_open),
+                    null, false, false, 0, 0,
+                )
+            }
+            manager.updateAppWidget(id, views)
+        }
+    }
+
+    private fun WidgetSize.legacyLayout(): Int {
+        val fontScale = context.resources.configuration.fontScale
+        return when {
+            width >= 205 && height >= 72 + 32 * fontScale -> R.layout.widget_music_player
+            width >= 164 && height >= maxOf(48f, 12 + 31 * fontScale) -> R.layout.widget_compact_wide
+            else -> R.layout.widget_compact_square
+        }
+    }
+
     private fun createRemoteViewsForSize(
-        options: Bundle,
+        size: WidgetSize,
         title: String,
         artist: String,
         albumArt: Bitmap?,
         isPlaying: Boolean,
         isLiked: Boolean,
         duration: Long,
-        currentPosition: Long
-    ): RemoteViews {
-        val minWidth = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH)
-        val minHeight = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT)
-
-        return when {
-            minWidth < 180 && minHeight < 100 -> {
-
-                createCompactSquareRemoteViews(albumArt, isPlaying)
+        currentPosition: Long,
+    ): RemoteViews = when (size.legacyLayout()) {
+        R.layout.widget_music_player ->
+            createRemoteViews(title, artist, albumArt, isPlaying, isLiked, duration, currentPosition)
+        R.layout.widget_compact_wide ->
+            createCompactWideRemoteViews(title, artist, albumArt, isPlaying, isLiked).apply {
+                setViewVisibility(
+                    R.id.widget_wide_like_container,
+                    if (size.width >= 225) android.view.View.VISIBLE else android.view.View.GONE,
+                )
             }
-            minWidth >= 180 && minHeight < 100 -> {
+        else -> createCompactSquareRemoteViews(albumArt, isPlaying)
+    }
 
-                createCompactWideRemoteViews(title, artist, albumArt, isPlaying, isLiked)
-            }
-            else -> {
-
-                createRemoteViews(title, artist, albumArt, isPlaying, isLiked, duration, currentPosition)
-            }
-        }
+    private fun RemoteViews.setLegacyProgress(duration: Long, position: Long) {
+        val level = if (duration > 0) {
+            (position.coerceIn(0L, duration).toDouble() / duration * 10_000).toInt()
+        } else 0
+        setInt(R.id.widget_progress_fill, "setImageLevel", level)
     }
 
     private fun createRemoteViews(
@@ -198,12 +230,7 @@ class MochyWidgetManager @Inject constructor(
         val likeIcon = if (isLiked) R.drawable.ic_widget_heart_nav else R.drawable.ic_widget_heart_outline_nav
         views.setImageViewResource(R.id.widget_like_button, likeIcon)
 
-        if (duration > 0) {
-            val level = ((currentPosition.toDouble() / duration.toDouble()) * 10000).toInt()
-            views.setInt(R.id.widget_progress_fill, "setImageLevel", level)
-        } else {
-            views.setInt(R.id.widget_progress_fill, "setImageLevel", 0)
-        }
+        views.setLegacyProgress(duration, currentPosition)
 
         views.setOnClickPendingIntent(R.id.widget_album_art, getOpenAppIntent())
         views.setOnClickPendingIntent(R.id.widget_play_pause_container, getPlayPauseIntent())
@@ -334,7 +361,6 @@ class MochyWidgetManager @Inject constructor(
     private fun createTurntableRemoteViews(
         circularAlbumArt: Bitmap?,
         isPlaying: Boolean,
-        isLiked: Boolean
     ): RemoteViews {
         val views = RemoteViews(context.packageName, R.layout.widget_turntable)
 

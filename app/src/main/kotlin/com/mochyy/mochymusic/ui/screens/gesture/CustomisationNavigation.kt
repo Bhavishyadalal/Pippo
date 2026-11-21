@@ -6,6 +6,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -31,7 +32,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,6 +43,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.painterResource
@@ -96,7 +100,8 @@ internal fun BottomNavigationSection() {
             val title = stringResource(R.string.scroll_player_title)
             var replay by remember { mutableIntStateOf(0) }
             val canPreview = scrollEnabled && animationsEnabled
-            val progress = rememberMotionPreview(scrollMotion, replay, canPreview)
+            var previewFold by remember(scrollMotion, canPreview) { mutableStateOf<Boolean?>(null) }
+            val progress = rememberMotionPreview(scrollMotion, replay, canPreview, previewFold)
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                     Text(title, color = Color.White, style = CardLabelStyle)
@@ -108,7 +113,11 @@ internal fun BottomNavigationSection() {
                     modifier = Modifier.semantics { contentDescription = title },
                 )
             }
-            NavigationPreview(style, pureBlack, progress, scrollMotion = scrollMotion)
+            NavigationPreview(
+                style, pureBlack, progress, scrollMotion = scrollMotion,
+                onFoldSwipe = if (canPreview) ({ previewFold = it }) else null,
+            )
+            if (canPreview) NavigationCaption(stringResource(R.string.scroll_player_preview_swipe))
             NavigationChoices(ScrollPlayerMotion.entries, scrollMotion, { it.label }, enabled = scrollEnabled) {
                 setScrollMotion(it)
                 replay++
@@ -292,12 +301,21 @@ private fun MotionPreviewButton(enabled: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-private fun rememberMotionPreview(motion: Enum<*>, replay: Int, enabled: Boolean): State<Float> {
+private fun rememberMotionPreview(
+    motion: Enum<*>,
+    replay: Int,
+    enabled: Boolean,
+    swipeFold: Boolean? = null,
+): State<Float> {
     val progress = remember { Animatable(0f) }
-    LaunchedEffect(motion, replay, enabled) {
+    LaunchedEffect(motion, replay, enabled, swipeFold) {
+        val scrollMotion = motion as? ScrollPlayerMotion
+        if (enabled && swipeFold != null && scrollMotion != null) {
+            progress.animateTo(if (swipeFold) 1f else 0f, scrollMotion.animation(entering = !swipeFold))
+            return@LaunchedEffect
+        }
         progress.snapTo(0f)
         if (enabled && replay > 0) {
-            val scrollMotion = motion as? ScrollPlayerMotion
             progress.animateTo(1f, scrollMotion?.animation(entering = false) ?: tween(330))
             delay(180)
             progress.animateTo(0f, scrollMotion?.animation(entering = true) ?: tween(330))
@@ -313,7 +331,9 @@ private fun NavigationPreview(
     progress: State<Float>? = null,
     scrollMotion: ScrollPlayerMotion? = null,
     openingMotion: BottomNavigationMotion? = null,
+    onFoldSwipe: ((Boolean) -> Unit)? = null,
 ) {
+    val currentFoldSwipe = rememberUpdatedState(onFoldSwipe)
     val rowHeight = style.barHeight + 16.dp
     val isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
     Box(
@@ -326,13 +346,23 @@ private fun NavigationPreview(
                     else listOf(Color(0xFF33313F), LabColors.Row),
                 ),
             )
+            .then(if (onFoldSwipe == null) Modifier else Modifier.pointerInput(Unit) {
+                var distance = 0f
+                detectVerticalDragGestures(
+                    onDragStart = { distance = 0f },
+                    onDragEnd = { if (kotlin.math.abs(distance) >= 12.dp.toPx()) currentFoldSwipe.value?.invoke(distance < 0f) },
+                    onVerticalDrag = { _, delta -> distance += delta },
+                )
+            })
             .clearAndSetSemantics {},
     ) {
         if (scrollMotion != null && progress != null) {
             MiniPlayerPreview(
                 Modifier.align(Alignment.BottomCenter)
                     .padding(start = 14.dp, end = 14.dp, bottom = rowHeight + 2.dp)
-                    .graphicsLayer { translationY = rowHeight.toPx() * progress.value },
+                    .graphicsLayer {
+                        if (!scrollMotion.keepsTabsVisible) translationY = rowHeight.toPx() * progress.value
+                    },
             )
         }
         AppNavigationBar(

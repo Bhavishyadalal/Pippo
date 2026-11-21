@@ -8,16 +8,16 @@
     android:background="@drawable/widget_background"
     android:paddingStart="12dp"
     android:paddingEnd="12dp"
-    android:paddingTop="8dp"
-    android:paddingBottom="8dp"
+    android:paddingTop="4dp"
+    android:paddingBottom="4dp"
     android:gravity="center_vertical"
     android:theme="@style/Theme.Widget.mochy">
 
     <!-- Album Art - Square -->
     <ImageView
         android:id="@+id/widget_wide_album_art"
-        android:layout_width="48dp"
-        android:layout_height="48dp"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
         android:scaleType="centerCrop"
         android:src="@mipmap/ic_launcher"
         android:contentDescription="@string/album_art" />
@@ -27,8 +27,8 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
-        android:layout_marginStart="12dp"
-        android:layout_marginEnd="12dp"
+        android:layout_marginStart="8dp"
+        android:layout_marginEnd="8dp"
         android:orientation="vertical"
         android:gravity="center_vertical">
 
@@ -40,7 +40,8 @@
             android:textSize="14sp"
             android:textStyle="bold"
             android:textColor="@color/widget_text_primary"
-            android:maxLines="1"
+            android:singleLine="true"
+                android:includeFontPadding="false"
             android:ellipsize="end" />
 
         <TextView
@@ -50,13 +51,15 @@
             android:text="@string/tap_to_play"
             android:textSize="12sp"
             android:textColor="@color/widget_text_secondary"
-            android:maxLines="1"
+            android:singleLine="true"
+                android:includeFontPadding="false"
             android:ellipsize="end"
             android:layout_marginTop="2dp" />
     </LinearLayout>
 
     <!-- Like Button -->
     <FrameLayout
+        android:id="@+id/widget_wide_like_container"
         android:layout_width="40dp"
         android:layout_height="40dp"
         android:layout_marginEnd="8dp"
@@ -76,8 +79,8 @@
     <!-- Play Button -->
     <FrameLayout
         android:id="@+id/widget_wide_play_container"
-        android:layout_width="44dp"
-        android:layout_height="44dp"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
         android:background="@drawable/widget_play_button_circular">
 
         <ImageView

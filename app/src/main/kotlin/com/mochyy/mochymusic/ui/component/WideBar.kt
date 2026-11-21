@@ -218,6 +218,7 @@ fun WideBarTabs(
     modifier: Modifier = Modifier,
     // a second quick tap on Search: straight into typing
     onSearchDoubleTap: (() -> Unit)? = null,
+    compactScale: () -> Float = { 1f },
 ) {
     val selectedIndex = navigationItems.indexOfFirst { it.route == selectedTabRoute }
     val pill = rememberNavPill(selectedIndex)
@@ -227,6 +228,7 @@ fun WideBarTabs(
                 .offset { IntOffset(lerp(bar.tabsAloneStart, bar.tabsStart, withPlayer()).roundToPx(), bar.pillGap.roundToPx()) }
                 .width(bar.tabsWidth)
                 .height(bar.height)
+                .graphicsLayer { scaleX = compactScale() }
                 .padding(horizontal = NavRowPadding)
                 // the wide bar's tabs sit apart from its glass, so mochy draws this pill even when the look's glass draws the nav bar's
                 .navHighlight(pill, navigationItems.size)

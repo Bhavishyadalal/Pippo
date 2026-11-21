@@ -48,7 +48,12 @@ internal enum class ScrollPlayerMotion(
     FLOAT(R.string.scroll_player_float, 380, vertical = -.28f, width = .96f, height = .96f),
     COMPRESS(R.string.scroll_player_compress, 240, width = .90f, height = .50f, fadeStart = .21f),
     UNFOLD(R.string.scroll_player_unfold, 320, horizontal = .11f, vertical = .46f, height = .74f),
-    SETTLE(R.string.scroll_player_settle, 400, vertical = .23f, width = .96f, height = .96f, settle = .032f);
+    SETTLE(R.string.scroll_player_settle, 400, vertical = .23f, width = .96f, height = .96f, settle = .032f),
+    COMPACT_FOLD(R.string.scroll_player_compact_fold, 300);
+
+    val keepsTabsVisible: Boolean get() = this == COMPACT_FOLD
+
+    fun compactScale(foldedFraction: Float): Float = 1f - .12f * foldedFraction.coerceIn(0f, 1f)
 
     fun animation(entering: Boolean) = tween<Float>(
         durationMillis = duration,
@@ -58,6 +63,13 @@ internal enum class ScrollPlayerMotion(
     /** Add the scroll effect on top of the existing open/close transforms. */
     fun applyTo(layer: GraphicsLayerScope, foldedFraction: Float, travel: Float, rtl: Boolean = false) {
         val folded = foldedFraction.coerceIn(0f, 1f)
+        if (keepsTabsVisible) {
+            with(layer) {
+                scaleX *= compactScale(folded)
+                scaleY *= 1f - .07f * folded
+            }
+            return
+        }
         val bounce = settle * (1f - folded) * folded * 4f
         val direction = if (rtl) -1f else 1f
         with(layer) {

@@ -19,6 +19,7 @@ import android.graphics.Shader
 import android.os.Bundle
 import android.util.LruCache
 import android.util.SizeF
+import android.view.View
 import android.widget.RemoteViews
 import androidx.annotation.StringRes
 import com.mochyy.mochymusic.MainActivity
@@ -37,7 +38,7 @@ internal enum class ArtworkWidgetStyle(val receiver: Class<out ArtworkWidgetRece
 
 abstract class ArtworkWidgetReceiver : AppWidgetProvider() {
     override fun onUpdate(context: Context, manager: AppWidgetManager, appWidgetIds: IntArray) {
-        if (MusicService.isRunning && requestPlaybackState(context)) return
+        if (MusicService.isRunning && requestWidgetRefresh(context)) return
         val style = ArtworkWidgetStyle.entries.firstOrNull { it.receiver == javaClass } ?: return
         ArtworkWidgets(context).updateEmpty(style, appWidgetIds)
     }
@@ -51,10 +52,7 @@ abstract class ArtworkWidgetReceiver : AppWidgetProvider() {
         onUpdate(context, manager, intArrayOf(appWidgetId))
     }
 
-    private fun requestPlaybackState(context: Context): Boolean = runCatching {
-        context.startService(Intent(context, MusicService::class.java).setAction(MusicWidgetReceiver.ACTION_UPDATE_WIDGET))
-        true
-    }.getOrDefault(false)
+
 }
 
 class VinylCollageWidget : ArtworkWidgetReceiver()
@@ -93,7 +91,7 @@ internal class ArtworkWidgets(private val context: Context) {
         position: Long,
     ) {
         ids.forEach { id ->
-            val size = widgetSize(manager.getAppWidgetOptions(id))
+            val size = widgetSize(context, manager.getAppWidgetOptions(id), WidgetSize(230, 155))
             val views = render(style, size, title, artist, art, playing, liked, duration, position)
             manager.updateAppWidget(id, views)
         }
@@ -101,25 +99,6 @@ internal class ArtworkWidgets(private val context: Context) {
 
     fun updateEmpty(style: ArtworkWidgetStyle, ids: IntArray) =
         update(style, ids, context.getString(R.string.no_song_playing), context.getString(R.string.tap_to_open), null, false, false, 0, 0)
-
-    @Suppress("DEPRECATION")
-    private fun widgetSize(options: Bundle): WidgetSize {
-        val landscape = context.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-        val width = options.getInt(
-            if (landscape) AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH else AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH,
-        )
-        val height = options.getInt(
-            if (landscape) AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT else AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT,
-        )
-        val sizes = (options.get(AppWidgetManager.OPTION_APPWIDGET_SIZES) as? List<*>).orEmpty()
-        val closest = sizes.filterIsInstance<SizeF>()
-            .filter { it.width.isFinite() && it.height.isFinite() && it.width > 0f && it.height > 0f }
-            .minByOrNull { kotlin.math.abs(it.width - width) + kotlin.math.abs(it.height - height) }
-        return WidgetSize(
-            closest?.width?.roundToInt()?.coerceAtLeast(1) ?: width.takeIf { it > 0 } ?: 230,
-            closest?.height?.roundToInt()?.coerceAtLeast(1) ?: height.takeIf { it > 0 } ?: 155,
-        )
-    }
 
     private fun render(
         style: ArtworkWidgetStyle,
@@ -140,12 +119,22 @@ internal class ArtworkWidgets(private val context: Context) {
         val chrome = surfaces.get(key) ?: renderBackground(style, size, art).also { surfaces.put(key, it) }
         return RemoteViews(context.packageName, R.layout.widget_pippo_artwork).apply {
             setImageViewBitmap(R.id.art_widget_background, chrome)
-            val inset = (14 * context.resources.displayMetrics.density).toInt()
-            val vinylEndInset = (44 * context.resources.displayMetrics.density).toInt()
-            val vertical = (10 * context.resources.displayMetrics.density).toInt()
-            val rtl = context.resources.configuration.layoutDirection == android.view.View.LAYOUT_DIRECTION_RTL
-            val end = if (style == ArtworkWidgetStyle.VINYL && size.width >= 196) vinylEndInset else inset
-            setViewPadding(R.id.art_widget_controls, if (rtl) end else inset, vertical, if (rtl) inset else end, vertical)
+            val metrics = context.resources.displayMetrics
+            val fontScale = context.resources.configuration.fontScale
+            val inset = if (size.width < 180) 8 else 12
+            // Keep controls over the sleeve. At narrow widths reserve less room for the disc.
+            val rightInset = if (style == ArtworkWidgetStyle.VINYL) {
+                maxOf(inset, (minOf(size.width, size.height) * .24f).roundToInt().coerceAtMost(size.width / 5))
+            } else inset
+            fun px(dp: Int) = (dp * metrics.density).roundToInt()
+            setViewPadding(R.id.art_widget_controls, px(inset), px(8), px(rightInset), px(8))
+            val showArtist = size.height >= 67 + 31 * fontScale
+            val showTimes = size.height >= 82 + 45 * fontScale && size.width >= 105 * fontScale
+            val showTimeline = size.height >= 69 + 19 * fontScale
+            setViewVisibility(R.id.art_widget_progress, if (showTimeline) View.VISIBLE else View.GONE)
+            setViewVisibility(R.id.art_widget_like, if (size.width >= 104 + 20 * fontScale) View.VISIBLE else View.GONE)
+            setViewVisibility(R.id.art_widget_artist, if (showArtist) View.VISIBLE else View.GONE)
+            setViewVisibility(R.id.art_widget_times, if (showTimes) View.VISIBLE else View.GONE)
             setTextViewText(R.id.art_widget_title, title)
             setTextViewText(R.id.art_widget_artist, artist)
             setTimeline(duration, position)
@@ -177,11 +166,30 @@ internal class ArtworkWidgets(private val context: Context) {
     }
 }
 
-private data class WidgetSize(val width: Int, val height: Int)
+internal data class WidgetSize(val width: Int, val height: Int)
+
+@Suppress("DEPRECATION")
+internal fun widgetSize(context: Context, options: Bundle, fallback: WidgetSize): WidgetSize {
+    val landscape = context.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+    val width = options.getInt(
+        if (landscape) AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH else AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH,
+    )
+    val height = options.getInt(
+        if (landscape) AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT else AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT,
+    )
+    val sizes = (options.get(AppWidgetManager.OPTION_APPWIDGET_SIZES) as? List<*>).orEmpty()
+    val closest = sizes.filterIsInstance<SizeF>()
+        .filter { it.width.isFinite() && it.height.isFinite() && it.width > 0f && it.height > 0f }
+        .minByOrNull { kotlin.math.abs(it.width - width) + kotlin.math.abs(it.height - height) }
+    return WidgetSize(
+        closest?.width?.roundToInt()?.coerceAtLeast(1) ?: width.takeIf { it > 0 } ?: fallback.width,
+        closest?.height?.roundToInt()?.coerceAtLeast(1) ?: height.takeIf { it > 0 } ?: fallback.height,
+    )
+}
 
 private fun renderBackground(style: ArtworkWidgetStyle, size: WidgetSize, artwork: Bitmap?): Bitmap {
     // Limit bitmap payloads sent to the launcher and use one drawing scale for both axes.
-    val bitmapScale = 480f / maxOf(size.width, size.height)
+    val bitmapScale = minOf(480f / maxOf(size.width, size.height), 2f)
     val pixelWidth = (size.width * bitmapScale).roundToInt().coerceAtLeast(1)
     val pixelHeight = (size.height * bitmapScale).roundToInt().coerceAtLeast(1)
     val bitmap = Bitmap.createBitmap(pixelWidth, pixelHeight, Bitmap.Config.ARGB_8888)

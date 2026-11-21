@@ -3211,6 +3211,10 @@ class MusicService :
             } else {
                 stopWidgetUpdates()
             }
+        } else if (events.contains(Player.EVENT_MEDIA_ITEM_TRANSITION) ||
+            (!player.isPlaying && events.contains(EVENT_POSITION_DISCONTINUITY))
+        ) {
+            updateWidgetUI(player.isPlaying)
         }
 
         if (events.containsAny(
@@ -3437,6 +3441,7 @@ class MusicService :
 
         providerHandoff?.let { handoff ->
             if (providerHandoffHost.currentTarget() == handoff.target) {
+                if (!isAudioRendererError(error)) discardFailedRendition(handoff.stream?.cacheKey)
                 handoff.ready.complete(ProviderSwitch.HandoffResult.Failed(
                     getString(R.string.pc_force_player_error, error.errorCodeName)
                 ))
@@ -3569,6 +3574,7 @@ class MusicService :
 
         try {
             playerCache.removeResource(mediaId)
+            discardFailedRendition(playingStreams[mediaId]?.cacheKey)
             Timber.tag(TAG).d("Cleared player cache for $mediaId")
         } catch (e: Exception) {
             Timber.tag(TAG).e(e, "Failed to clear player cache for $mediaId")
@@ -3587,6 +3593,14 @@ class MusicService :
     private fun isContainerParseError(error: PlaybackException) =
         error.errorCode == PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED ||
             error.errorCode == PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED
+
+    private fun discardFailedRendition(cacheKey: String?) {
+        if (cacheKey == null || !cacheKey.startsWith(ModuleCacheKeyPrefix)) return
+        scope.launch(Dispatchers.IO) {
+            runCatching { playerCache.removeResource(cacheKey) }
+                .onFailure { Timber.tag(TAG).w(it, "Couldn't clear the failed audio rendition") }
+        }
+    }
 
     /** Every source module's cached copy of [mediaId], which lives under its own key. */
     private fun dropModuleCache(mediaId: String) {
@@ -4266,6 +4280,7 @@ class MusicService :
         val wasPlaying = player.playWhenReady
         if (announce) showBanner("${sourceModules.nameOf(failed)} couldn't play this · trying ${sourceModules.nameOf(next)}")
         player.stop()
+        discardFailedRendition(playingStreams[mediaId]?.cacheKey)
         player.seekTo(index, position)
         player.prepare()
         player.playWhenReady = wasPlaying
@@ -4642,24 +4657,31 @@ class MusicService :
     private fun updateWidgetUI(isPlaying: Boolean, progressOnly: Boolean = false) {
         scope.launch {
             try {
-                val songData = currentSong.value
+                val queued = player.currentMetadata
+                val songData = currentSong.value?.takeIf { it.id == player.currentMediaItem?.mediaId }
                 val song = songData?.song
-                val songTitle = song?.title ?: getString(R.string.no_song_playing)
-                val artistName = songData?.artists?.joinToString(", ") { it.name } ?: getString(R.string.tap_to_open)
+                val songTitle = queued?.title ?: song?.title ?: getString(R.string.no_song_playing)
+                val artistName = queued?.artists?.joinToString(", ") { it.name }
+                    ?: songData?.artists?.joinToString(", ") { it.name } ?: getString(R.string.tap_to_open)
                 val isLiked = songData?.song?.liked == true
 
                 widgetManager.updateWidgets(
                     title = songTitle,
                     artist = artistName,
-                    artworkUri = song?.thumbnailUrl,
+                    artworkUri = queued?.thumbnailUrl ?: song?.thumbnailUrl,
                     isPlaying = isPlaying,
                     isLiked = isLiked,
                     duration = if (player.duration != C.TIME_UNSET) player.duration else 0,
                     currentPosition = player.currentPosition,
                     progressOnly = progressOnly,
                 )
+                if (!progressOnly && player.isPlaying && widgetManager.hasTickingWidgets && widgetUpdateJob == null) {
+                    startWidgetUpdates()
+                }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
-
+                Timber.tag(TAG).w(e, "Widget update failed")
             }
         }
     }
@@ -4667,9 +4689,9 @@ class MusicService :
     private var widgetUpdateJob: Job? = null
 
     private fun startWidgetUpdates() {
-        widgetUpdateJob?.cancel()
+        if (widgetUpdateJob?.isActive == true || !widgetManager.hasTickingWidgets) return
         widgetUpdateJob = scope.launch {
-            while (isActive) {
+            while (isActive && widgetManager.hasTickingWidgets) {
                 // nobody sees a widget with the screen off, and redrawing it every second there was all cost
                 if (player.isPlaying && powerManager?.isInteractive != false) {
                     updateWidgetUI(true, progressOnly = true)
@@ -4678,6 +4700,7 @@ class MusicService :
                 // frames in the app
                 delay(WidgetProgressIntervalMs)
             }
+            widgetUpdateJob = null
         }
     }
 
