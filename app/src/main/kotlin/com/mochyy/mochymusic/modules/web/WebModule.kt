@@ -116,11 +116,14 @@ internal class WebModule(
 
     private lateinit var host: ModuleHost
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
-    private val matches = ConcurrentHashMap<String, CatalogTrack>()
-    private val misses = ConcurrentHashMap<String, Long>()
+    private data class LookupKey(val track: TrackQuery, val tier: String, val atmos: Boolean)
+    private data class DirectStream(val url: String, val fetchedAt: Long)
+
+    private val matches = ConcurrentHashMap<LookupKey, CatalogTrack>()
+    private val misses = ConcurrentHashMap<LookupKey, Long>()
 
     // a search answer may already carry each song's stream, then there's no second request; keyed by what was asked too
-    private val directStreams = ConcurrentHashMap<String, String>()
+    private val directStreams = ConcurrentHashMap<String, DirectStream>()
 
     // the songs that are an atmos mix, tidal lists those as songs of their own
     private val atmosRows = ConcurrentHashMap.newKeySet<String>()
@@ -150,6 +153,7 @@ internal class WebModule(
     override fun signOut() {
         matches.clear()
         misses.clear()
+        directStreams.clear()
     }
 
     // ---- songs ----------------------------------------------------------------------------------
@@ -162,7 +166,7 @@ internal class WebModule(
         // the atmos mix only when this phone can decode it, otherwise the stereo one plays instead of silence
         val atmos = picks[ChoiceMix] == OptionAtmos && DeviceDecoders.canPlay(AtmosCodec)
         val asked = "$tier|$atmos"
-        val key = "${track.title}|${track.artists.joinToString(",")}|$asked"
+        val key = LookupKey(track, tier, atmos)
         val missedAt = misses[key]
         if (missedAt != null && System.currentTimeMillis() - missedAt < MissMemoryMs) {
             report(DiagnosticStep("Find the song", false, "Not on ${info.name}"))
@@ -182,7 +186,13 @@ internal class WebModule(
                 return ResolveResult.Unavailable("$siteName answered ${response.code}")
             }
             host.storage.set("unreachable", null)
-            val best = pick(TrackMatcher.ranked(track, tracksIn(response.text, asked)), atmos)
+            val tracks = tracksIn(response.text, asked)
+            if (tracks == null) {
+                val reason = "$siteName returned an unreadable search response"
+                report(DiagnosticStep("Find the song", false, reason))
+                return ResolveResult.Unavailable(reason)
+            }
+            val best = pick(TrackMatcher.ranked(track, tracks), atmos)
             if (best == null) {
                 misses[key] = System.currentTimeMillis()
                 report(DiagnosticStep("Find the song", false, "No matching recording of “${track.title}”"))
@@ -202,6 +212,7 @@ internal class WebModule(
             asTiered
         }
         if (stream == null) {
+            matches.remove(key, found)
             report(DiagnosticStep("Stream", false, "$siteName gave no stream Pippo can play"))
             return ResolveResult.Unavailable("$siteName gave no stream Pippo can play")
         }
@@ -267,9 +278,9 @@ internal class WebModule(
         }
     }
 
-    private fun tracksIn(text: String, asked: String): List<CatalogTrack> {
-        val root = runCatching { json.parseToJsonElement(text) as? JsonObject }.getOrNull() ?: return emptyList()
-        val tracks = root["tracks"] as? JsonArray ?: return emptyList()
+    private fun tracksIn(text: String, asked: String): List<CatalogTrack>? {
+        val root = runCatching { json.parseToJsonElement(text) as? JsonObject }.getOrNull() ?: return null
+        val tracks = root["tracks"] as? JsonArray ?: return null
         return tracks.mapNotNull { element ->
             val t = element as? JsonObject ?: return@mapNotNull null
             val id = t.string("id") ?: return@mapNotNull null
@@ -283,7 +294,9 @@ internal class WebModule(
                 durationMs = duration,
                 isrc = t.string("isrc"),
             ).also { track ->
-                t.string("streamURL")?.let { directStreams["$asked|${track.id}"] = it }
+                t.string("streamURL")?.let { url ->
+                    directStreams["$asked|${track.id}"] = DirectStream(url, android.os.SystemClock.elapsedRealtime())
+                }
                 if (t.marksAtmos()) atmosRows += track.id
             }
         }
@@ -291,7 +304,13 @@ internal class WebModule(
 
     private fun streamFor(track: CatalogTrack, tier: String, atmos: Boolean): SourceStream? {
         val rowIsAtmos = track.id in atmosRows
-        directStreams["$tier|$atmos|${track.id}"]?.let { url -> return streamOf(url, JsonObject(emptyMap()), rowIsAtmos) }
+        val key = "$tier|$atmos|${track.id}"
+        directStreams[key]?.let { direct ->
+            if (android.os.SystemClock.elapsedRealtime() - direct.fetchedAt < DirectStreamMemoryMs) {
+                return streamOf(direct.url, JsonObject(emptyMap()), rowIsAtmos)
+            }
+            directStreams.remove(key, direct)
+        }
         val response = runCatching { host.http(HttpRequest("$base/stream/${enc(track.id)}?${paramsFor(tier, atmos)}", headers = headers)) }.getOrNull()
         if (response == null || !response.ok) return null
         val answer = runCatching { json.parseToJsonElement(response.text) as? JsonObject }.getOrNull() ?: return null
@@ -412,6 +431,7 @@ internal class WebModule(
     private fun enc(text: String) = URLEncoder.encode(text, "UTF-8").replace("+", "%20")
 
     private companion object {
+        const val DirectStreamMemoryMs = 60_000L
         const val MissMemoryMs = 30L * 60 * 1000
         const val UnreachableRetryMs = 10L * 60 * 1000
         val headers = mapOf("Accept" to "application/json", "User-Agent" to "Pippo")
