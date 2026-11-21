@@ -104,10 +104,12 @@ internal fun BlendHomeArtworkIntoChrome(list: LazyListState, enabled: Boolean, b
     DisposableEffect(chrome, list, enabled, region) {
         val coverage = derivedStateOf(structuralEqualityPolicy()) {
             val layout = list.layoutInfo
-            val bottom = layout.viewportEndOffset
+            val bottom = layout.viewportEndOffset.toFloat()
             val item = layout.visibleItemsInfo.lastOrNull()
             if (item == null || item.key != HomeArtworkKey || region <= 0f) 0f else {
-                val covered = minOf(bottom, item.offset + item.size) - maxOf(bottom - region, item.offset)
+                val itemStart = item.offset.toFloat()
+                val itemEnd = itemStart + item.size
+                val covered = minOf(bottom, itemEnd) - maxOf(bottom - region, itemStart)
                 (covered / region).coerceIn(0f, 1f)
             }
         }
