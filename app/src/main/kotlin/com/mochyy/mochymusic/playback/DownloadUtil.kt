@@ -122,6 +122,8 @@ constructor(
 
     private class NoLosslessDownload : java.io.IOException("No downloadable FLAC or ALAC stream")
     private val repairLock = Mutex()
+    // DownloadManager commands and their callbacks are serialized on the application thread.
+    private val pendingPlaylistRepairs = mutableSetOf<String>()
     private val unavailableLossless = MutableStateFlow<Set<String>>(emptySet())
     internal val losslessFailures = unavailableLossless.asStateFlow()
 
@@ -279,40 +281,51 @@ constructor(
                         download: Download,
                         finalException: Exception?,
                     ) {
-                        downloads.update { map ->
-                            map.toMutableMap().apply {
-                                set(download.request.id, download)
-                            }
-                        }
-
                         val id = download.request.id
+                        if (download.state != Download.STATE_REMOVING) pendingPlaylistRepairs.remove(id)
+                        downloads.update { it + (id to download) }
                         val unavailable = download.state == Download.STATE_FAILED &&
                             generateSequence<Throwable>(finalException) { it.cause }.any { it is NoLosslessDownload }
                         unavailableLossless.update { if (unavailable) it + id else it - id }
+
                         scope.launch {
-                            if (downloads.value[id] !== download) return@launch
-                            when (download.state) {
-                                Download.STATE_COMPLETED -> {
-                                    database.updateDownloadedInfo(download.request.id, true, LocalDateTime.now())
-                                    recordDownloadedLength(download)
-                                    moduleDownloads.remove(download.request.id)
-                                    failedProviders.remove(download.request.id)
-                                    saveLyrics(download.request.id)
-                                }
-                                Download.STATE_FAILED -> {
-                                    database.updateDownloadedInfo(download.request.id, false, null)
-                                    repairLock.withLock {
-                                        if (downloads.value[id] === download) forgetStream(id)
+                            val completed = repairLock.withLock {
+                                if (downloads.value[id] !== download) return@withLock false
+                                when (download.state) {
+                                    Download.STATE_COMPLETED -> {
+                                        recordDownloadedLength(download)
+                                        database.updateDownloadedInfo(id, true, LocalDateTime.now())
+                                        moduleDownloads.remove(id)
+                                        failedProviders.remove(id)
                                     }
-                                    // kept by R8 in release builds, unlike Timber: the reason is the only clue
-                                    android.util.Log.w(LOG_TAG, "Download of ${download.request.id} failed", finalException)
+                                    Download.STATE_FAILED -> {
+                                        database.updateDownloadedInfo(id, false, null)
+                                        forgetStream(id)
+                                        // Release builds keep this log so a failure has a diagnostic reason.
+                                        android.util.Log.w(LOG_TAG, "Download of $id failed", finalException)
+                                    }
+                                    Download.STATE_STOPPED,
+                                    Download.STATE_REMOVING,
+                                    Download.STATE_RESTARTING -> database.updateDownloadedInfo(id, false, null)
                                 }
-                                Download.STATE_STOPPED,
-                                Download.STATE_REMOVING -> {
-                                    database.updateDownloadedInfo(download.request.id, false, null)
-                                }
-                                else -> {
-                                }
+                                download.state == Download.STATE_COMPLETED
+                            }
+                            if (completed) saveLyrics(id)
+                        }
+                    }
+
+                    override fun onDownloadRemoved(downloadManager: DownloadManager, download: Download) {
+                        val id = download.request.id
+                        pendingPlaylistRepairs.remove(id)
+                        downloads.update { it - id }
+                        unavailableLossless.update { it - id }
+                        songUrlCache.remove(id)
+                        songStreamHeaders.remove(id)
+                        moduleDownloads.remove(id)
+                        failedProviders.remove(id)
+                        scope.launch {
+                            repairLock.withLock {
+                                if (downloads.value[id] == null) database.updateDownloadedInfo(id, false, null)
                             }
                         }
                     }
@@ -559,11 +572,11 @@ constructor(
     internal fun needsPlaylistRepair(download: Download?): Boolean = when (download?.state) {
         null, Download.STATE_FAILED -> true
         Download.STATE_COMPLETED -> {
-            val id = download.request.id
+            val cacheKey = download.request.customCacheKey ?: download.request.uri.toString()
             val length = download.contentLength.takeIf { it > 0 }
-                ?: ContentMetadata.getContentLength(downloadCache.getContentMetadata(id))
-            if (length > 0) !downloadCache.isCached(id, 0, length)
-            else downloadCache.getCachedSpans(id).isEmpty()
+                ?: ContentMetadata.getContentLength(downloadCache.getContentMetadata(cacheKey))
+            if (length > 0) !downloadCache.isCached(cacheKey, 0, length)
+            else downloadCache.getCachedSpans(cacheKey).firstOrNull()?.position != 0L
         }
         else -> false
     }
@@ -577,7 +590,10 @@ constructor(
                     if (song.song.isLocal) continue
                     val known = downloads.value[song.id]
                     if (!needsPlaylistRepair(known)) continue
-                    if (downloads.value[song.id] !== known) continue
+                    val canSubmit = kotlinx.coroutines.withContext(Dispatchers.Main) {
+                        !OfflineMode.isOn && downloads.value[song.id] === known && song.id !in pendingPlaylistRepairs
+                    }
+                    if (!canSubmit) continue
                     if (known?.state == Download.STATE_FAILED) forgetStream(song.id)
                     failedProviders.remove(song.id)
                     val request = known?.request ?: DownloadRequest.Builder(song.id, song.id.toUri())
@@ -585,18 +601,21 @@ constructor(
                         .setData(song.song.title.toByteArray())
                         .build()
                     kotlinx.coroutines.withContext(Dispatchers.Main) submit@{
-                        if (OfflineMode.isOn || downloads.value[song.id] !== known) return@submit
-                        if (known?.state == Download.STATE_COMPLETED) {
-                            downloadManager.removeDownload(song.id)
+                        if (OfflineMode.isOn || downloads.value[song.id] !== known ||
+                            !pendingPlaylistRepairs.add(song.id)
+                        ) return@submit
+                        try {
+                            if (known?.state == Download.STATE_COMPLETED) downloadManager.removeDownload(song.id)
+                            // Keep remove and add in order on the manager's command queue.
                             downloadManager.addDownload(request)
-                        } else {
-                            runCatching {
-                                DownloadService.sendAddDownload(
-                                    context, ExoDownloadService::class.java, request, false,
-                                )
-                            }.onFailure { downloadManager.addDownload(request) }
+                            submitted++
+                        } catch (e: Exception) {
+                            pendingPlaylistRepairs.remove(song.id)
+                            throw e
                         }
-                        submitted++
+                        if (submitted == 1) {
+                            runCatching { DownloadService.start(context, ExoDownloadService::class.java) }
+                        }
                     }
                 }
                 submitted

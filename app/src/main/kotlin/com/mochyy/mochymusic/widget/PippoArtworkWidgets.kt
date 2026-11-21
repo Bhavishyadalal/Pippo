@@ -148,13 +148,18 @@ internal class ArtworkWidgets(private val context: Context) {
             val artistHeight = widgetLineHeight(context, artistSp)
             val textWidth = size.width - inset - rightInset
             val headRoom = (size.height - 2 * vertical - buttonHeight).coerceAtLeast(0)
-            val showLike = textWidth >= 110 && headRoom >= 40
+            val showTitle = headRoom >= titleHeight
+            val titleWidth = widgetTextWidth(context, titleSp, title.take(6) + "…", bold = true)
+            val showLike = textWidth >= maxOf(110, titleWidth + 48) && headRoom >= maxOf(40, titleHeight)
             val likeHeight = if (showLike) 36 else 0
             val showArtist = artist.isNotBlank() && headRoom >= maxOf(likeHeight, titleHeight + artistHeight) + 10
-            val headerHeight = maxOf(likeHeight, titleHeight + if (showArtist) artistHeight else 0)
+            val textHeight = (if (showTitle) titleHeight else 0) + (if (showArtist) artistHeight else 0)
+            val headerHeight = maxOf(likeHeight, textHeight)
             val timelineRoom = headRoom - headerHeight
             val showTimeline = timelineRoom >= 9
-            val showTimes = showTimeline && timelineRoom >= widgetLineHeight(context, 10) + 11 && textWidth >= 94
+            val longestTime = "−" + makeTimeString(duration.coerceAtLeast(position).coerceAtLeast(0L))
+            val minTimeWidth = 2 * widgetTextWidth(context, 10, longestTime) + 16
+            val showTimes = showTimeline && timelineRoom >= widgetLineHeight(context, 10) + 11 && textWidth >= minTimeWidth
 
             setTextViewTextSize(R.id.art_widget_title, TypedValue.COMPLEX_UNIT_SP, titleSp.toFloat())
             setTextViewTextSize(R.id.art_widget_artist, TypedValue.COMPLEX_UNIT_SP, artistSp.toFloat())
@@ -164,6 +169,7 @@ internal class ArtworkWidgets(private val context: Context) {
             setTextColor(R.id.art_widget_remaining, detailColor)
             setViewVisibility(R.id.art_widget_progress, if (showTimeline) View.VISIBLE else View.GONE)
             setViewVisibility(R.id.art_widget_like, if (showLike) View.VISIBLE else View.GONE)
+            setViewVisibility(R.id.art_widget_title, if (showTitle) View.VISIBLE else View.GONE)
             setViewVisibility(R.id.art_widget_artist, if (showArtist) View.VISIBLE else View.GONE)
             setViewVisibility(R.id.art_widget_times, if (showTimes) View.VISIBLE else View.GONE)
             setTextViewText(R.id.art_widget_title, title)
@@ -199,12 +205,18 @@ internal class ArtworkWidgets(private val context: Context) {
 
 internal fun widgetLineHeight(context: Context, sp: Int, bold: Boolean = false): Int {
     val metrics = context.resources.displayMetrics
-    val paint = Paint().apply {
-        textSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, sp.toFloat(), metrics)
-        typeface = if (bold) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
-    }
+    val paint = widgetTextPaint(context, sp, bold)
     // Include a little room for fallback glyphs used by CJK and Indic titles.
     return kotlin.math.ceil(paint.fontSpacing / metrics.density + 2f).toInt()
+}
+
+private fun widgetTextWidth(context: Context, sp: Int, text: String, bold: Boolean = false): Int =
+    kotlin.math.ceil(widgetTextPaint(context, sp, bold).measureText(text) /
+        context.resources.displayMetrics.density).toInt()
+
+private fun widgetTextPaint(context: Context, sp: Int, bold: Boolean): Paint = Paint().apply {
+    textSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, sp.toFloat(), context.resources.displayMetrics)
+    typeface = if (bold) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
 }
 
 internal data class WidgetSize(val width: Int, val height: Int)
