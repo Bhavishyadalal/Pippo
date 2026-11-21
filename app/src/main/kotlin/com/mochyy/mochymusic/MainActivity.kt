@@ -782,6 +782,7 @@ class MainActivity : ComponentActivity() {
                         (playerBottomSheetState.isCollapsed || playerBottomSheetState.isDismissed)
                 }
                 val scrollFold = scrollPlayerFraction(navBackStackEntry, scrollChrome, scrollMotion)
+                val scrollHideAmount = { if (scrollMotion.keepsTabsVisible) 0f else scrollFold.value }
                 val playerCoversTabs by remember(playerBottomSheetState) {
                     derivedStateOf { navigationPlayerHideFraction(playerBottomSheetState.progress) >= 1f }
                 }
@@ -1132,7 +1133,7 @@ class MainActivity : ComponentActivity() {
                                                         routeOffset = hideOffset, scrim = true,
                                                     )
                                                     if (wideBar == null || playerBottomSheetState.isDismissed) {
-                                                        translationY += navPadding.toPx() * scrollFold.value
+                                                        translationY += navPadding.toPx() * scrollHideAmount()
                                                     }
                                                 }
                                         )
@@ -1155,16 +1156,15 @@ class MainActivity : ComponentActivity() {
                                                     routeOffset = hideOffset,
                                                 )
                                             }
-                                        val scrollTabsHidden by remember(scrollFold) {
-                                            derivedStateOf { scrollFold.value >= 1f }
+                                        val scrollTabsHidden by remember(scrollFold, scrollMotion) {
+                                            derivedStateOf { scrollHideAmount() >= 1f }
                                         }
                                         val scrollTabs = Modifier
                                             .then(if (scrollTabsHidden || playerCoversTabs) Modifier.clearAndSetSemantics {} else Modifier)
                                             .graphicsLayer {
-                                                scrollMotion.applyTo(
-                                                    this, scrollFold.value, size.height,
-                                                    rtl = isRtl,
-                                                )
+                                                if (wideBar == null || !scrollMotion.keepsTabsVisible) {
+                                                    scrollMotion.applyTo(this, scrollFold.value, size.height, rtl = isRtl)
+                                                }
                                             }
                                         // the wide pill shrinks onto the tabs while nothing is playing, read while laying out
                                         val withPlayer = animateFloatAsState(
@@ -1180,12 +1180,14 @@ class MainActivity : ComponentActivity() {
                                                 withPlayer = withPlayerNow,
                                                 pureBlack = pureBlack,
                                                 modifier = barMotion.fillMaxWidth().graphicsLayer {
-                                                    scrollMotion.applyTo(
-                                                        this, scrollFold.value * (1f - withPlayer.value),
-                                                        size.height, rtl = isRtl,
-                                                    )
+                                                    if (!scrollMotion.keepsTabsVisible) {
+                                                        scrollMotion.applyTo(
+                                                            this, scrollFold.value * (1f - withPlayer.value),
+                                                            size.height, rtl = isRtl,
+                                                        )
+                                                    }
                                                 },
-                                                scrollFold = { scrollFold.value },
+                                                scrollFold = scrollHideAmount,
                                             )
                                         }
 
@@ -1196,7 +1198,7 @@ class MainActivity : ComponentActivity() {
                                                 pureBlack = pureBlack,
                                                 modifier = Modifier.launchRise(order = 3).then(
                                                     if (wideBar != null) Modifier else Modifier.graphicsLayer {
-                                                        translationY = navPadding.toPx() * scrollFold.value *
+                                                        translationY = navPadding.toPx() * scrollHideAmount() *
                                                             (1f - playerBottomSheetState.progress.coerceIn(0f, 1f))
                                                     },
                                                 ),
@@ -1211,6 +1213,7 @@ class MainActivity : ComponentActivity() {
                                                 selectedTabRoute = selectedTabRoute,
                                                 onItemClick = onNavItemClick,
                                                 onSearchDoubleTap = onSearchDoubleTap,
+                                                compactScale = { if (scrollMotion.keepsTabsVisible) scrollMotion.compactScale(scrollFold.value) else 1f },
                                                 modifier = barMotion.then(scrollTabs).fillMaxWidth(),
                                             )
                                             com.mochyy.mochymusic.ui.component.WideBarExtras(

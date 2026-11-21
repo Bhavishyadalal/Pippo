@@ -6,7 +6,6 @@ import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import android.os.Bundle
 import com.mochyy.mochymusic.playback.MusicService
 
@@ -19,36 +18,19 @@ class MusicWidgetReceiver : AppWidgetProvider() {
     ) {
 
         if (MusicService.isRunning) {
-            val intent = Intent(context, MusicService::class.java).apply {
-                action = ACTION_UPDATE_WIDGET
-            }
-            try {
-                androidx.core.content.ContextCompat.startForegroundService(context, intent)
-            } catch (e: Exception) {
-
-            }
+            requestWidgetRefresh(context)
+        } else {
+            MochyWidgetManager(context).updateEmpty(appWidgetManager, appWidgetIds)
         }
-
     }
 
     override fun onAppWidgetOptionsChanged(
         context: Context,
         appWidgetManager: AppWidgetManager,
         appWidgetId: Int,
-        newOptions: Bundle
+        newOptions: Bundle,
     ) {
-        super.onAppWidgetOptionsChanged(context, appWidgetManager, appWidgetId, newOptions)
-
-        if (MusicService.isRunning) {
-            val intent = Intent(context, MusicService::class.java).apply {
-                action = ACTION_UPDATE_WIDGET
-            }
-            try {
-                androidx.core.content.ContextCompat.startForegroundService(context, intent)
-            } catch (e: Exception) {
-
-            }
-        }
+        onUpdate(context, appWidgetManager, intArrayOf(appWidgetId))
     }
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -78,3 +60,9 @@ class MusicWidgetReceiver : AppWidgetProvider() {
         const val ACTION_UPDATE_WIDGET = "com.mochyy.mochymusic.widget.UPDATE_WIDGET"
     }
 }
+
+
+internal fun requestWidgetRefresh(context: Context): Boolean = runCatching {
+    context.startService(Intent(context, MusicService::class.java).setAction(MusicWidgetReceiver.ACTION_UPDATE_WIDGET))
+    true
+}.getOrDefault(false)

@@ -32,4 +32,6 @@
     <string name="scroll_player_compress">Compress</string>
     <string name="scroll_player_unfold">Unfold</string>
     <string name="scroll_player_settle">Settle</string>
+    <string name="scroll_player_compact_fold">Compact fold</string>
+    <string name="scroll_player_preview_swipe">Swipe up in the preview to fold the bar. Swipe down to open it.</string>
 </resources>
