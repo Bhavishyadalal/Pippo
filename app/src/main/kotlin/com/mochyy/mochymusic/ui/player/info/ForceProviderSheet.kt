@@ -58,11 +58,9 @@ import com.mochyy.mochymusic.module.StreamOption
 import com.mochyy.mochymusic.modules.SourceModules
 import com.mochyy.mochymusic.playback.ProviderSwitch
 import com.mochyy.mochymusic.playback.ProviderSwitchState
-import com.mochyy.mochymusic.ui.player.menu.LocalMenuSheetClose
 import com.mochyy.mochymusic.ui.player.menu.MenuRowSurface
 import com.mochyy.mochymusic.ui.player.menu.MenuSheetSurface
 import com.mochyy.mochymusic.utils.rememberPreference
-import kotlinx.coroutines.delay
 import com.mochyy.mochymusic.ui.component.AppSwitch
 import com.mochyy.mochymusic.ui.component.RemoteFocus
 
@@ -93,14 +91,7 @@ fun ForceProviderSheet(currentProviderId: String?, currentOption: String? = null
     LaunchedEffect(Unit) { modules.refresh() }
     DisposableEffect(Unit) { onDispose { service.providerSwitch.acknowledge() } }
 
-    MenuSheetSurface(onDismiss = onDismiss, wrapHeight = true) { _ ->
-        val close = LocalMenuSheetClose.current
-        // once it plays from the new provider there's nothing left to choose
-        LaunchedEffect(state) {
-            val completed = state as? ProviderSwitchState.Done ?: return@LaunchedEffect
-            delay(700)
-            if (service.providerSwitch.state.value === completed) close()
-        }
+    MenuSheetSurface(onDismiss = onDismiss, wrapHeight = true, dragFromContent = false) { _ ->
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).navigationBarsPadding(),

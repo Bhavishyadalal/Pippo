@@ -191,6 +191,7 @@ fun MenuSheetSurface(
 
     dismissEnabled: Boolean = true,
     revealProvider: ((Float) -> Unit)? = null,
+    dragFromContent: Boolean = true,
     content: @Composable ColumnScope.(dragHandle: Modifier) -> Unit,
 ) {
     val scope = rememberCoroutineScope()
@@ -476,7 +477,7 @@ fun MenuSheetSurface(
                     entry.sheetHeightPx = it.height.toFloat()
                 }
                 // a floating card's list scrolls inside it; the card itself stays put
-                .then(if (floating) Modifier else Modifier.nestedScroll(sheetNestedScroll))
+                .then(if (floating || !dragFromContent) Modifier else Modifier.nestedScroll(sheetNestedScroll))
                 .graphicsLayer {
                     var shift = 0f
                     var depth = 0f

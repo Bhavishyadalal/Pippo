@@ -17,6 +17,8 @@ import com.mochyy.mochymusic.module.monochrome.MonochromeModule
 import com.mochyy.mochymusic.utils.DataSaver
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -113,8 +115,8 @@ class SourceModules @Inject constructor(
         data class Module(val module: SourceModule, val stream: SourceStream, val selectedQuality: String?) : Route
         /** hand it to YouTube, by its video id */
         data object YouTube : Route
-        /** every provider in [skip] or without it */
-        data object Exhausted : Route
+        /** No provider could open the song. A timed-out or unavailable provider may work on retry. */
+        data class Exhausted(val temporaryFailure: Boolean) : Route
     }
 
     /**
@@ -179,10 +181,10 @@ class SourceModules @Inject constructor(
             if (id == YouTubeId) break
         }
         // every module ahead of youtube is asked at once, so a slow one up front no longer holds up the rest; answers are still taken in order
-        val startedAt = System.currentTimeMillis()
+        val startedAt = android.os.SystemClock.elapsedRealtime()
         val answers = if (track == null) emptyMap() else asked.mapNotNull { id ->
             val module = module(id) ?: return@mapNotNull null
-            id to resolveScope.async {
+            val response = resolveScope.async {
                 runCatching {
                     val picks = picksFor(id, module)
                     val quality = streamQuality(module, picks)
@@ -191,20 +193,30 @@ class SourceModules @Inject constructor(
                     .onFailure { if (it !is CancellationException) android.util.Log.w(Tag, "$id failed for ${track.title}", it) }
                     .getOrNull()
             }
+            id to (module to response)
         }.toMap()
+        var temporaryFailure = false
         try {
             for (id in asked) {
                 if (!usable(id)) continue
                 if (id == YouTubeId) return@withContext Route.YouTube
-                val module = module(id) ?: continue
-                val answer = answers[id] ?: continue
+                val (module, answer) = answers[id] ?: continue
                 // timed on the waiting side, so a module stuck in a call that ignores cancelling can't hold the song either
-                val left = ModuleTimeoutMs - (System.currentTimeMillis() - startedAt)
-                val response = withTimeoutOrNull(left.coerceAtLeast(1L)) { answer.await() }
-                if (response == null && answer.isActive) android.util.Log.i(Tag, "$id took longer than ${ModuleTimeoutMs / 1000} s for ${track?.title}, moving on")
-                val (result, quality) = response ?: continue
+                val left = ModuleTimeoutMs - (android.os.SystemClock.elapsedRealtime() - startedAt)
+                val response = try {
+                    withTimeoutOrNull(left.coerceAtLeast(1L)) { answer.await() }
+                } catch (_: CancellationException) {
+                    currentCoroutineContext().ensureActive()
+                    null
+                }
                 // A provider can be disabled or replaced while its lookup is in flight.
                 if (!usable(id) || module(id) !== module) continue
+                if (response == null) {
+                    temporaryFailure = true
+                    if (answer.isActive) android.util.Log.i(Tag, "$id took longer than ${ModuleTimeoutMs / 1000} s for ${track?.title}, moving on")
+                    continue
+                }
+                val (result, quality) = response
                 when (result) {
                     is ResolveResult.Found -> {
                         val matched = result.stream.matched
@@ -217,13 +229,16 @@ class SourceModules @Inject constructor(
                         return@withContext Route.Module(module, result.stream, quality)
                     }
                     is ResolveResult.NotFound -> android.util.Log.i(Tag, "$id: ${track?.title}: ${result.reason}")
-                    is ResolveResult.Unavailable -> android.util.Log.i(Tag, "$id unavailable for ${track?.title}: ${result.reason}")
+                    is ResolveResult.Unavailable -> {
+                        temporaryFailure = true
+                        android.util.Log.i(Tag, "$id unavailable for ${track?.title}: ${result.reason}")
+                    }
                 }
             }
-            Route.Exhausted
+            Route.Exhausted(temporaryFailure)
         } finally {
             // the ones further down the order aren't needed once one has the song
-            answers.values.forEach { it.cancel() }
+            answers.values.forEach { (_, answer) -> answer.cancel() }
         }
     }
 
