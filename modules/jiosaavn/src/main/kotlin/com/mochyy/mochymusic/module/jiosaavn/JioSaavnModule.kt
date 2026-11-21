@@ -39,8 +39,8 @@ class JioSaavnModule : SourceModule {
 
     private lateinit var host: ModuleHost
     private val json = Json { ignoreUnknownKeys = true }
-    private val matches = ConcurrentHashMap<String, SaavnSong>()
-    private val misses = ConcurrentHashMap<String, Long>()
+    private val matches = ConcurrentHashMap<TrackQuery, CachedMatch>()
+    private val misses = ConcurrentHashMap<TrackQuery, Long>()
 
     override fun attach(host: ModuleHost) {
         this.host = host
@@ -86,15 +86,14 @@ class JioSaavnModule : SourceModule {
         diagnose(track, picks) {}
 
     override suspend fun diagnose(track: TrackQuery, picks: Map<String, String>, report: (DiagnosticStep) -> Unit): ResolveResult {
-        val key = "${track.title}|${track.artists.joinToString(",")}"
-        val missedAt = misses[key]
+        val missedAt = misses[track]
         if (missedAt != null && System.currentTimeMillis() - missedAt < MissMemoryMs) {
             report(DiagnosticStep("Find the song", false, "Not on JioSaavn"))
             return ResolveResult.NotFound("Not on JioSaavn")
         }
 
         report(DiagnosticStep("Find the song", null, "Searching JioSaavn…"))
-        val song = matches[key] ?: run {
+        val match = matches[track]?.takeIf { System.currentTimeMillis() - it.fetchedAt < MatchMemoryMs } ?: run {
             val query = "${TrackMatcher.core(track.title)} ${track.artists.firstOrNull().orEmpty()}".trim()
             val response = runCatching { host.http(HttpRequest(searchUrl(query, 10), headers = headers)) }.getOrElse {
                 report(DiagnosticStep("Find the song", false, "JioSaavn didn't answer"))
@@ -106,31 +105,41 @@ class JioSaavnModule : SourceModule {
                 return ResolveResult.Unavailable("JioSaavn answered ${response.code}")
             }
             host.storage.set("unreachable", null)
-            val songs = songsIn(response.text)
-            val best = TrackMatcher.ranked(track, songs.map { it.catalog }).firstOrNull()
-                ?.let { scored -> songs.first { it.catalog === scored.track } }
-            if (best == null) {
-                misses[key] = System.currentTimeMillis()
+            val songs = parseSongs(response.text)
+            if (songs == null) {
+                val reason = "JioSaavn returned an unreadable search response"
+                report(DiagnosticStep("Find the song", false, reason))
+                return ResolveResult.Unavailable(reason)
+            }
+            val ranked = TrackMatcher.ranked(track, songs.map { it.catalog })
+            if (ranked.isEmpty()) {
+                misses[track] = System.currentTimeMillis()
                 report(DiagnosticStep("Find the song", false, "No matching recording of “${track.title}”"))
                 return ResolveResult.NotFound("No matching recording on JioSaavn")
             }
-            matches[key] = best
+            val best = ranked.firstNotNullOfOrNull { scored ->
+                val candidate = songs.first { it.catalog === scored.track }
+                decryptMediaUrl(candidate.encryptedUrl)?.let { url ->
+                    CachedMatch(candidate, url, System.currentTimeMillis())
+                }
+            }
+            if (best == null) {
+                val reason = "JioSaavn returned no readable stream link"
+                report(DiagnosticStep("Stream", false, reason))
+                return ResolveResult.Unavailable(reason)
+            }
+            matches[track] = best
             best
         }
+        val song = match.song
         report(DiagnosticStep("Find the song", true, "${song.catalog.title} · ${song.catalog.artist}"))
-
         report(DiagnosticStep("Stream", null, "Opening the stream…"))
-        val given = decryptMediaUrl(song.encryptedUrl)
-        if (given == null) {
-            report(DiagnosticStep("Stream", false, "JioSaavn's link couldn't be read"))
-            return ResolveResult.Unavailable("JioSaavn's link couldn't be read")
-        }
         val wanted = when (picks[ChoiceQuality] ?: Option320) {
             Option96 -> 96
             Option160 -> 160
             else -> if (song.has320) 320 else 160
         }
-        val stream = streamAt(given, wanted)
+        val stream = streamAt(match.url, wanted)
         report(DiagnosticStep("Stream", true, "AAC ${stream.kbps ?: "?"} kbps"))
 
         return ResolveResult.Found(
@@ -159,9 +168,13 @@ class JioSaavnModule : SourceModule {
 
     internal class SaavnStream(val url: String, val kbps: Int?)
 
-    internal fun songsIn(text: String): List<SaavnSong> {
-        val root = runCatching { json.parseToJsonElement(text) as? JsonObject }.getOrNull() ?: return emptyList()
-        val results = root["results"] as? JsonArray ?: return emptyList()
+    private data class CachedMatch(val song: SaavnSong, val url: String, val fetchedAt: Long)
+
+    internal fun songsIn(text: String): List<SaavnSong> = parseSongs(text).orEmpty()
+
+    private fun parseSongs(text: String): List<SaavnSong>? {
+        val root = runCatching { json.parseToJsonElement(text) as? JsonObject }.getOrNull() ?: return null
+        val results = root["results"] as? JsonArray ?: return null
         return results.mapNotNull { element ->
             val song = element as? JsonObject ?: return@mapNotNull null
             val more = song["more_info"] as? JsonObject ?: return@mapNotNull null
@@ -231,6 +244,7 @@ class JioSaavnModule : SourceModule {
         const val Option96 = "96"
         private const val Api = "https://www.jiosaavn.com/api.php"
         private const val MediaKey = "38346591"
+        private const val MatchMemoryMs = 2 * 60_000L
         private const val MissMemoryMs = 30L * 60 * 1000
         private const val UnreachableRetryMs = 10L * 60 * 1000
         private val RenditionPattern = Regex("_(12|48|96|160|320)\\.(mp4|m4a|aac|mp3)(?=[?#]|$)", RegexOption.IGNORE_CASE)
