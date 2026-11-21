@@ -87,7 +87,7 @@
     <string name="pc_about_nothing_yet">Nothing about this song yet</string>
     <string name="player_provider_quality">%1$s · %2$s</string>
     <string name="pc_force_title">Play from</string>
-    <string name="pc_force_switch_hint">The current track keeps playing during the lookup. You can choose another provider or cancel. Quality choices here apply to this track.</string>
+    <string name="pc_force_switch_hint">The current track keeps playing during lookup. Switch providers off to exclude them from future fetches. Quality choices here apply to this track.</string>
     <string name="pc_force_hint">The song stops while it\'s fetched from the one you pick.</string>
     <string name="pc_force_fetching">Fetching from %1$s…</string>
     <string name="pc_force_try_of">Try %1$d of %2$d, up to a minute</string>
@@ -98,6 +98,15 @@
     <string name="pc_force_switched">Switched to %1$s</string>
     <string name="pc_force_wrong_recording">This provider returned a different recording or preview.</string>
     <string name="pc_force_unsupported_audio">This device cannot decode the selected stream.</string>
+    <string name="pc_force_player_error">Playback failed after the stream was found (%1$s).</string>
+    <string name="pc_force_transition_busy">A track transition is still in progress. Try again after it finishes.</string>
+    <string name="pc_force_open_timeout">The stream was found but playback did not start in time.</string>
+    <string name="pc_force_open_failed">Pippo could not start playback from %1$s.</string>
+    <string name="pc_force_lookup_failed">%1$s did not return a stream. Playback stayed on the previous source.</string>
+    <string name="pc_provider_toggle">Use %1$s for playback</string>
+    <string name="pc_provider_off">Off for playback</string>
+    <string name="pc_provider_off_current">Playing now · off for future fetches</string>
+    <string name="pc_provider_unavailable">Check this provider in Modules</string>
     <string name="pc_session_queue">Playing from %1$s</string>
     <string name="pc_force_playing_here">Playing from here now</string>
     <string name="pc_force_tap_here">Tap to play from here</string>

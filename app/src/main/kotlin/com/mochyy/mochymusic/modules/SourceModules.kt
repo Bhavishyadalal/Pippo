@@ -194,6 +194,7 @@ class SourceModules @Inject constructor(
         }.toMap()
         try {
             for (id in asked) {
+                if (!usable(id)) continue
                 if (id == YouTubeId) return@withContext Route.YouTube
                 val module = module(id) ?: continue
                 val answer = answers[id] ?: continue
@@ -202,6 +203,8 @@ class SourceModules @Inject constructor(
                 val response = withTimeoutOrNull(left.coerceAtLeast(1L)) { answer.await() }
                 if (response == null && answer.isActive) android.util.Log.i(Tag, "$id took longer than ${ModuleTimeoutMs / 1000} s for ${track?.title}, moving on")
                 val (result, quality) = response ?: continue
+                // A provider can be disabled or replaced while its lookup is in flight.
+                if (!usable(id) || module(id) !== module) continue
                 when (result) {
                     is ResolveResult.Found -> {
                         val matched = result.stream.matched

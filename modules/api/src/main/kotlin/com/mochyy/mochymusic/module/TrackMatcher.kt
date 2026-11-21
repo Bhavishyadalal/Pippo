@@ -75,10 +75,9 @@ object TrackMatcher {
     fun isDurationCompatible(expectedMs: Long?, durationMs: Long?): Boolean {
         val wanted = expectedMs?.takeIf { it > 0 } ?: return true
         val actual = durationMs?.takeIf { it > 0 } ?: return true
-        // Music videos sometimes have an intro/outro. Allow moderate drift on long tracks
-        // while rejecting catalog entries that are a small fraction of the original.
-        val tolerance = (wanted / 5).coerceIn(5_000L, 45_000L)
-        return abs(wanted - actual) <= tolerance
+        // The queue often describes a music video while the provider has the studio cut.
+        // Duration still contributes to ranking. Only a clear preview is a hard rejection.
+        return actual > 60_000L || wanted < 75_000L || actual * 2 >= wanted
     }
 
     class Scored(val track: CatalogTrack, val score: Float)
