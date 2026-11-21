@@ -40,15 +40,17 @@ data class PlayingFrom(
 }
 
 /** A manual route for one song, with the answer from its preflight lookup if available. */
-class ForcedRoute(
+data class ForcedRoute(
     val providerId: String,
-    @Volatile var freshStream: SourceStream? = null,
+    val freshStream: SourceStream? = null,
     val option: Pair<String, String>? = null,
     val youtubeQuality: AudioQuality? = null,
-    @Volatile var freshYouTube: YTPlayerUtils.PlaybackData? = null,
+    val freshYouTube: YTPlayerUtils.PlaybackData? = null,
     val expectedDurationMs: Long? = null,
     val selectedModuleQuality: String? = null,
-)
+) {
+    val isPreflight: Boolean get() = freshStream != null || freshYouTube != null
+}
 
 /** what "force change" in stream info is doing */
 sealed interface ProviderSwitchState {
@@ -62,7 +64,7 @@ sealed interface ProviderSwitchState {
 /** Resolves the latest choice in the background before handing off the current queue entry. */
 class ProviderSwitch(private val scope: () -> CoroutineScope, private val host: Host) {
 
-    data class Target(val mediaId: String, val index: Int)
+    data class Target(val mediaId: String, val index: Int, val occurrence: Long)
 
     sealed interface Resolution {
         data class Found(val route: ForcedRoute) : Resolution
@@ -155,9 +157,8 @@ class ProviderSwitch(private val scope: () -> CoroutineScope, private val host: 
         _state.value = ProviderSwitchState.Idle
     }
 
-    fun onMediaChanged(newOccurrence: Boolean) {
-        val active = target ?: return
-        if (newOccurrence || host.currentTarget() != active) cancel()
+    fun onMediaChanged() {
+        if (target != null && host.currentTarget() != target) cancel()
     }
 
     fun acknowledge() {
