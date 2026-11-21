@@ -5237,10 +5237,12 @@ class MusicService :
         // offline: no provider is asked; the song plays if it's cached, and is skipped if not.
         // An imported file is never looked for online, even one whose file has gone missing.
         if (com.mochyy.mochymusic.utils.OfflineMode.isOn || mediaId.startsWith("LOCAL_")) return null
+        val youtubeId = com.mochyy.mochymusic.modules.SourceModules.YouTubeId
+        var failedOverride: String? = null
         while (true) {
             val handoff = handoffFor(mediaId)
             val forced = handoff?.route ?: forcedRoutes[mediaId] ?: break
-            val stream = if (forced.providerId == com.mochyy.mochymusic.modules.SourceModules.YouTubeId) {
+            val stream = if (forced.providerId == youtubeId) {
                 forcedYouTubeStream(mediaId, forced)
             } else {
                 forcedModuleStream(mediaId, forced)
@@ -5251,9 +5253,14 @@ class MusicService :
             if (handoff != null) {
                 throw java.io.IOException("The selected provider could not open this recording")
             }
-            if (forcedRoutes.remove(mediaId, forced)) break
+            if (forcedRoutes.remove(mediaId, forced)) {
+                // A failed YouTube quality override can fall back to normal YouTube.
+                // Other modules would get the same lookup twice on this prepare.
+                failedOverride = forced.providerId.takeUnless { it == youtubeId }
+                break
+            }
         }
-        val skip = recentFailures(mediaId)
+        val skip = recentFailures(mediaId) + listOfNotNull(failedOverride)
         // a fresh lookup: a notice from one that never got to play no longer holds
         if (skip.isEmpty()) decoderNotices.remove(mediaId)
         // songs that only YouTube has (and the common case of YouTube first) need no lookup
