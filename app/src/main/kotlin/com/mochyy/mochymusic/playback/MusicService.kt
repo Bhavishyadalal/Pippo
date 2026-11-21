@@ -2468,14 +2468,7 @@ class MusicService :
                     // A new page of the queue is shuffled in itself; Autoplay keeps the radio's order.
                     placeAddedInShuffleOrder(insertAt until insertAt + newItems.size, shuffleThem = !fromInfinite)
                 }
-                if (endedWithNothingNext && player.playWhenReady) {
-                    val nextIndex = player.nextMediaItemIndex
-                    if (nextIndex != C.INDEX_UNSET) {
-                        player.seekTo(nextIndex, 0)
-                        player.prepare()
-                        player.play()
-                    }
-                }
+                if (endedWithNothingNext) advanceQueueAtEnd(player)
                 // That may have been the queue's last page, which is when Autoplay lines up.
                 if (!fromInfinite) scope.launch(SilentHandler) { ensureQueueRunway() }
                 return@launch
@@ -3064,6 +3057,8 @@ class MusicService :
         // The same ID can occupy two queue entries or loop back to the start.
         bufferingRecoveryJob?.cancel()
         bufferingRecoveryJob = null
+        moduleEndRecoveryJob?.cancel()
+        moduleEndRecoveryJob = null
         providerOccurrence++
         providerSwitch.onMediaChanged()
         // A recovery belongs to the old item; it must not prepare or skip a newly selected song.
@@ -3142,13 +3137,12 @@ class MusicService :
         if (playbackState != Player.STATE_IDLE) clearStreamFailure()
 
         if (playbackState == Player.STATE_ENDED) {
-            val repeatMode = runBlocking { dataStore.get(RepeatModeKey, REPEAT_MODE_OFF) }
-            if (repeatMode == REPEAT_MODE_ALL && player.mediaItemCount > 0 && player.playWhenReady) {
-                player.seekTo(0, 0)
-                player.prepare()
-            } else {
-                // Ran out of songs (e.g. a page load failed earlier): try to extend and keep playing.
-                ensureQueueRunway()
+            val target = player
+            val occurrence = providerOccurrence
+            // Let the other listeners (including the sleep timer) see ENDED before advancing.
+            scope.launch {
+                if (player !== target || providerOccurrence != occurrence || target.playbackState != Player.STATE_ENDED) return@launch
+                if (!advanceQueueAtEnd(target)) ensureQueueRunway()
             }
         }
 
@@ -3257,6 +3251,70 @@ class MusicService :
         }
     }
 
+    private var moduleEndRecoveryJob: Job? = null
+
+    private fun watchForModuleTrackEnd(target: Player) {
+        moduleEndRecoveryJob?.cancel()
+        moduleEndRecoveryJob = null
+        val mediaId = target.currentMediaItem?.mediaId ?: return
+        val stream = playingStreams[mediaId] ?: return
+        if (stream.cacheKey?.startsWith(ModuleCacheKeyPrefix) != true || stream.isDash || stream.isHls) return
+
+        val occurrence = providerOccurrence
+        val pauseGeneration = transport.pauseGeneration
+        fun stillPlaying() = player === target && providerOccurrence == occurrence && target.isPlaying &&
+            transport.pauseGeneration == pauseGeneration && !target.isCurrentMediaItemDynamic &&
+            !target.isCurrentMediaItemLive && !target.isPlayingAd && target.duration > 0L &&
+            handoffFor(mediaId) == null && castConnectionHandler?.isCasting?.value != true
+
+        if (!stillPlaying()) return
+        moduleEndRecoveryJob = scope.launch {
+            val remaining = (target.duration - target.contentPosition).coerceAtLeast(0L)
+            delay((remaining / target.playbackParameters.speed.toDouble()).toLong() + ModuleEndGraceMs)
+            if (!stillPlaying()) return@launch
+            // Use the decoded timeline, never the module's catalog estimate. If the clock has
+            // not reached the end, wait for it instead of skipping legitimate audio.
+            while (target.contentPosition < target.duration || transport.isFading ||
+                isCrossfading || crossmixDirector.isTransitioning
+            ) {
+                delay(ModuleEndGraceMs)
+                if (!stillPlaying()) return@launch
+            }
+            val duration = target.duration
+            val position = target.contentPosition
+            delay(ModuleEndGraceMs)
+            if (!stillPlaying() || target.duration != duration || target.contentPosition < duration ||
+                transport.isFading || isCrossfading || crossmixDirector.isTransitioning
+            ) return@launch
+            // A healthy decoder drains or moves to the next period. Recover only if the clock
+            // has run past the end or stopped there with no additional buffered audio.
+            if (target.contentBufferedPosition > duration + ModuleEndBufferToleranceMs) return@launch
+            if (target.contentPosition - duration < ModuleEndGraceMs && target.contentPosition != position) return@launch
+
+            Timber.tag(TAG).w("Module playback did not finish at the end of %s", mediaId)
+            if (sleepTimer.pauseWhenSongEnd) {
+                sleepTimer.notifySongTransition()
+            } else if (!advanceQueueAtEnd(target)) {
+                ensureQueueRunway()
+                if (!currentQueue.hasNextPage() && !isInfiniteQueueEnabled()) target.pause()
+            }
+        }
+    }
+
+    private fun advanceQueueAtEnd(target: Player): Boolean {
+        if (!target.playWhenReady || sleepTimer.pauseWhenSongEnd ||
+            castConnectionHandler?.isCasting?.value == true || handoffFor(target.currentMediaItem?.mediaId.orEmpty()) != null
+        ) return false
+        val timeline = target.currentTimeline
+        val index = target.currentMediaItemIndex
+        if (index !in 0 until timeline.windowCount) return false
+        val next = timeline.getNextWindowIndex(index, target.repeatMode, target.shuffleModeEnabled)
+        if (next == C.INDEX_UNSET) return false
+        target.seekToDefaultPosition(next)
+        target.prepare()
+        return true
+    }
+
     override fun onEvents(
         player: Player,
         events: Player.Events,
@@ -3270,6 +3328,14 @@ class MusicService :
         ) {
             watchForPlaybackStall(player)
         }
+        if (player === this.player && events.containsAny(
+                Player.EVENT_IS_PLAYING_CHANGED,
+                Player.EVENT_MEDIA_ITEM_TRANSITION,
+                Player.EVENT_TIMELINE_CHANGED,
+                Player.EVENT_POSITION_DISCONTINUITY,
+                Player.EVENT_PLAYBACK_PARAMETERS_CHANGED,
+            )
+        ) watchForModuleTrackEnd(player)
         if (player === this.player && player.playbackState == Player.STATE_READY &&
             events.containsAny(Player.EVENT_PLAYBACK_STATE_CHANGED, Player.EVENT_TRACKS_CHANGED, Player.EVENT_TIMELINE_CHANGED)
         ) {
@@ -4672,6 +4738,7 @@ class MusicService :
 
         routeRefreshJob?.cancel()
         bufferingRecoveryJob?.cancel()
+        moduleEndRecoveryJob?.cancel()
         retryJob?.cancel()
         clearStreamFailure()
         stopWidgetUpdates()
@@ -5525,12 +5592,15 @@ class MusicService :
                 durationMs = queued.duration.takeIf { it > 0 }?.times(1000L),
             )
         }
-        val saved = database.song(mediaId).first() ?: return null
+        val saved = database.song(mediaId).first()
+        val title = queued?.title?.takeIf { it.isNotBlank() }
+            ?: saved?.song?.title?.takeIf { it.isNotBlank() }
+            ?: return null
         return com.mochyy.mochymusic.module.TrackQuery(
-            title = saved.song.title,
-            artists = saved.artists.map { it.name },
-            album = saved.song.albumName ?: saved.album?.title,
-            durationMs = saved.song.duration.takeIf { it > 0 }?.times(1000L),
+            title = title,
+            artists = queued?.artists.orEmpty().map { it.name }.ifEmpty { saved?.artists.orEmpty().map { it.name } },
+            album = queued?.album?.title ?: saved?.song?.albumName ?: saved?.album?.title,
+            durationMs = (queued?.duration?.takeIf { it > 0 } ?: saved?.song?.duration?.takeIf { it > 0 })?.times(1000L),
         )
     }
 
@@ -6022,6 +6092,8 @@ class MusicService :
         private const val RUNWAY_RETRY_BASE_MS = 5_000L
         const val MAX_RETRY_COUNT = 10
         private const val MaxProviderLookupRetries = 2
+        private const val ModuleEndGraceMs = 2_000L
+        private const val ModuleEndBufferToleranceMs = 1_000L
 
         private const val MAX_GAIN_MB = 300
         private const val MIN_GAIN_MB = -1500

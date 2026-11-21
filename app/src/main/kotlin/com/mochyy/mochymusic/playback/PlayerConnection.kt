@@ -280,8 +280,10 @@ class PlayerConnection(
         // Crossmix can replace the service's player before its flow observer attaches to it.
         if (p !== player) return
         if (newPlayback) playbackGeneration++
-        val position = p.currentPosition.coerceAtLeast(0L)
         val duration = p.duration.coerceAtLeast(0L)
+        val position = p.currentPosition.coerceAtLeast(0L).let {
+            if (duration > 0L && !p.isCurrentMediaItemDynamic) it.coerceAtMost(duration) else it
+        }
         _progressState.value = com.mochyy.mochymusic.ui.player.models.ProgressState(
             position = position,
             duration = duration,

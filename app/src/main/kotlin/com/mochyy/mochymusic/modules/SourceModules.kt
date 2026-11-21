@@ -101,9 +101,13 @@ class SourceModules @Inject constructor(
         return current.map { if (it in shown && reordered.isNotEmpty()) reordered.removeFirst() else it } + reordered
     }
 
-    /** whether [id] can play anything now: YouTube while it's on, a module when on and signed in */
-    fun isUsable(id: String): Boolean = isEnabled(id) &&
-        (id == YouTubeId || module(id)?.accountState() is AccountState.SignedIn)
+    /** Health reports from account-free providers are advisory. Only sign-in can block a lookup. */
+    fun isUsable(id: String): Boolean {
+        if (!isEnabled(id)) return false
+        if (id == YouTubeId) return true
+        val source = module(id) ?: return false
+        return source.signIn == null || source.accountState() is AccountState.SignedIn
+    }
 
     /** whether [id] can give a download: youtube always, since downloads have always fallen back to it, a module when on and signed in */
     fun isUsableForDownload(id: String): Boolean = id == YouTubeId || isUsable(id)
