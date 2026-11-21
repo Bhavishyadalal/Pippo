@@ -50,6 +50,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import com.mochyy.mochymusic.ui.player.customize.playerArtworkBackgroundStrength
+import com.mochyy.mochymusic.ui.player.customize.playerArtworkOverlayStrength
 import com.mochyy.mochymusic.ui.player.studio.playHoldRamp
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
@@ -392,6 +394,8 @@ private fun PlayerSheet(
     // the flagships' landscape layout draws the whole open player itself, the way the other styles do
     val landscapeFlagship = playerStyle.flagshipFamily && landscapeWindow
     // each flagship keeps its own background, the new one starting on the moving colours it was made with
+    val artworkStrength = playerArtworkBackgroundStrength()
+    val artworkOverlay = playerArtworkOverlayStrength(artworkStrength)
     var classicBackground by rememberEnumPreference(PlayerBackgroundStyleKey, PlayerBackgroundStyle.COVER_GRADIENT)
     var flagshipBackground by rememberEnumPreference(FlagshipBackgroundStyleKey, PlayerBackgroundStyle.AMBIENT)
     val backgroundStyle = when {
@@ -999,6 +1003,7 @@ private fun PlayerSheet(
                     modifier = Modifier.fillMaxSize(),
                     coverStyle = shownCoverStyle,
                     backgroundStyle = backgroundStyle,
+                    artworkStrength = artworkStrength,
                     stillArtworkBackdrop = studioSession,
                     pauseBackdrop = showExpandMenu || showActionMenu || showProviderSwitch || showStreamInfo ||
                         showPlaybackSpeed || showDeviceOutput || showLyricsSource || showSongDetails,
@@ -1150,6 +1155,7 @@ private fun PlayerSheet(
                     pages = transition,
                     turntable = isTurntable,
                     preferSquare = artworkFrame,
+                    artworkStrength = artworkStrength,
                     sheetShowing = sheetShowing,
                     interactive = remember(state) { { landscapeOpen } },
                     expanded = remember(state) { { state.isExpanded } },
@@ -1233,11 +1239,11 @@ private fun PlayerSheet(
 
             // the new flagship's cover fades into its own blurred copy instead, with only a light shade for the text; the Turntable's record isn't a cover to soften
             if (isFlagship) {
-                if (shownCoverStyle == PlayerCoverStyle.EDGE_TO_EDGE) CoverFrost(
+                if (shownCoverStyle == PlayerCoverStyle.EDGE_TO_EDGE && artworkOverlay > 0f) CoverFrost(
                     glassState = morphingGlassState,
                     progressProvider = progressProvider,
                     maxHeight = screenHeight,
-                    fadeProvider = { 1f - lyricsProgress },
+                    fadeProvider = { (1f - lyricsProgress) * artworkOverlay },
                     offsetProvider = layoutTweaks::controlsOffset,
                 )
                 if (shownCoverStyle == PlayerCoverStyle.EDGE_TO_EDGE) ControlsShade(
@@ -1247,13 +1253,13 @@ private fun PlayerSheet(
                     offsetProvider = layoutTweaks::controlsOffset,
                     glareProvider = ambient::glare,
                 )
-            } else if (!isTurntable) SeamBlur(
+            } else if (!isTurntable && artworkOverlay > 0f) SeamBlur(
                 glassState = morphingGlassState,
                 progressProvider = progressProvider,
                 trackInfo = trackInfo,
                 maxHeight = screenHeight,
 
-                fadeProvider = { 1f - lyricsProgress },
+                fadeProvider = { (1f - lyricsProgress) * artworkOverlay },
                 offsetProvider = layoutTweaks::controlsOffset,
             )
 

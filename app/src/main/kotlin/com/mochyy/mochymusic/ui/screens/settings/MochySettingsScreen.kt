@@ -127,6 +127,7 @@ private val LocalizedSettingsTitles = mapOf(
     "Now playing" to R.string.settings_now_playing,
     "Disable description on settings" to R.string.settings_hide_descriptions,
     "True Black" to R.string.true_black_amoled,
+    "Artwork background" to R.string.player_artwork_background_strength,
     "Bottom navigation" to R.string.nav_appearance_title,
     "Cover rounding" to R.string.customise_cover_rounding,
     "Playlist styles" to R.string.customise_playlist_styles,
@@ -156,6 +157,7 @@ private val SettingsIndex = listOf(
     // Customisation
     SettingsEntry("Customisation", "Customisation", "customisation_settings", "customize cover rounding playlist player home styles gesture swipe blur animation lyrics"),
     SettingsEntry("Cover rounding", "Customisation", "customisation_settings", "square rounded corner radius px thumbnail art"),
+    SettingsEntry("Artwork background", "Customisation", "customisation_settings", "album cover blur tint brightness contrast player amoled"),
     SettingsEntry("True Black", "Customisation", "customisation_settings", "amoled oled pure black dark theme"),
     SettingsEntry("Bottom navigation", "Customisation", "customisation_settings", "nav bar tabs fold fade slide capsule ribbon docked scroll player motion animations"),
     SettingsEntry("Playlist styles", "Customisation", "customisation_settings", "flow classic minimal header layout"),
