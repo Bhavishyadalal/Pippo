@@ -65,6 +65,12 @@ import com.mochyy.mochymusic.R
 import com.mochyy.mochymusic.constants.PlayerStyle
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.disabled
+import androidx.compose.ui.semantics.progressBarRangeInfo
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.setProgress
 import com.mochyy.mochymusic.ui.component.pressBounce
 import com.mochyy.mochymusic.ui.screens.audiolab.LabColors
 import com.mochyy.mochymusic.ui.theme.InterFontFamily
@@ -221,6 +227,8 @@ internal fun CustomiseSliderCard(
     modifier: Modifier = Modifier,
     valueText: String? = null,
     enabled: Boolean = true,
+    preview: (@Composable () -> Unit)? = null,
+    onValueChangeFinished: (() -> Unit)? = null,
 ) {
     Column(
         modifier = modifier
@@ -234,8 +242,18 @@ internal fun CustomiseSliderCard(
             Text(text = title, style = SliderTitleStyle, color = Color.White, modifier = Modifier.weight(1f))
             if (valueText != null) Text(text = valueText, style = SliderTitleStyle, color = Color.White.copy(alpha = 0.7f))
         }
+        if (preview != null) {
+            Spacer(Modifier.height(12.dp))
+            preview()
+        }
         Spacer(Modifier.height(4.dp))
-        BareSlider(fraction = fraction, onFractionChange = onFractionChange, enabled = enabled)
+        BareSlider(
+            label = title,
+            fraction = fraction,
+            onFractionChange = onFractionChange,
+            enabled = enabled,
+            onValueChangeFinished = onValueChangeFinished,
+        )
         Row(
             horizontalArrangement = Arrangement.SpaceBetween,
             modifier = Modifier.fillMaxWidth(),
@@ -290,11 +308,18 @@ private fun RoundingSwatch(radiusPx: Float, modifier: Modifier) {
 
 // a bare line like the mock: the bright part is how far along it is, tap or drag anywhere on it
 @Composable
-private fun BareSlider(fraction: Float, onFractionChange: (Float) -> Unit, enabled: Boolean) {
+private fun BareSlider(
+    label: String,
+    fraction: Float,
+    onFractionChange: (Float) -> Unit,
+    enabled: Boolean,
+    onValueChangeFinished: (() -> Unit)?,
+) {
     var widthPx by remember { mutableFloatStateOf(1f) }
     val shown = fraction.coerceIn(0f, 1f)
     val currentShown by androidx.compose.runtime.rememberUpdatedState(shown)
     val currentOnChange by androidx.compose.runtime.rememberUpdatedState(onFractionChange)
+    val currentOnFinished by androidx.compose.runtime.rememberUpdatedState(onValueChangeFinished)
 
     fun updateFromX(x: Float) {
         currentOnChange((x / widthPx).coerceIn(0f, 1f))
@@ -311,13 +336,30 @@ private fun BareSlider(fraction: Float, onFractionChange: (Float) -> Unit, enabl
         modifier = Modifier
             .fillMaxWidth()
             .height(20.dp)
+            .semantics {
+                contentDescription = label
+                progressBarRangeInfo = ProgressBarRangeInfo(shown, 0f..1f)
+                if (enabled) {
+                    setProgress { next ->
+                        currentOnChange(next.coerceIn(0f, 1f))
+                        currentOnFinished?.invoke()
+                        true
+                    }
+                } else disabled()
+            }
             .onSizeChanged { widthPx = it.width.toFloat().coerceAtLeast(1f) }
-            .pointerInput(enabled) { if (enabled) detectTapGestures { offset -> updateFromX(offset.x) } }
+            .pointerInput(enabled) {
+                if (enabled) detectTapGestures { offset ->
+                    updateFromX(offset.x)
+                    currentOnFinished?.invoke()
+                }
+            }
             .draggable(
                 state = dragState,
                 orientation = Orientation.Horizontal,
                 enabled = enabled,
                 onDragStarted = { dragX = currentShown * widthPx },
+                onDragStopped = { currentOnFinished?.invoke() },
             ),
     ) {
         val y = size.height / 2f

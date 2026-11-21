@@ -34,4 +34,8 @@
     <string name="scroll_player_settle">Settle</string>
     <string name="scroll_player_compact_fold">Compact fold</string>
     <string name="scroll_player_preview_swipe">Swipe up in the preview to fold the bar. Swipe down to open it.</string>
+    <string name="player_artwork_background_strength">Artwork background</string>
+    <string name="player_artwork_background_black">AMOLED black</string>
+    <string name="player_artwork_background_full">Full artwork</string>
+    <string name="player_artwork_background_percent">%1$d%%</string>
 </resources>

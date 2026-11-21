@@ -2,6 +2,7 @@
 
 package com.mochyy.mochymusic.ui.screens.gesture
 
+import com.mochyy.mochymusic.ui.player.customize.dimPlayerArtworkBackground
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
@@ -26,11 +27,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -39,6 +42,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -197,6 +201,55 @@ internal fun TrueBlackSection() {
             color = Color.White.copy(alpha = .65f),
         )
     }
+}
+
+@Composable
+internal fun ArtworkBackgroundSection() {
+    val (saved, setStrength) = rememberPreference(
+        com.mochyy.mochymusic.constants.PlayerArtworkBackgroundStrengthKey,
+        com.mochyy.mochymusic.ui.player.customize.DefaultPlayerArtworkBackgroundStrength,
+    )
+    var strength by remember { mutableFloatStateOf(saved.coerceIn(0f, 1f)) }
+    CustomiseSliderCard(
+        title = stringResource(R.string.player_artwork_background_strength),
+        startLabel = stringResource(R.string.player_artwork_background_black),
+        endLabel = stringResource(R.string.player_artwork_background_full),
+        valueText = stringResource(R.string.player_artwork_background_percent, (strength * 100).roundToInt()),
+        fraction = strength,
+        onFractionChange = { strength = (it * 20).roundToInt() / 20f },
+        onValueChangeFinished = { setStrength(strength) },
+        preview = {
+            Box(Modifier.fillMaxWidth().height(94.dp).clip(RoundedCornerShape(16.dp))) {
+                Box(
+                    Modifier.matchParentSize()
+                        .dimPlayerArtworkBackground(strength)
+                        .background(
+                            Brush.linearGradient(listOf(Color(0xFFF9F7F4), Color(0xFFDBD7D8), Color(0xFFF5F3EF))),
+                        ),
+                )
+                Row(
+                    Modifier.fillMaxSize().padding(horizontal = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                ) {
+                    Box(
+                        Modifier.size(58.dp).clip(RoundedCornerShape(11.dp)).background(Color(0xFFF8F6F2)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Box(Modifier.size(25.dp).clip(CircleShape).background(Color(0xFF242329)))
+                    }
+                    Column(
+                        Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        Box(Modifier.fillMaxWidth(.58f).height(6.dp).clip(CircleShape).background(Color.White))
+                        Box(Modifier.fillMaxWidth(.36f).height(4.dp).clip(CircleShape).background(Color.White.copy(alpha = .74f)))
+                        Box(Modifier.fillMaxWidth().height(3.dp).clip(CircleShape).background(Color.White.copy(alpha = .55f)))
+                    }
+                }
+            }
+        },
+    )
 }
 
 // blur on things themselves, apart from the glass: lyric lines, the cover zooming away, title morphs, menus, page wipes

@@ -60,6 +60,9 @@ import com.mochyy.mochymusic.ui.player.StudioSessionTopClearance
 import com.mochyy.mochymusic.ui.player.StudioSessionVolumeMinHeight
 import com.mochyy.mochymusic.ui.player.FlagshipCardLook
 import com.mochyy.mochymusic.ui.player.SongInfoRow
+import com.mochyy.mochymusic.ui.player.customize.dimPlayerArtworkBackground
+import com.mochyy.mochymusic.ui.player.customize.playerArtworkBackgroundStrength
+import com.mochyy.mochymusic.ui.player.customize.playerArtworkOverlayStrength
 import com.mochyy.mochymusic.ui.player.customize.DiscCoverStack
 import com.mochyy.mochymusic.ui.player.customize.PlayerBackgroundPreview
 import com.mochyy.mochymusic.ui.player.customize.coverArtBox
@@ -184,6 +187,8 @@ internal fun FlagshipPreview(
         if (flagship) FlagshipBackgroundStyleKey else PlayerBackgroundStyleKey,
         if (flagship) PlayerBackgroundStyle.AMBIENT else PlayerBackgroundStyle.COVER_GRADIENT,
     )
+    val artworkStrength = playerArtworkBackgroundStrength()
+    val artworkOverlay = playerArtworkOverlayStrength(artworkStrength)
     val backgroundStyle = if (artworkFrame) PlayerBackgroundStyle.COVER_GRADIENT else savedBackground
     // the Turntable is built on the new flagship, so it shares the new bottom bar, as on the live player
     val newBottomBar = flagship || turntable
@@ -194,26 +199,30 @@ internal fun FlagshipPreview(
     val (showBottomCard) = rememberPreference(ShowPlayerBottomCardKey, defaultValue = true)
     val transportLayout by rememberEnumPreference(FlagshipTransportLayoutKey, FlagshipTransportLayout.THREE)
     val ambient = rememberAmbientColors()
-    if (flagship) FollowPicture(ambient, track.thumbnailUrl)
+    if (flagship && artworkStrength > 0f) FollowPicture(ambient, track.thumbnailUrl)
     val statusTop = WindowInsets.stableStatusBars.asPaddingValues().calculateTopPadding()
     val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val edgeToEdge = coverStyle == PlayerCoverStyle.EDGE_TO_EDGE
     val showVolumeBar = barStyle == PlayerBottomBarStyle.VOLUME
     val showDeck = showBottomCard && barStyle == PlayerBottomBarStyle.STACK
     BoxWithConstraints(modifier = modifier.fillMaxSize().inert()) {
-        if (flagship && backgroundStyle == PlayerBackgroundStyle.AMBIENT) {
-            // held still on the card, the live player's own clock isn't running here
-            AmbientBackdrop(colors = ambient, time = { 0f }, modifier = Modifier.fillMaxSize())
-        } else {
-            PlayerBackgroundPreview(
-                style = backgroundStyle,
-                thumbnailUrl = track.thumbnailUrl,
-                width = maxWidth,
-                height = maxHeight,
-                animate = false,
-                warp = false,
-                modifier = Modifier.fillMaxSize(),
-            )
+        Box(Modifier.fillMaxSize().dimPlayerArtworkBackground(artworkStrength)) {
+            if (artworkStrength > 0f) {
+                if (flagship && backgroundStyle == PlayerBackgroundStyle.AMBIENT) {
+                    // Hold still in the selector preview.
+                    AmbientBackdrop(colors = ambient, time = { 0f }, modifier = Modifier.fillMaxSize())
+                } else {
+                    PlayerBackgroundPreview(
+                        style = backgroundStyle,
+                        thumbnailUrl = track.thumbnailUrl,
+                        width = maxWidth,
+                        height = maxHeight,
+                        animate = false,
+                        warp = false,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+            }
         }
         val artHeight = if (studioSession) maxHeight * StudioSessionArtHeight else maxHeight
         val artTop = statusTop + if (studioSession) StudioSessionTopClearance else 0.dp
@@ -242,7 +251,7 @@ internal fun FlagshipPreview(
                         onDrawBehind { drawRect(shade) }
                     },
             )
-        } else if (!flagship && !turntable) {
+        } else if (!flagship && !turntable && artworkOverlay > 0f) {
             // the classic's band of the cover's colour behind the title, without the blur it has live
             SeamBlur(
                 glassState = remember { GlassState() },
@@ -250,6 +259,7 @@ internal fun FlagshipPreview(
                 trackInfo = track,
                 maxHeight = maxHeight,
                 noBlur = true,
+                fadeProvider = { artworkOverlay },
             )
         }
 
