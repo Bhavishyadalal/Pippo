@@ -194,4 +194,9 @@
     <string name="module_browser_fetch_failed">Couldn\'t download %1$s. Try again in a bit.</string>
     <string name="module_browser_locked_note">%1$s is a paid module. Get it on Pippo\'s Bar, then come back and add it.</string>
     <string name="module_browser_sign_out">Sign out of the browser</string>
+    <string name="settings_disable_player_video">Disable player video</string>
+    <string name="settings_disable_player_video_desc">Keep the player on still artwork. This turns off video backgrounds and animated Canvas loops.</string>
+    <string name="aq_dl_desc_lossless">Save the original FLAC or ALAC from a compatible provider.</string>
+    <string name="quality_download_order_youtube_skipped">Skipped for lossless</string>
+    <string name="quality_download_lossless_footnote">Lossless downloads follow your module order and require a complete FLAC or ALAC file. If no enabled module has one, the download fails. Existing downloads stay as they are.</string>
 </resources>

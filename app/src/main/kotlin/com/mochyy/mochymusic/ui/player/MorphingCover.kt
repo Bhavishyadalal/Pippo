@@ -120,6 +120,7 @@ import com.mochyy.mochymusic.constants.CanvasWifiOnlyKey
 import com.mochyy.mochymusic.constants.DisableBlurKey
 import com.mochyy.mochymusic.constants.ForceYtBackdropBlur1500Key
 import com.mochyy.mochymusic.constants.PlayVideoBackgroundKey
+import com.mochyy.mochymusic.constants.DisablePlayerVideoKey
 import com.mochyy.mochymusic.constants.DisableVideoAutoplayKey
 import com.mochyy.mochymusic.constants.PlayerBackgroundStyle
 import com.mochyy.mochymusic.constants.PlayerCoverStyle
@@ -464,7 +465,9 @@ fun MorphingCover(
     // video here on its own; songs only get one when the video background setting asks for it
     val songIsVideo = currentMetadata?.id == trackInfo.mediaId && currentMetadata?.isVideoSong == true
     val trackIsVideo = !disableVideoAutoplay && songIsVideo
-    val playVideoBackground = if (alternateStyle) miniVideo else forceVideoBackground || playVideoPref || trackIsVideo
+    val playerVideoDisabled by rememberPreference(DisablePlayerVideoKey, defaultValue = false)
+    val playVideoBackground = !playerVideoDisabled &&
+        if (alternateStyle) miniVideo else forceVideoBackground || playVideoPref || trackIsVideo
     // the audio of a track that is a video is that very video, so its own stream lines up exactly and needs no search;
     // the full video mode asked for the video itself, so it plays its own even with autoplay off, as the mode does
     val videoInfo = rememberSongVideo(
@@ -2012,7 +2015,9 @@ private fun CoverCanvasLayer(
     val context = LocalContext.current
     val playerConnection = LocalPlayerConnection.current
     var canvasArtwork by remember(trackInfo.mediaId) { mutableStateOf<CanvasArtwork?>(null) }
-    val canvasEnabled = rememberPreference(CanvasThumbnailAnimationKey, defaultValue = true).value && !alternateStyle
+    val playerVideoDisabled by rememberPreference(DisablePlayerVideoKey, defaultValue = false)
+    val canvasEnabled = !playerVideoDisabled &&
+        rememberPreference(CanvasThumbnailAnimationKey, defaultValue = true).value && !alternateStyle
     val canvasWifiOnly by rememberPreference(CanvasWifiOnlyKey, defaultValue = true)
     LaunchedEffect(trackInfo.mediaId, trackInfo.title, trackInfo.artist, canvasEnabled, canvasWifiOnly) {
         val mediaId = trackInfo.mediaId
@@ -2072,7 +2077,7 @@ private fun CoverCanvasLayer(
             primaryUrl = canvasArtwork?.preferredAnimationUrl,
             fallbackUrl = null,
 
-            isPlaying = playing,
+            isPlaying = playing && canvasEnabled,
             onReadyChange = if (mirror == null && onLiveEnd == null && onShowingChange == null) null else { ready ->
                 mirror?.ready = ready
                 onShowingChange?.invoke(ready)

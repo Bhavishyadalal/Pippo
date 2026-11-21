@@ -87,6 +87,7 @@ fun AudioQualityScreen(navController: NavController, modules: ModulesViewModel =
         com.mochyy.mochymusic.constants.DownloadQualityKey,
         defaultValue = com.mochyy.mochymusic.constants.DownloadQuality.HIGH,
     )
+    val losslessDownloads = downloadQuality == com.mochyy.mochymusic.constants.DownloadQuality.LOSSLESS
     // the tiers Monochrome used to serve from here belong to its module now
     val quality = if (stored.usesMonochrome) AudioQuality.HIGH else stored
     val entries by modules.entries.collectAsState()
@@ -190,12 +191,13 @@ fun AudioQualityScreen(navController: NavController, modules: ModulesViewModel =
             }
         }
 
-        // what a download from youtube is saved as; the download order below picks where each download comes from
+        // Lossless uses the download order among compatible modules. The other options tune YouTube.
         Spacer(Modifier.height(24.dp))
         LabSheetTitle(stringResource(R.string.aq_section_download))
         LabGroup {
             com.mochyy.mochymusic.constants.DownloadQuality.entries.forEach { option ->
                 val (titleRes, descRes) = when (option) {
+                    com.mochyy.mochymusic.constants.DownloadQuality.LOSSLESS -> R.string.aq_quality_lossless to R.string.aq_dl_desc_lossless
                     com.mochyy.mochymusic.constants.DownloadQuality.HIGH -> R.string.aq_quality_high to R.string.aq_dl_desc_high
                     com.mochyy.mochymusic.constants.DownloadQuality.MEDIUM -> R.string.aq_quality_medium to R.string.aq_dl_desc_medium
                     com.mochyy.mochymusic.constants.DownloadQuality.LOW -> R.string.aq_quality_low to R.string.aq_dl_desc_low
@@ -205,7 +207,10 @@ fun AudioQualityScreen(navController: NavController, modules: ModulesViewModel =
                 }
             }
         }
-        Footnote(stringResource(R.string.quality_download_footnote))
+        Footnote(stringResource(
+            if (losslessDownloads)
+                R.string.quality_download_lossless_footnote else R.string.quality_download_footnote,
+        ))
 
         Spacer(Modifier.height(24.dp))
         LabSheetTitle(stringResource(R.string.aq_section_provider))
@@ -235,12 +240,14 @@ fun AudioQualityScreen(navController: NavController, modules: ModulesViewModel =
 
         Spacer(Modifier.height(24.dp))
         LabSheetTitle(stringResource(R.string.quality_download_order))
-        val youTubeForDownloads = stringResource(R.string.quality_download_order_youtube)
+        val youTubeForDownloads = stringResource(
+            if (losslessDownloads) R.string.quality_download_order_youtube_skipped else R.string.quality_download_order_youtube,
+        )
         ProviderOrder(
             order = shownDownloadOrder,
             name = modules::nameOf,
             logo = ::providerLogo,
-            usable = { id -> id == SourceModules.YouTubeId || usable(id) },
+            usable = { id -> if (id == SourceModules.YouTubeId) !losslessDownloads else usable(id) },
             status = { id ->
                 if (id == SourceModules.YouTubeId) {
                     youTubeForDownloads
@@ -254,7 +261,7 @@ fun AudioQualityScreen(navController: NavController, modules: ModulesViewModel =
             },
             onReorder = modules::setVisibleDownloadOrder,
         )
-        Footnote(stringResource(R.string.quality_download_order_footnote))
+        if (!losslessDownloads) Footnote(stringResource(R.string.quality_download_order_footnote))
     }
 }
 

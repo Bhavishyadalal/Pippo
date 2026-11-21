@@ -30,6 +30,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -51,7 +52,6 @@ import com.mochyy.mochymusic.constants.AudioQuality
 import com.mochyy.mochymusic.constants.AudioQualityKey
 import com.mochyy.mochymusic.module.StreamOption
 import com.mochyy.mochymusic.modules.SourceModules
-import com.mochyy.mochymusic.playback.ProviderSwitch
 import com.mochyy.mochymusic.playback.ProviderSwitchState
 import com.mochyy.mochymusic.ui.player.menu.LocalMenuSheetClose
 import com.mochyy.mochymusic.ui.player.menu.MenuRowSurface
@@ -102,12 +102,12 @@ fun ForceProviderSheet(currentProviderId: String?, onDismiss: () -> Unit) {
                 InfoSheetTitle(stringResource(R.string.pc_force_title))
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    text = stringResource(R.string.pc_force_hint),
+                    text = stringResource(R.string.pc_force_switch_hint),
                     color = InfoMuted,
                     fontSize = 13.sp,
                 )
                 Spacer(Modifier.height(16.dp))
-                SwitchStatus(state, nameOf = modules::nameOf)
+                SwitchStatus(state, nameOf = modules::nameOf, onCancel = service.providerSwitch::cancel)
                 providers.forEach { id ->
                     val module = modules.module(id)
                     val choice = module?.choices?.firstOrNull { it.id.contains("quality", ignoreCase = true) }
@@ -116,7 +116,6 @@ fun ForceProviderSheet(currentProviderId: String?, onDismiss: () -> Unit) {
                         providerId = id,
                         name = modules.nameOf(id),
                         isCurrent = id == currentProviderId,
-                        busy = state is ProviderSwitchState.Working,
                         options = when {
                             choice != null -> choice.options
                             id == SourceModules.YouTubeId -> YouTubeQualities.map { StreamOption(it.name, stringResource(qualityLabelRes(it)), "") }
@@ -138,7 +137,7 @@ fun ForceProviderSheet(currentProviderId: String?, onDismiss: () -> Unit) {
 }
 
 @Composable
-private fun SwitchStatus(state: ProviderSwitchState, nameOf: (String) -> String) {
+private fun SwitchStatus(state: ProviderSwitchState, nameOf: (String) -> String, onCancel: () -> Unit) {
     AnimatedVisibility(
         visible = state !is ProviderSwitchState.Idle,
         enter = fadeIn(tween(200)) + expandVertically(tween(260)),
@@ -161,11 +160,14 @@ private fun SwitchStatus(state: ProviderSwitchState, nameOf: (String) -> String)
                     Box(Modifier.fillMaxWidth().height(4.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.12f))) {
                         Box(Modifier.fillMaxWidth(progress).fillMaxHeight().clip(CircleShape).background(Color.White))
                     }
+                    TextButton(onClick = onCancel, modifier = Modifier.align(Alignment.End)) {
+                        Text(stringResource(R.string.cancel), color = Color.White)
+                    }
                 }
                 is ProviderSwitchState.Failed -> {
                     Text(stringResource(R.string.pc_force_unavailable), color = Color(0xFFFF7A7A), fontSize = 14.sp, fontWeight = FontWeight.Bold)
                     Text(
-                        stringResource(R.string.pc_force_failed, nameOf(state.providerId), ProviderSwitch.MaxTries),
+                        stringResource(R.string.pc_force_failed, nameOf(state.providerId), state.attempts),
                         color = InfoMuted,
                         fontSize = 12.sp,
                     )
@@ -184,7 +186,6 @@ private fun ProviderChoiceRow(
     providerId: String,
     name: String,
     isCurrent: Boolean,
-    busy: Boolean,
     options: List<StreamOption>,
     selectedOption: String?,
     /** null when the row itself was tapped, keeping the quality as it is */
@@ -196,7 +197,6 @@ private fun ProviderChoiceRow(
             .clip(RoundedCornerShape(18.dp))
             .background(MenuRowSurface)
             .clickable(
-                enabled = !busy,
                 interactionSource = remember { MutableInteractionSource() },
                 indication = RemoteFocus,
             ) { onPick(null) }
@@ -224,7 +224,6 @@ private fun ProviderChoiceRow(
                     QualityChip(
                         label = option.label,
                         selected = option.id == selectedOption,
-                        enabled = !busy,
                         onClick = { onPick(option.id) },
                     )
                 }
@@ -234,7 +233,7 @@ private fun ProviderChoiceRow(
 }
 
 @Composable
-private fun QualityChip(label: String, selected: Boolean, enabled: Boolean, onClick: () -> Unit) {
+private fun QualityChip(label: String, selected: Boolean, onClick: () -> Unit) {
     val shape = RoundedCornerShape(50)
     Box(
         contentAlignment = Alignment.Center,
@@ -242,7 +241,7 @@ private fun QualityChip(label: String, selected: Boolean, enabled: Boolean, onCl
             .height(28.dp)
             .clip(shape)
             .then(if (selected) Modifier.background(Color.White) else Modifier.border(1.dp, Color.White.copy(alpha = 0.25f), shape))
-            .clickable(enabled = enabled, interactionSource = remember { MutableInteractionSource() }, indication = RemoteFocus, onClick = onClick)
+            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = RemoteFocus, onClick = onClick)
             .padding(horizontal = 12.dp),
     ) {
         Text(text = label, color = if (selected) Color.Black else Color.White.copy(alpha = 0.8f), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)

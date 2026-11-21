@@ -1,11 +1,11 @@
 # Pippo stable 0.1.2 preparation
 
 - Branch: `stable-0.1.2`.
-- Includes beta through `d6267e0`, including True Black AMOLED and the redesigned bottom navigation controls.
+- Includes beta through `3b3ae62`, with full-width Home artwork, resizable widgets, cancellable provider switching, updated immersive controls, a player video toggle, and lossless downloads.
 - Version name: `0.1.2`, version code: `74` (previously `1.0.0`, code `73`). Android compares the increasing version code for installation upgrades.
 - Package remains `com.bhavishyadalal.pippo`; stored data and the existing preferences/schema are retained.
 
-The Bottom navigation section includes four bar styles, fifteen Scroll player presets, and a separate Open and close motion control. Each motion picker has a replayable preview. Scroll player motion applies while the mini player is visible and respects the app and Android animation settings.
+The Bottom navigation section includes four bar styles, fifteen Scroll player presets, and a separate Open and close motion control. Tap a Scroll player preset to preview it. The Open and close motion picker has a replay button. Scroll player motion applies on music pages and respects the app and Android animation settings.
 
 ## Optimized release configuration
 

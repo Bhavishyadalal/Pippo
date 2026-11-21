@@ -5,11 +5,15 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.saveable.listSaver
@@ -30,7 +34,10 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -87,6 +94,28 @@ internal class HomeArtworkRotation private constructor(
     }
 }
 
+internal val LocalHomeArtworkChrome = staticCompositionLocalOf<MutableState<(() -> Float)?>?> { null }
+
+@Composable
+internal fun BlendHomeArtworkIntoChrome(list: LazyListState, enabled: Boolean, bottomChrome: Dp) {
+    val chrome = LocalHomeArtworkChrome.current
+    val region = with(LocalDensity.current) { (bottomChrome + 40.dp).toPx() }
+    DisposableEffect(chrome, list, enabled, region) {
+        val coverage = derivedStateOf {
+            val layout = list.layoutInfo
+            val bottom = layout.viewportEndOffset
+            val item = layout.visibleItemsInfo.lastOrNull()
+            if (item == null || item.key != HomeArtworkKey || region <= 0f) 0f else {
+                val covered = minOf(bottom, item.offset + item.size) - maxOf(bottom - region, item.offset)
+                (covered / region).coerceIn(0f, 1f)
+            }
+        }
+        val readCoverage: () -> Float = { coverage.value }
+        if (enabled) chrome?.value = readCoverage
+        onDispose { if (chrome != null && chrome.value === readCoverage) chrome.value = null }
+    }
+}
+
 private enum class FooterVisibility { Entered, Between, Above }
 
 @Composable
@@ -119,7 +148,7 @@ internal fun FollowHomeArtworkScroll(list: LazyListState, rotation: HomeArtworkR
 }
 
 @Composable
-internal fun HomeArtworkFooter(rotation: HomeArtworkRotation) {
+internal fun HomeArtworkFooter(rotation: HomeArtworkRotation, bottomChrome: Dp) {
     val artwork = rotation.artwork
     val reveal = remember(artwork) { Animatable(0f) }
     val reducedMotion = AppMotion.durationScale.scaleFactor <= 0f
@@ -132,54 +161,61 @@ internal fun HomeArtworkFooter(rotation: HomeArtworkRotation) {
     }
     val stillRevealing by remember(reveal) { derivedStateOf { reveal.value < 1f } }
 
-    Box(Modifier.fillMaxWidth().aspectRatio(1.93f).clipToBounds()) {
-        Image(
-            painter = painter,
-            contentDescription = null,
-            contentScale = ContentScale.FillBounds,
-            modifier = Modifier.fillMaxSize().graphicsLayer {
-                val progress = if (reducedMotion) 1f else reveal.value
-                alpha = .68f + .32f * progress
-                translationY = (1f - progress) * 5.dp.toPx()
-            },
-        )
-        if (loaded && rotation.visited && !reducedMotion && stillRevealing) {
-            // A second pass draws only the upper strip. The lower scene stays sharp.
-            Box(
-                Modifier.fillMaxWidth().aspectRatio(5.5f).clipToBounds()
-                    .graphicsLayer {
-                        val remaining = 1f - reveal.value
-                        compositingStrategy = CompositingStrategy.Offscreen
-                        alpha = remaining
-                        renderEffect = BlurEffectCache.element(8.dp.toPx() * remaining)
-                    }
-                    .drawWithCache {
-                        val mask = Brush.verticalGradient(
-                            0f to Color.White,
-                            .57f to Color.White,
-                            1f to Color.Transparent,
-                        )
-                        val glow = Brush.radialGradient(
-                            listOf(Color(0x55F7AC8B), Color.Transparent),
-                            center = Offset(size.width * .5f, size.height * .83f),
-                            radius = size.width * .42f,
-                        )
-                        val sceneSize = Size(size.width, size.width / 1.93f)
-                        onDrawBehind {
-                            with(painter) { draw(size = sceneSize) }
-                            drawRect(glow)
-                            drawRect(mask, blendMode = BlendMode.DstIn)
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val sceneHeight = (maxWidth * .60f).coerceAtMost(380.dp) + bottomChrome
+        val upperStrip = (sceneHeight * .28f).coerceAtMost(120.dp)
+        Box(Modifier.fillMaxWidth().height(sceneHeight).clipToBounds()) {
+            Image(
+                painter = painter,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize().graphicsLayer {
+                    val progress = if (reducedMotion) 1f else reveal.value
+                    alpha = .72f + .28f * progress
+                },
+            )
+            if (loaded && rotation.visited && !reducedMotion && stillRevealing) {
+                Box(
+                    Modifier.fillMaxWidth().height(upperStrip).clipToBounds()
+                        .graphicsLayer {
+                            val remaining = 1f - reveal.value
+                            compositingStrategy = CompositingStrategy.Offscreen
+                            alpha = remaining
+                            renderEffect = BlurEffectCache.element(8.dp.toPx() * remaining)
                         }
-                    },
-            )
+                        .drawWithCache {
+                            val viewport = Size(size.width, sceneHeight.toPx())
+                            val intrinsic = painter.intrinsicSize
+                            val source = if (intrinsic != Size.Unspecified &&
+                                intrinsic.width > 0f && intrinsic.height > 0f
+                            ) intrinsic else viewport
+                            val scale = maxOf(viewport.width / source.width, viewport.height / source.height)
+                            val scaled = Size(source.width * scale, source.height * scale)
+                            val mask = Brush.verticalGradient(0f to Color.White, 1f to Color.Transparent)
+                            val glow = Brush.radialGradient(
+                                listOf(Color(0x55F7AC8B), Color.Transparent),
+                                center = Offset(size.width * .5f, size.height * .76f),
+                                radius = size.width * .42f,
+                            )
+                            onDrawBehind {
+                                translate((viewport.width - scaled.width) / 2f, (viewport.height - scaled.height) / 2f) {
+                                    with(painter) { draw(size = scaled) }
+                                }
+                                drawRect(glow)
+                                drawRect(mask, blendMode = BlendMode.DstIn)
+                            }
+                        },
+                )
+            }
+            Box(Modifier.fillMaxSize().drawWithCache {
+                val seam = Brush.verticalGradient(
+                    0f to Color.Black,
+                    .24f to Color.Transparent,
+                    .74f to Color.Transparent,
+                    1f to Color.Black.copy(alpha = .26f),
+                )
+                onDrawBehind { drawRect(seam) }
+            })
         }
-        Box(Modifier.fillMaxSize().drawWithCache {
-            val seam = Brush.verticalGradient(
-                0f to Color.Black,
-                .27f to Color.Transparent,
-                1f to Color.Transparent,
-            )
-            onDrawBehind { drawRect(seam) }
-        })
     }
 }

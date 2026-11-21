@@ -27,14 +27,11 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -81,6 +78,8 @@ import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import com.mochyy.mochymusic.LocalPlayerConnection
 import com.mochyy.mochymusic.R
+import com.mochyy.mochymusic.constants.FlagshipTransportLayout
+import com.mochyy.mochymusic.ui.player.flagship.FlagshipTransportRow
 import com.mochyy.mochymusic.playback.PlayerConnection
 import com.mochyy.mochymusic.ui.player.models.TrackInfo
 import com.mochyy.mochymusic.ui.utils.AppMotion
@@ -291,8 +290,7 @@ private fun ImmersiveContent(connection: PlayerConnection, onExit: () -> Unit) {
                         modifier = Modifier.widthIn(max = 600.dp).fillMaxWidth()
                             .padding(horizontal = 16.dp, vertical = 10.dp)
                             .heightIn(max = dockMaxHeight),
-                        shape = RoundedCornerShape(24.dp),
-                        color = DockColor,
+                        color = Color.Transparent,
                         contentColor = SceneInk,
                     ) {
                         Column(
@@ -311,7 +309,7 @@ private fun ImmersiveContent(connection: PlayerConnection, onExit: () -> Unit) {
                                         }
                                     }
                                 }
-                                .padding(horizontal = 14.dp, vertical = 6.dp),
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
                         ) {
                             if (selectedStyle != ImmersiveStyle.ARTWORK_CINEMA) {
@@ -320,24 +318,14 @@ private fun ImmersiveContent(connection: PlayerConnection, onExit: () -> Unit) {
                                     Text(track.artist, color = SceneMuted, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 }
                             }
-                            PlayerProgressSlider(active = controlsVisible && resumed && !pickerOpen)
-                            Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                                IconButton(enabled = canSkipPrevious, onClick = { revealControls(); connection.seekToPrevious() }) {
-                                    Icon(painterResource(R.drawable.skip_previous), stringResource(R.string.immersive_previous))
-                                }
-                                FilledIconButton(
-                                    onClick = { revealControls(); connection.togglePlayPause() },
-                                    colors = IconButtonDefaults.filledIconButtonColors(containerColor = SceneAccent, contentColor = SceneBase),
-                                ) {
-                                    Icon(
-                                        painterResource(if (playing) R.drawable.pause else R.drawable.play),
-                                        stringResource(if (playing) R.string.pause else R.string.play),
-                                    )
-                                }
-                                IconButton(enabled = canSkipNext, onClick = { revealControls(); connection.seekToNext() }) {
-                                    Icon(painterResource(R.drawable.skip_next), stringResource(R.string.immersive_next))
-                                }
-                            }
+                            PlayerProgressSlider(
+                                active = controlsVisible && resumed && !pickerOpen,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                            FlagshipTransportRow(
+                                layout = FlagshipTransportLayout.THREE,
+                                modifier = Modifier.padding(top = 14.dp),
+                            )
                         }
                     }
                 }

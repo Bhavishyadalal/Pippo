@@ -27,6 +27,7 @@ import com.mochyy.mochymusic.constants.IpVersionKey
 import com.mochyy.mochymusic.constants.OfflineModeKey
 import com.mochyy.mochymusic.module.TrackQuery
 import com.mochyy.mochymusic.modules.SourceModules
+import com.mochyy.mochymusic.modules.isLosslessDownload
 import com.mochyy.mochymusic.utils.dataStore
 import com.music.innertube.models.IpVersion
 import okhttp3.Dns
@@ -99,7 +100,12 @@ constructor(
     private val songStreamHeaders = java.util.concurrent.ConcurrentHashMap<String, Map<String, String>>()
 
     /** a module's file for each song being downloaded from one, looked up once since the download opens it more than once */
-    private class ModuleDownload(val providerId: String, val url: String, val headers: Map<String, String>)
+    private class ModuleDownload(
+        val providerId: String,
+        val url: String,
+        val headers: Map<String, String>,
+        val lossless: Boolean,
+    )
 
     private val moduleDownloads = java.util.concurrent.ConcurrentHashMap<String, ModuleDownload>()
 
@@ -142,20 +148,24 @@ constructor(
             ),
         ) { dataSpec ->
             val mediaId = dataSpec.key ?: error("No media id")
+            val quality = downloadQuality
+            val lossless = quality == DownloadQuality.LOSSLESS
 
             // a tv copying a song its linked phone already has takes the phone's file, the very same song and much quicker
-            com.mochyy.mochymusic.link.PhoneFiles.streamUrl(mediaId)?.let {
+            if (!lossless) com.mochyy.mochymusic.link.PhoneFiles.streamUrl(mediaId)?.let {
                 rememberDownloadStream(mediaId, "phone:$it", dataSpec.position)
                 return@Factory dataSpec.withUri(it.toUri())
             }
 
-            moduleDownload(mediaId)?.let { found ->
+            moduleDownload(mediaId, lossless)?.let { found ->
                 rememberDownloadStream(mediaId, "module:${found.providerId}:${found.url}", dataSpec.position)
                 return@Factory dataSpec.buildUpon()
                     .setUri(found.url.toUri())
                     .setHttpRequestHeaders(dataSpec.httpRequestHeaders + found.headers)
                     .build()
             }
+
+            if (lossless) throw java.io.IOException("No downloadable FLAC or ALAC stream available for $mediaId")
 
             // only while it still works. This used to keep the url's lifetime instead of when it ends,
             // and compare the wrong way round, so a dead url was reused for every retry of a download
@@ -168,7 +178,7 @@ constructor(
             val playbackData = runBlocking(Dispatchers.IO) {
                 YTPlayerUtils.playerResponseForPlayback(
                     mediaId,
-                    audioQuality = downloadQuality.youTubeQuality,
+                    audioQuality = quality.youTubeQuality,
                     connectivityManager = connectivityManager,
                 )
             }.getOrThrow()
@@ -352,8 +362,8 @@ constructor(
     }
 
     /** the first module in the download order with a whole file of [mediaId]; null when youtube comes first or nothing else has it */
-    private fun moduleDownload(mediaId: String): ModuleDownload? {
-        moduleDownloads[mediaId]?.let { return it }
+    private fun moduleDownload(mediaId: String, lossless: Boolean): ModuleDownload? {
+        moduleDownloads[mediaId]?.takeIf { !lossless || it.lossless }?.let { return it }
         val song = runBlocking(Dispatchers.IO) { database.song(mediaId).first() } ?: return null
         val track = TrackQuery(
             title = song.song.title,
@@ -361,7 +371,7 @@ constructor(
             album = song.song.albumName ?: song.album?.title,
             durationMs = song.song.duration.takeIf { it > 0 }?.times(1000L),
         )
-        val route = runBlocking(Dispatchers.IO) { sourceModules.downloadRoute(track, failedProviders[mediaId].orEmpty()) }
+        val route = runBlocking(Dispatchers.IO) { sourceModules.downloadRoute(track, failedProviders[mediaId].orEmpty(), lossless) }
         val (module, stream) = route as? SourceModules.Route.Module ?: return null
         val (mimeType, codecs) = savedFormatOf(stream.codec)
 
@@ -383,11 +393,11 @@ constructor(
             )
             if (song.song.dateDownload == null) upsert(song.song.copy(dateDownload = LocalDateTime.now()))
         }
-        return ModuleDownload(module.info.id, stream.url, stream.headers).also { moduleDownloads[mediaId] = it }
+        return ModuleDownload(module.info.id, stream.url, stream.headers, stream.isLosslessDownload).also { moduleDownloads[mediaId] = it }
     }
 
     // the saved file as the format badges read it, a mime type and a codec, from the codec the module named
-    private fun savedFormatOf(codec: String?): Pair<String, String> = when (codec?.uppercase()) {
+    private fun savedFormatOf(codec: String?): Pair<String, String> = when (codec?.trim()?.uppercase()) {
         "FLAC" -> "audio/flac" to "flac"
         "ALAC" -> "audio/mp4" to "alac"
         "AAC", "HE-AAC" -> "audio/mp4" to "aac"
@@ -430,6 +440,7 @@ constructor(
 
     private val DownloadQuality.youTubeQuality: AudioQuality
         get() = when (this) {
+            DownloadQuality.LOSSLESS -> error("YouTube cannot provide lossless downloads")
             DownloadQuality.HIGH -> AudioQuality.HIGH
             DownloadQuality.MEDIUM -> AudioQuality.MEDIUM
             DownloadQuality.LOW -> AudioQuality.LOW
