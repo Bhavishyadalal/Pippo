@@ -107,8 +107,11 @@ class MonochromeModule : SourceModule, ServerListModule {
         val usable = all.filter { downReason(it) == null }.ifEmpty { all }
         var result: ResolveResult = ResolveResult.NotFound("Not on Monochrome")
         for (server in usable) {
-            result = resolveOn(server, track, report)
-            if (result is ResolveResult.Found) return result
+            when (val attempt = resolveOn(server, track, report)) {
+                is ResolveResult.Found -> return attempt
+                is ResolveResult.Unavailable -> result = attempt
+                is ResolveResult.NotFound -> if (result !is ResolveResult.Unavailable) result = attempt
+            }
         }
         return result
     }

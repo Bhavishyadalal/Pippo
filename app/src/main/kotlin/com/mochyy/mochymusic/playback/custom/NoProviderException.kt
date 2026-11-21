@@ -1,7 +1,9 @@
 package com.mochyy.mochymusic.playback.custom
 
-/**
- * Every provider that's on was asked for the song and none can play it. Asking again gives the
- * same answer, so playback moves on with this as the reason instead of retrying.
- */
-class NoProviderException(reason: String) : java.io.IOException(reason)
+/** Describes a failed playback lookup separately from decoder and transport failures. */
+class NoProviderException(
+    reason: String,
+    val retryable: Boolean,
+    val providerId: String? = null,
+    cause: Throwable? = null,
+) : java.io.IOException(reason, cause)

@@ -20,11 +20,8 @@ import java.util.concurrent.Executors
 @UnstableApi
 class VideoAudioSync(
     private val dataSourceFactory: () -> DataSource.Factory,
-    // streams opened only to be listened to, so the service doesn't report their failures as the user's playback failing
-    private val listeningOnly: MutableSet<String>,
 ) {
-    // a recording to read: listeningOnly when it isn't the one playing
-    class Source(val uri: Uri, val key: String, val listeningOnly: Boolean)
+    class Source(val uri: Uri, val key: String)
 
     private class Found(val map: SongVideoMap?, val atMs: Long)
 
@@ -60,7 +57,6 @@ class VideoAudioSync(
 
     private suspend fun printsOf(source: Source): AudioPrints? {
         prints.get(source.key)?.let { return it }
-        if (source.listeningOnly) listeningOnly += source.key
         return try {
             val printer = AudioPrinter()
             withTimeoutOrNull(ListenTimeoutMs) {
@@ -74,8 +70,6 @@ class VideoAudioSync(
         } catch (e: Exception) {
             android.util.Log.w("VideoAudioSync", "Couldn't listen to ${source.key}", e)
             null
-        } finally {
-            if (source.listeningOnly) listeningOnly -= source.key
         }
     }
 

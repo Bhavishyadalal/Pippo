@@ -248,6 +248,7 @@ import com.mochyy.mochymusic.utils.get
 import com.mochyy.mochymusic.utils.reportException
 import com.mochyy.mochymusic.widget.MochyWidgetManager
 import com.mochyy.mochymusic.widget.MusicWidgetReceiver
+import com.mochyy.mochymusic.playback.custom.NoProviderException
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
@@ -665,12 +666,9 @@ class MusicService :
     /** the stream each song was handed to the player as, when it wasn't the plain YouTube one */
     private val playingStreams = java.util.concurrent.ConcurrentHashMap<String, com.mochyy.mochymusic.playback.custom.CustomStreamResult>()
 
-    // streams opened only to be listened to (a music video matched against its song); a failure there isn't the user's playback failing
-    private val listeningOnlyStreams: MutableSet<String> = java.util.concurrent.ConcurrentHashMap.newKeySet()
-
     // matches a song's recording against its music video's, for the video background and for a music video's lyrics
     private val videoAudioSync by lazy {
-        com.mochyy.mochymusic.lyrics.VideoAudioSync({ createDataSourceFactory() }, listeningOnlyStreams)
+        com.mochyy.mochymusic.lyrics.VideoAudioSync { createDataSourceFactory() }
     }
 
     // where songId's recording sits inside videoId's, found by listening to both; null when they don't share it
@@ -679,9 +677,9 @@ class MusicService :
         fun sourceOf(id: String): com.mochyy.mochymusic.lyrics.VideoAudioSync.Source {
             if (current != null && current.mediaId == id) {
                 val (uri, key) = lyricsAudioSource(current)
-                return com.mochyy.mochymusic.lyrics.VideoAudioSync.Source(uri, key, listeningOnly = false)
+                return com.mochyy.mochymusic.lyrics.VideoAudioSync.Source(uri, key)
             }
-            return com.mochyy.mochymusic.lyrics.VideoAudioSync.Source(id.toUri(), id, listeningOnly = true)
+            return com.mochyy.mochymusic.lyrics.VideoAudioSync.Source(id.toUri(), id)
         }
         return videoAudioSync.match(sourceOf(songId), sourceOf(videoId))
     }
@@ -784,6 +782,7 @@ class MusicService :
     private var consecutivePlaybackErr = 0
     private var retryJob: Job? = null
     private var retryCount = 0
+    private var providerLookupRetries = 0
     private var silenceSkipJob: Job? = null
 
     private val songUrlCache = java.util.concurrent.ConcurrentHashMap<String, Pair<String, Long>>()
@@ -1784,6 +1783,43 @@ class MusicService :
         target.prepare()
     }
 
+    // Retry a temporary lookup on the same queue occurrence without changing play intent.
+    private fun retryProviderLookup(): Boolean {
+        val target = player
+        val mediaId = target.currentMediaItem?.mediaId ?: return false
+        if (!target.playWhenReady || providerLookupRetries >= MaxProviderLookupRetries ||
+            com.mochyy.mochymusic.utils.OfflineMode.isOn || castConnectionHandler?.isCasting?.value == true
+        ) return false
+
+        val occurrence = providerOccurrence
+        val pauseGeneration = transport.pauseGeneration
+        val wait = 400L shl providerLookupRetries
+        providerLookupRetries++
+        retryJob?.cancel()
+        retryJob = scope.launch {
+            delay(wait)
+            if (player !== target || providerOccurrence != occurrence || !target.playWhenReady ||
+                target.playbackState != Player.STATE_IDLE || transport.pauseGeneration != pauseGeneration ||
+                handoffFor(mediaId) != null || castConnectionHandler?.isCasting?.value == true
+            ) return@launch
+            if (com.mochyy.mochymusic.utils.OfflineMode.isOn) {
+                val next = nextOfflineIndex()
+                if (next != C.INDEX_UNSET) playOfflineSong(next) else failStream(allowAutoRecovery = false)
+                return@launch
+            }
+            if (!connectivityObserver.isCurrentlyConnected()) {
+                waitOnNetworkError()
+                return@launch
+            }
+            songUrlCache.remove(mediaId)
+            // Reconsider sources that were passed over after a transient failure.
+            failedSources.remove(mediaId)
+            failedSourcesAt.remove(mediaId)
+            target.prepare()
+        }
+        return true
+    }
+
     /** Moves past a stream that never came back, unless it has failed too many times in a row. */
     private fun skipAfterFailure() {
         consecutivePlaybackErr += 2
@@ -1940,7 +1976,7 @@ class MusicService :
     /** A readable reason from the root cause, since IO_UNSPECIFIED alone says nothing. */
     private fun plainReason(e: PlaybackException): String {
         val causes = generateSequence<Throwable>(e) { it.cause }.toList()
-        val noProvider = causes.firstOrNull { it is com.mochyy.mochymusic.playback.custom.NoProviderException }
+        val noProvider = causes.filterIsInstance<NoProviderException>().firstOrNull()
         return when {
             noProvider != null -> noProvider.message.orEmpty()
             causes.any { it is java.net.SocketTimeoutException } -> "connection timed out"
@@ -3034,6 +3070,7 @@ class MusicService :
         retryJob?.cancel()
         retryJob = null
         retryCount = 0
+        providerLookupRetries = 0
         waitingForNetworkConnection.value = false
         clearStreamFailure()
         if (!promotingCrossmix) crossmixDirector.onItemChanged()
@@ -3106,10 +3143,9 @@ class MusicService :
 
         if (playbackState == Player.STATE_ENDED) {
             val repeatMode = runBlocking { dataStore.get(RepeatModeKey, REPEAT_MODE_OFF) }
-            if (repeatMode == REPEAT_MODE_ALL && player.mediaItemCount > 0) {
+            if (repeatMode == REPEAT_MODE_ALL && player.mediaItemCount > 0 && player.playWhenReady) {
                 player.seekTo(0, 0)
                 player.prepare()
-                player.play()
             } else {
                 // Ran out of songs (e.g. a page load failed earlier): try to extend and keep playing.
                 ensureQueueRunway()
@@ -3123,6 +3159,7 @@ class MusicService :
         if (playbackState == Player.STATE_READY) {
             consecutivePlaybackErr = 0
             retryCount = 0
+            providerLookupRetries = 0
             waitingForNetworkConnection.value = false
             retryJob?.cancel()
 
@@ -3487,11 +3524,14 @@ class MusicService :
         if (isExpiredUrlError(error) || isRangeNotSatisfiableError(error) || isPageReloadError(error)) {
             return false
         }
-        return error.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED ||
-                error.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT ||
-                error.cause is java.net.ConnectException ||
-                error.cause is java.net.UnknownHostException ||
-                (error.cause as? PlaybackException)?.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED
+        return generateSequence<Throwable>(error) { it.cause }.any { cause ->
+            when (cause) {
+                is java.net.ConnectException, is java.net.UnknownHostException, is java.net.SocketTimeoutException -> true
+                is PlaybackException -> cause.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED ||
+                    cause.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT
+                else -> false
+            }
+        }
     }
 
     private fun isAudioRendererError(error: PlaybackException): Boolean {
@@ -3561,12 +3601,24 @@ class MusicService :
         }
 
         lastPlaybackError = error
-        // every provider that's on was already asked: retrying would only ask them all again, so
-        // straight on with the reason. Without a connection it waits for one like any other song.
-        if (isNetworkConnected.value &&
-            generateSequence<Throwable>(error) { it.cause }.any { it is com.mochyy.mochymusic.playback.custom.NoProviderException }
-        ) {
-            failStream()
+        val lookupFailure = generateSequence<Throwable>(error) { it.cause }
+            .filterIsInstance<NoProviderException>().firstOrNull()
+        if (lookupFailure != null) {
+            when {
+                !connectivityObserver.isCurrentlyConnected() && !onPhone -> waitOnNetworkError()
+                lookupFailure.retryable && retryProviderLookup() -> Unit
+                else -> {
+                    val mediaId = player.currentMediaItem?.mediaId
+                    if (mediaId != null && lookupFailure.providerId != null &&
+                        resolvedSourceIds[mediaId] == lookupFailure.providerId &&
+                        forceFallBack(mediaId, includeYouTube = true, announce = false)
+                    ) return
+                    if (player.playWhenReady) {
+                        notifyPlaybackError(getString(R.string.error_stream_unavailable_title), lookupFailure.message.orEmpty())
+                    }
+                    failStream()
+                }
+            }
             return
         }
         val mediaId = player.currentMediaItem?.mediaId
@@ -4182,8 +4234,11 @@ class MusicService :
                     preferStudio = studioForVideos,
                 )
             }.getOrElse { throwable ->
+                if (throwable is PlaybackException && throwable.errorCode != PlaybackException.ERROR_CODE_REMOTE_ERROR) {
+                    throw throwable
+                }
                 when (throwable) {
-                    is PlaybackException -> throw throwable
+                    is CancellationException, is com.music.innertube.OfflineModeException -> throw throwable
 
                     is java.net.ConnectException, is java.net.UnknownHostException -> {
                         throw PlaybackException(
@@ -4202,16 +4257,13 @@ class MusicService :
                     }
 
                     else -> {
-                        // Surface the reason rather than a silent stall; the media notification
-                        // channel is silent by design so errors get their own.
-                        val reason = friendlyReason(throwable)
-                        if (mediaId !in listeningOnlyStreams) {
-                            notifyPlaybackError(getString(R.string.error_stream_unavailable_title), reason)
-                        }
-                        throw PlaybackException(
-                            reason,
-                            throwable,
-                            PlaybackException.ERROR_CODE_REMOTE_ERROR
+                        throw NoProviderException(
+                            reason = friendlyReason(throwable),
+                            retryable = throwable !is com.mochyy.mochymusic.utils.YouTubePremiumOnlyException &&
+                                throwable !is com.mochyy.mochymusic.utils.YouTubeRateLimitedException &&
+                                throwable !is com.mochyy.mochymusic.utils.YouTubeBotCheckException,
+                            providerId = com.mochyy.mochymusic.modules.SourceModules.YouTubeId,
+                            cause = throwable,
                         )
                     }
                 }
@@ -4353,6 +4405,17 @@ class MusicService :
         return true
     }
 
+    private val playbackLoadErrors = object : androidx.media3.exoplayer.upstream.DefaultLoadErrorHandlingPolicy() {
+        override fun getRetryDelayMsFor(info: androidx.media3.exoplayer.upstream.LoadErrorHandlingPolicy.LoadErrorInfo): Long {
+            // Playback owns the retry budget for lookup errors. Media3 still handles ordinary
+            // HTTP reads and decoder input separately.
+            if (generateSequence<Throwable>(info.exception) { it.cause }.any { it is NoProviderException }) {
+                return C.TIME_UNSET
+            }
+            return super.getRetryDelayMsFor(info)
+        }
+    }
+
     private fun createMediaSourceFactory(): androidx.media3.exoplayer.source.MediaSource.Factory {
         val defaultFactory = DefaultMediaSourceFactory(
             createDataSourceFactory(),
@@ -4367,7 +4430,7 @@ class MusicService :
                         val factory = DefaultMediaSourceFactory(
                             createDataSourceFactory(),
                             androidx.media3.extractor.DefaultExtractorsFactory(),
-                        )
+                        ).setLoadErrorHandlingPolicy(playbackLoadErrors)
                         if (drmManager != null) {
                             factory.setDrmSessionManagerProvider { drmManager }
                         }
@@ -5359,16 +5422,15 @@ class MusicService :
         return when (route) {
             is com.mochyy.mochymusic.modules.SourceModules.Route.Module -> moduleStream(mediaId, route.module, route.stream, route.selectedQuality)
             com.mochyy.mochymusic.modules.SourceModules.Route.YouTube -> youTubeRoute(mediaId)
-            com.mochyy.mochymusic.modules.SourceModules.Route.Exhausted -> {
-                val youTube = com.mochyy.mochymusic.modules.SourceModules.YouTubeId
-                when {
-                    // YouTube is in the order after providers that don't have it: it plays there
-                    youTube !in skip && sourceModules.isUsable(youTube) -> youTubeRoute(mediaId)
-                    // the user turned YouTube off to hear only their other providers
-                    !sourceModules.isEnabled(youTube) ->
-                        throw com.mochyy.mochymusic.playback.custom.NoProviderException("none of your providers have it, and YouTube Music is off")
-                    else -> throw com.mochyy.mochymusic.playback.custom.NoProviderException("every provider failed on it")
+            is com.mochyy.mochymusic.modules.SourceModules.Route.Exhausted -> {
+                if (youtubeId !in skip && sourceModules.isUsable(youtubeId)) return youTubeRoute(mediaId)
+                val retryable = route.temporaryFailure || skip.any(sourceModules::isUsable)
+                val reason = when {
+                    route.temporaryFailure -> getString(R.string.pippo_provider_temporarily_unavailable)
+                    !sourceModules.isEnabled(youtubeId) -> "none of your providers have it, and YouTube Music is off"
+                    else -> "every provider failed on it"
                 }
+                throw NoProviderException(reason, retryable)
             }
         }
     }
@@ -5959,6 +6021,7 @@ class MusicService :
         private const val MAX_RUNWAY_RETRIES = 5
         private const val RUNWAY_RETRY_BASE_MS = 5_000L
         const val MAX_RETRY_COUNT = 10
+        private const val MaxProviderLookupRetries = 2
 
         private const val MAX_GAIN_MB = 300
         private const val MIN_GAIN_MB = -1500
