@@ -57,7 +57,12 @@ sealed interface ProviderSwitchState {
     data object Idle : ProviderSwitchState
     data class Working(val providerId: String, val attempt: Int, val of: Int) : ProviderSwitchState
     data class Starting(val providerId: String) : ProviderSwitchState
-    data class Failed(val providerId: String, val attempts: Int, val reason: String? = null) : ProviderSwitchState
+    data class Failed(
+        val providerId: String,
+        val attempts: Int,
+        val reason: String? = null,
+        val opening: Boolean = false,
+    ) : ProviderSwitchState
     data class Done(val providerId: String) : ProviderSwitchState
 }
 
@@ -72,12 +77,17 @@ class ProviderSwitch(private val scope: () -> CoroutineScope, private val host: 
         data object Retry : Resolution
     }
 
+    sealed interface HandoffResult {
+        data object Ready : HandoffResult
+        data class Failed(val reason: String? = null) : HandoffResult
+    }
+
     interface Host {
         fun currentTarget(): Target?
         suspend fun resolve(target: Target, providerId: String, option: Pair<String, String>?): Resolution
 
-        /** True once the replacement can play. A failed or cancelled handoff restores the old route. */
-        suspend fun switchTo(target: Target, route: ForcedRoute): Boolean
+        /** Confirms the replacement or reports why opening it failed. */
+        suspend fun switchTo(target: Target, route: ForcedRoute): HandoffResult
     }
 
     private val _state = MutableStateFlow<ProviderSwitchState>(ProviderSwitchState.Idle)
@@ -137,12 +147,14 @@ class ProviderSwitch(private val scope: () -> CoroutineScope, private val host: 
                         throw e
                     } catch (e: Exception) {
                         Timber.tag(Tag).w(e, "Provider handoff failed")
-                        false
+                        HandoffResult.Failed()
                     }
                     currentCoroutineContext().ensureActive()
                     if (host.currentTarget() != target) ProviderSwitchState.Idle
-                    else if (switched) ProviderSwitchState.Done(providerId)
-                    else ProviderSwitchState.Failed(providerId, attempts)
+                    else when (switched) {
+                        HandoffResult.Ready -> ProviderSwitchState.Done(providerId)
+                        is HandoffResult.Failed -> ProviderSwitchState.Failed(providerId, attempts, switched.reason, opening = true)
+                    }
                 }
                 else -> ProviderSwitchState.Failed(providerId, attempts, (result as? Resolution.Rejected)?.reason)
             }
@@ -155,6 +167,15 @@ class ProviderSwitch(private val scope: () -> CoroutineScope, private val host: 
         job = null
         target = null
         _state.value = ProviderSwitchState.Idle
+    }
+
+    fun cancelIfSelecting(providerId: String) {
+        val pendingId = when (val state = _state.value) {
+            is ProviderSwitchState.Working -> state.providerId
+            is ProviderSwitchState.Starting -> state.providerId
+            else -> null
+        }
+        if (pendingId == providerId) cancel()
     }
 
     fun onMediaChanged() {
