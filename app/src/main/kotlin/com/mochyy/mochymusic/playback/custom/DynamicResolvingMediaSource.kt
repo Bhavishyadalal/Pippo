@@ -92,13 +92,23 @@ class DynamicResolvingMediaSource(
                 return@launch
             }
 
-            val builder = originalMediaItem.buildUpon().setUri(Uri.parse(result.streamUrl))
-            result.cacheKey?.let(builder::setCustomCacheKey)
-
-            if (result.isDash || result.streamUrl.endsWith(".mpd")) {
-                builder.setMimeType(MimeTypes.APPLICATION_MPD)
+            val uri = Uri.parse(result.streamUrl)
+            val path = uri.path.orEmpty()
+            val adaptiveMime = when {
+                result.isDash -> MimeTypes.APPLICATION_MPD
+                result.isHls -> MimeTypes.APPLICATION_M3U8
+                path.endsWith(".mpd", ignoreCase = true) -> MimeTypes.APPLICATION_MPD
+                path.endsWith(".m3u8", ignoreCase = true) -> MimeTypes.APPLICATION_M3U8
+                else -> null
             }
-            if (result.isHls) builder.setMimeType(MimeTypes.APPLICATION_M3U8)
+            val builder = originalMediaItem.buildUpon().setUri(uri)
+            if (adaptiveMime != null) {
+                // Adaptive segment requests identify themselves by URL. A progressive cache
+                // key cannot describe all of the manifest's independent resources.
+                builder.setMimeType(adaptiveMime).setCustomCacheKey(null)
+            } else {
+                result.cacheKey?.let(builder::setCustomCacheKey)
+            }
 
             val widevine = result.widevineLicense
             if (widevine != null) {
@@ -164,9 +174,13 @@ class DynamicResolvingMediaSource(
         playbackHandler?.post {
             // released, or prepared again, while the stream was being looked up
             if (gen != generation) return@post
-            val source = factory.createMediaSource(item)
-            innerMediaSource = source
-            prepareChildSource(null, source)
+            try {
+                val source = factory.createMediaSource(item)
+                innerMediaSource = source
+                prepareChildSource(null, source)
+            } catch (e: RuntimeException) {
+                fetchError = IOException("Could not prepare the resolved audio source", e)
+            }
         }
     }
 

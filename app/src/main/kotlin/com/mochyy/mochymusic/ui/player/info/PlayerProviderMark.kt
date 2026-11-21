@@ -41,14 +41,14 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.currentStateAsState
+import com.mochyy.mochymusic.LocalArtworkColor
 import com.mochyy.mochymusic.LocalPlayerConnection
 import com.mochyy.mochymusic.R
 import com.mochyy.mochymusic.playback.PlayingFrom
+import com.mochyy.mochymusic.ui.theme.ArtworkPalette
 import com.mochyy.mochymusic.ui.utils.AppMotion
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.isActive
 
 internal val ProviderMarkRoom = 40.dp
 
@@ -81,51 +81,52 @@ internal fun PlayerProviderMark(
         else -> codec
     }?.takeIf { from != null }
     val name = from?.name ?: stringResource(R.string.pc_force_title)
-    val title = if (quality == null) name else stringResource(R.string.player_provider_quality, name, quality)
+    val artworkColor = LocalArtworkColor.current
+    val palette = remember(artworkColor) { ArtworkPalette.from(artworkColor) }
     val canSwitch = mediaId.isNotBlank() && !mediaId.startsWith("LOCAL_")
     val lifecycle by LocalLifecycleOwner.current.lifecycle.currentStateAsState()
-    val sweeping = animate && lifecycle.isAtLeast(Lifecycle.State.RESUMED) && AppMotion.durationScale.scaleFactor > 0f
-
-    if (sweeping) {
-        val sweep = remember { Animatable(0f) }
-        LaunchedEffect(sweep) {
-            while (isActive) {
-                sweep.snapTo(0f)
-                sweep.animateTo(1f, tween(1800, easing = LinearEasing))
-                delay(2400)
-            }
+    val sweeping = from != null && animate && lifecycle.isAtLeast(Lifecycle.State.RESUMED) &&
+        AppMotion.durationScale.scaleFactor > 0f
+    val sweep = remember { Animatable(1f) }
+    LaunchedEffect(mediaId, from?.providerId, quality, sweeping) {
+        if (sweeping) {
+            sweep.snapTo(0f)
+            sweep.animateTo(1f, tween(950, easing = LinearEasing))
+        } else {
+            sweep.snapTo(1f)
         }
-        ProviderCapsule(title, canSwitch, onClick, modifier, sweep = { sweep.value })
-    } else {
-        ProviderCapsule(title, canSwitch, onClick, modifier)
     }
+    ProviderCapsule(name, quality, palette, canSwitch, onClick, modifier, sweep = { sweep.value })
 }
 
 @Composable
 private fun ProviderCapsule(
-    title: String,
+    provider: String,
+    quality: String?,
+    palette: ArtworkPalette,
     canSwitch: Boolean,
     onClick: () -> Unit,
     modifier: Modifier,
-    sweep: (() -> Float)? = null,
+    sweep: () -> Float,
 ) {
-    val ink = Color(0xFFF0F3F8)
+    val ink = palette.onContainer
     Row(
         modifier = modifier
-            .widthIn(max = 320.dp)
+            .widthIn(max = 294.dp)
             .heightIn(min = 36.dp)
             .clip(CircleShape)
-            .background(Color(0x660D1520))
-            .border(1.dp, ink.copy(alpha = .19f), CircleShape)
+            .background(palette.surface.copy(alpha = .90f))
+            .border(1.dp, palette.accent.copy(alpha = .29f), CircleShape)
             .drawWithCache {
                 val band = size.width * .48f
                 val silver = Brush.linearGradient(
-                    listOf(Color.Transparent, Color(0x36DCEAFF), Color.Transparent),
+                    listOf(Color.Transparent, palette.accent.copy(alpha = .23f), Color.Transparent),
                     start = Offset.Zero,
                     end = Offset(band, size.height * .55f),
                 )
                 onDrawBehind {
-                    if (sweep != null) translate(left = (size.width + band) * sweep() - band) {
+                    val fraction = sweep()
+                    if (fraction < 1f) translate(left = (size.width + band) * fraction - band) {
                         drawRect(silver, size = Size(band, size.height))
                     }
                 }
@@ -140,16 +141,29 @@ private fun ProviderCapsule(
         horizontalArrangement = Arrangement.spacedBy(7.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(painterResource(R.drawable.graphic_eq), null, Modifier.size(15.dp), tint = ink)
+        Icon(painterResource(R.drawable.graphic_eq), null, Modifier.size(14.dp), tint = palette.accent)
         Text(
-            title,
+            provider,
             modifier = Modifier.weight(1f, fill = false),
             color = ink,
-            fontWeight = FontWeight.SemiBold,
+            fontWeight = FontWeight.Medium,
             fontSize = 12.sp,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
-        if (canSwitch) Icon(painterResource(R.drawable.navigate_next), null, Modifier.size(14.dp), tint = ink.copy(alpha = .7f))
+        if (quality != null) {
+            Text(
+                quality,
+                modifier = Modifier.widthIn(max = 92.dp)
+                    .background(palette.container, CircleShape)
+                    .padding(horizontal = 7.dp, vertical = 2.dp),
+                color = palette.onContainer,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 10.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        if (canSwitch) Icon(painterResource(R.drawable.navigate_next), null, Modifier.size(13.dp), tint = ink.copy(alpha = .62f))
     }
 }

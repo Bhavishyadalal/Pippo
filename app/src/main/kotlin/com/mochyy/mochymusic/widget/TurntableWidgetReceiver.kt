@@ -17,16 +17,10 @@ class TurntableWidgetReceiver : AppWidgetProvider() {
     ) {
 
         if (MusicService.isRunning) {
-            val intent = Intent(context, MusicService::class.java).apply {
-                action = ACTION_UPDATE_TURNTABLE_WIDGET
-            }
-            try {
-                context.startService(intent)
-            } catch (e: Exception) {
-
-            }
+            requestWidgetRefresh(context)
+        } else {
+            MochyWidgetManager(context).updateEmpty(appWidgetManager, appWidgetIds, turntable = true)
         }
-
     }
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -57,6 +51,5 @@ class TurntableWidgetReceiver : AppWidgetProvider() {
         const val ACTION_TURNTABLE_PLAY_PAUSE = "com.mochyy.mochymusic.widget.TURNTABLE_PLAY_PAUSE"
         const val ACTION_TURNTABLE_NEXT = "com.mochyy.mochymusic.widget.TURNTABLE_NEXT"
         const val ACTION_TURNTABLE_PREVIOUS = "com.mochyy.mochymusic.widget.TURNTABLE_PREVIOUS"
-        const val ACTION_UPDATE_TURNTABLE_WIDGET = "com.mochyy.mochymusic.widget.UPDATE_TURNTABLE_WIDGET"
     }
 }
