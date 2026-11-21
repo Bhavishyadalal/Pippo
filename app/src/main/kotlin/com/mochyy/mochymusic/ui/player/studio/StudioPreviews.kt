@@ -206,6 +206,8 @@ internal fun FlagshipPreview(
     val showVolumeBar = barStyle == PlayerBottomBarStyle.VOLUME
     val showDeck = showBottomCard && barStyle == PlayerBottomBarStyle.STACK
     BoxWithConstraints(modifier = modifier.fillMaxSize().inert()) {
+        val backdropWidth = maxWidth
+        val backdropHeight = maxHeight
         Box(Modifier.fillMaxSize().dimPlayerArtworkBackground(artworkStrength)) {
             if (artworkStrength > 0f) {
                 if (flagship && backgroundStyle == PlayerBackgroundStyle.AMBIENT) {
@@ -215,8 +217,8 @@ internal fun FlagshipPreview(
                     PlayerBackgroundPreview(
                         style = backgroundStyle,
                         thumbnailUrl = track.thumbnailUrl,
-                        width = maxWidth,
-                        height = maxHeight,
+                        width = backdropWidth,
+                        height = backdropHeight,
                         animate = false,
                         warp = false,
                         modifier = Modifier.fillMaxSize(),
