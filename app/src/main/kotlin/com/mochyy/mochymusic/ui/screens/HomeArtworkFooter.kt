@@ -24,6 +24,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.structuralEqualityPolicy
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithCache
@@ -101,7 +102,7 @@ internal fun BlendHomeArtworkIntoChrome(list: LazyListState, enabled: Boolean, b
     val chrome = LocalHomeArtworkChrome.current
     val region = with(LocalDensity.current) { (bottomChrome + 40.dp).toPx() }
     DisposableEffect(chrome, list, enabled, region) {
-        val coverage = derivedStateOf {
+        val coverage = derivedStateOf(structuralEqualityPolicy()) {
             val layout = list.layoutInfo
             val bottom = layout.viewportEndOffset
             val item = layout.visibleItemsInfo.lastOrNull()
