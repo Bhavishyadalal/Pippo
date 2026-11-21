@@ -448,6 +448,7 @@ class StyleActions(
     val onQueue: (() -> Unit)? = null,
     // the rotate item; none in the selector's cards or on a tv
     val turn: StyleTurn? = null,
+    val onImmersive: (() -> Unit)? = null,
 )
 
 // whether the style on now is turned sideways and the switch for it, read as lambdas since the actions are built once
@@ -589,6 +590,12 @@ fun BoxScope.StyleMenu(
         val menu = listOfNotNull(
             actions.onLyrics?.let { open -> MenuItem(lyricsLabel, R.drawable.lyrics) { onOpenChange(false); open() } },
             actions.onQueue?.takeIf { queue }?.let { open -> MenuItem(queueLabel, R.drawable.queue_music) { onOpenChange(false); open() } },
+            actions.onImmersive?.let { enter ->
+                MenuItem(androidx.compose.ui.res.stringResource(R.string.immersive_mode), R.drawable.fullscreen) {
+                    onOpenChange(false)
+                    enter()
+                }
+            },
         ) + shuffleAndRepeat + extras.map { extra ->
             MenuItem(extra.label, extra.icon, extra.active, extra.picture) {
                 if (!extra.keepsOpen) onOpenChange(false)
@@ -606,6 +613,7 @@ fun BoxScope.StyleMenu(
             else -> menu + turnItem + editItem
         }
         val itemGap = 10.dp
+        val staggerStep = minOf(0.12f, 0.72f / rows.size.coerceAtLeast(1))
         val roomForRows = androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp.dp - edge - buttonSize - itemGap
         Column(
             modifier = Modifier
@@ -628,7 +636,7 @@ fun BoxScope.StyleMenu(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     modifier = Modifier.graphicsLayer {
-                        val delay = order * 0.12f
+                        val delay = order * staggerStep
                         val p = ((reveal.value - delay) / (1f - delay)).coerceIn(0f, 1.2f)
                         alpha = p.coerceIn(0f, 1f)
                         val away = if (atBottom) 1f else -1f

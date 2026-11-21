@@ -2,6 +2,8 @@
 
 package com.mochyy.mochymusic
 
+import com.mochyy.mochymusic.utils.removeCustomizationExpansionPreferences
+
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.PendingIntent
@@ -161,7 +163,6 @@ import com.mochyy.mochymusic.constants.GridItemSize
 import com.mochyy.mochymusic.constants.SwipeToSongKey
 import com.mochyy.mochymusic.constants.DisableScreenshotKey
 import com.mochyy.mochymusic.constants.DynamicThemeKey
-import com.mochyy.mochymusic.constants.EnableHighRefreshRateKey
 import com.mochyy.mochymusic.constants.MiniPlayerBottomSpacing
 import com.mochyy.mochymusic.constants.MiniPlayerHeight
 import com.mochyy.mochymusic.constants.NavigationBarAnimationSpec
@@ -424,8 +425,12 @@ class MainActivity : ComponentActivity() {
     @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
+        setTheme(com.mochyy.mochymusic.utils.AppIcons.current(this).splashTheme)
         installSplashScreen().handOffToLaunchIntro { introPlays }
         super.onCreate(savedInstanceState)
+        lifecycleScope.launch(Dispatchers.IO) {
+            applicationContext.removeCustomizationExpansionPreferences()
+        }
         // a tv that opens the phone app from an old shortcut gets the big-screen one instead
         if (savedInstanceState == null && intent?.action == Intent.ACTION_MAIN && isTelevision()) {
             startActivity(Intent(this, com.mochyy.mochymusic.ui.tv.TvActivity::class.java))
@@ -498,7 +503,6 @@ class MainActivity : ComponentActivity() {
         syncUtils: SyncUtils,
     ) {
         val enableDynamicTheme by rememberPreference(DynamicThemeKey, defaultValue = true)
-        val enableHighRefreshRate by rememberPreference(EnableHighRefreshRateKey, defaultValue = true)
         val context = LocalContext.current
 
         LaunchedEffect(Unit) {
@@ -530,33 +534,11 @@ class MainActivity : ComponentActivity() {
             onDispose { rootView.keepScreenOn = false }
         }
 
-        LaunchedEffect(enableHighRefreshRate) {
-            val window = this@MainActivity.window
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                val layoutParams = window.attributes
-                if (enableHighRefreshRate) {
-                    layoutParams.preferredDisplayModeId = highRefreshModeId()
-                } else {
-                    val modes = window.windowManager.defaultDisplay.supportedModes
-                    val mode60 = modes.firstOrNull { kotlin.math.abs(it.refreshRate - 60f) < 1f }
-                        ?: modes.minByOrNull { kotlin.math.abs(it.refreshRate - 60f) }
-
-                    if (mode60 != null) {
-                        layoutParams.preferredDisplayModeId = mode60.modeId
-                    }
-                }
-                window.attributes = layoutParams
-            } else {
-                val params = window.attributes
-                if (enableHighRefreshRate) {
-                    params.preferredRefreshRate = 0f
-                    params.preferredDisplayModeId = highRefreshModeId()
-                } else {
-                    params.preferredRefreshRate = 60f
-                    params.preferredDisplayModeId = 0
-                }
-                window.attributes = params
-            }
+        DisposableEffect(rootView) {
+            val automaticRefresh = com.mochyy.mochymusic.ui.utils.AutomaticRefreshRate(
+                this@MainActivity, rootView, this@MainActivity.lifecycle,
+            )
+            onDispose { automaticRefresh.close() }
         }
 
         val useDarkTheme = ForceDarkTheme
@@ -634,6 +616,7 @@ class MainActivity : ComponentActivity() {
             ) {
                 val glassState = remember { GlassState() }
                 val hideAppChrome = remember { mutableStateOf(false) }
+                val homeArtworkChrome = remember { mutableStateOf<(() -> Float)?>(null) }
                 val detailAccentColor = remember { mutableStateOf<Color?>(null) }
                 val focusManager = LocalFocusManager.current
                 val density = LocalDensity.current
@@ -677,8 +660,8 @@ class MainActivity : ComponentActivity() {
                     val plays = introRequested && (tabOpenedFromShortcut ?: defaultOpenTab) == NavigationTab.HOME
                     introPlays = plays
                     if (introRequested && !plays) LaunchGate.skip()
-                    // an anime icon's splash shows the icon itself, so the intro bounces out of it; every other launch starts from the bare mark
-                    val icon = com.mochyy.mochymusic.utils.AppIcons.launchedFrom(intent)?.takeIf(com.mochyy.mochymusic.utils.AppIcons::splashShows)
+                    // Use the saved selection even when opened from a stale launcher shortcut.
+                    val icon = com.mochyy.mochymusic.utils.AppIcons.current(this@MainActivity)
                     LaunchIntroState(plays, icon)
                 }
 
@@ -972,6 +955,7 @@ class MainActivity : ComponentActivity() {
                     LocalPlayerConnection provides playerConnection,
                     LocalGlassState provides glassState,
                     LocalHideAppChrome provides hideAppChrome,
+                    com.mochyy.mochymusic.ui.screens.LocalHomeArtworkChrome provides homeArtworkChrome,
                     LocalDetailAccentColor provides detailAccentColor,
                     LocalArtworkColor provides themeColor,
                     LocalPlayerAwareWindowInsets provides playerAwareWindowInsets,
@@ -1124,14 +1108,18 @@ class MainActivity : ComponentActivity() {
                                                 .height(bottomInset + navPadding + 40.dp)
                                                 // the tint fades over 500 ms, read it while drawing so the bar doesn't recompose
                                                 .drawBehind {
+                                                    val artworkCoverage = if (currentRoute == Screens.Home.route) {
+                                                        homeArtworkChrome.value?.invoke() ?: 0f
+                                                    } else 0f
+                                                    val strength = 1f - .67f * artworkCoverage
                                                     val tint = navScrimTint
                                                     drawRect(
                                                         androidx.compose.ui.graphics.Brush.verticalGradient(
                                                             colors = listOf(
                                                                 Color.Transparent,
-                                                                tint.copy(alpha = 0.5f),
-                                                                tint.copy(alpha = 0.9f),
-                                                                tint
+                                                                tint.copy(alpha = 0.5f * strength),
+                                                                tint.copy(alpha = 0.9f * strength),
+                                                                tint.copy(alpha = strength)
                                                             )
                                                         )
                                                     )
@@ -1458,21 +1446,6 @@ class MainActivity : ComponentActivity() {
 
                 }
             }
-        }
-    }
-
-    // fastest mode at the current screen size; android 15+ needs it too, left alone it kept lyrics and the turntable at 60hz on 120hz phones
-    @Suppress("DEPRECATION")
-    private fun highRefreshModeId(): Int {
-        return try {
-            val display = window.windowManager.defaultDisplay
-            val current = display.mode
-            display.supportedModes
-                .filter { it.physicalWidth == current.physicalWidth && it.physicalHeight == current.physicalHeight }
-                .maxByOrNull { it.refreshRate }
-                ?.modeId ?: 0
-        } catch (e: Exception) {
-            0
         }
     }
 

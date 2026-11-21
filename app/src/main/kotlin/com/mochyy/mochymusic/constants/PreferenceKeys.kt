@@ -15,6 +15,7 @@ import java.time.ZoneOffset
 import com.music.innertube.models.IpVersion
 
 val IsFirstRunKey = booleanPreferencesKey("isFirstRun")
+// Legacy storage key; refresh selection is now automatic and ignores this old switch.
 val EnableHighRefreshRateKey = booleanPreferencesKey("enableHighRefreshRate")
 val DynamicThemeKey = booleanPreferencesKey("dynamicTheme")
 val SelectedThemeColorKey = intPreferencesKey("selectedThemeColor")
@@ -190,10 +191,11 @@ enum class AudioQuality {
         get() = this == LOSSLESS || this == HI_RES_LOSSLESS || this == DOLBY_ATMOS
 }
 
-// what a download from youtube is saved as; which provider a download comes from is the download order
+// Quality for future downloads. Lossless requires a compatible lossless provider.
 val DownloadQualityKey = stringPreferencesKey("downloadQuality")
 
 enum class DownloadQuality(val title: String, val description: String) {
+    LOSSLESS("Lossless", "Save original FLAC or ALAC when available"),
     HIGH("High", "The best YouTube has: ~160 kbps Opus"),
     MEDIUM("Medium", "Around 128 kbps, half the space"),
     LOW("Low", "The smallest files, ~50–70 kbps"),
@@ -465,6 +467,7 @@ val ShowCommentButtonKey = booleanPreferencesKey("show_comment_button")
 val ShowPlayerBottomCardKey = booleanPreferencesKey("showPlayerBottomCard")
 val PlayVideoBackgroundKey = booleanPreferencesKey("playVideoBackground")
 // a track that is a YouTube video (from a video row or the Videos search tab) shows that video in the player
+val DisablePlayerVideoKey = booleanPreferencesKey("disablePlayerVideo")
 val DisableVideoAutoplayKey = booleanPreferencesKey("disableVideoAutoplay")
 
 // how sharp youtube videos play; auto drops to a lower picture when the connection slows down instead of freezing

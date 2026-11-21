@@ -75,6 +75,7 @@ internal fun VideoModeMenu(
     onSongInfo: () -> Unit,
     // opens select video once the card has gone, the mode hosts it so it stays when the menu leaves
     onPickVideo: () -> Unit,
+    onImmersive: (() -> Unit)? = null,
 ) {
     val connection = LocalPlayerConnection.current ?: return
     val track by connection.uiState.trackInfo.collectAsState()
@@ -198,6 +199,14 @@ internal fun VideoModeMenu(
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
+                if (onImmersive != null) {
+                    MenuRow(
+                        icon = R.drawable.fullscreen,
+                        title = stringResource(R.string.immersive_mode),
+                        onClick = { closeThen(onImmersive) },
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
                 MenuRow(
                     icon = R.drawable.lyrics,
                     title = stringResource(R.string.video_mode_lyrics),

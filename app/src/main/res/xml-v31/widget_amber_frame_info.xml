@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="220dp"
+    android:minHeight="146dp"
+    android:minResizeWidth="160dp"
+    android:minResizeHeight="138dp"
+    android:targetCellWidth="4" android:targetCellHeight="2"
+    android:updatePeriodMillis="0"
+    android:initialLayout="@layout/widget_pippo_artwork"
+    android:previewLayout="@layout/widget_pippo_artwork"
+    android:description="@string/widget_amber_frame_description"
+    android:widgetCategory="home_screen"
+    android:resizeMode="horizontal|vertical" />

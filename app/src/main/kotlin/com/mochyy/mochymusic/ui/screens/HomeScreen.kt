@@ -2,6 +2,7 @@
 
 package com.mochyy.mochymusic.ui.screens
 
+import com.mochyy.mochymusic.ui.brand.PippoAppBadge
 import com.mochyy.mochymusic.ui.utils.stableSystemBars
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -60,7 +61,6 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.em
-import com.mochyy.mochymusic.ui.component.BlurEffectCache
 import com.mochyy.mochymusic.ui.theme.InterFontFamily
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -76,6 +76,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.snapshotFlow
@@ -478,7 +479,7 @@ fun AllTimeHitsCard(
 }
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
-private val HomeMarkWidth = 31.dp
+private val HomeMarkWidth = 34.dp
 private val HomeMarkHeight = 34.dp
 private val HomeTopBarRise = 16.dp
 
@@ -526,10 +527,7 @@ private fun HomeShell() {
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                painter = painterResource(R.drawable.ic_mochy_mark),
-                contentDescription = "Pippo",
-                tint = Color.White,
+            PippoAppBadge(
                 modifier = Modifier
                     .launchMarkTarget()
                     .size(HomeMarkWidth, HomeMarkHeight)
@@ -754,32 +752,30 @@ fun HomeScreen(
     val scope = rememberCoroutineScope()
 
     val lazylistState = rememberLazyListState()
+    val artworkRotation = rememberSaveable(saver = HomeArtworkRotation.Saver) { HomeArtworkRotation() }
+    val showArtworkFooter = !launchHold && !isFirstLoad
+    val bottomChrome = LocalPlayerAwareWindowInsets.current.asPaddingValues().calculateBottomPadding()
+    FollowHomeArtworkScroll(lazylistState, artworkRotation, showArtworkFooter)
+    BlendHomeArtworkIntoChrome(lazylistState, showArtworkFooter, bottomChrome)
 
     val carouselHeightDp = com.mochyy.mochymusic.ui.component.heroHeight()
     val collapseDistancePx = with(LocalDensity.current) {
         if (homeStyle == HomeStyle.MOCHYY) carouselHeightDp.toPx() else 140.dp.toPx()
     }
 
-    val firstItemScrollOffset by remember(collapseDistancePx) {
+    // Keep state objects explicit: changing Home style creates a new collapse distance.
+    // Providers must follow that new state rather than capturing the first composition's delegate.
+    val heroScrollProgress = remember(lazylistState, collapseDistancePx) {
         derivedStateOf {
             if (lazylistState.firstVisibleItemIndex == 0) {
-                lazylistState.firstVisibleItemScrollOffset.toFloat()
-            } else {
-                collapseDistancePx
-            }
+                (lazylistState.firstVisibleItemScrollOffset / collapseDistancePx).coerceIn(0f, 1f)
+            } else 1f
         }
     }
-    val heroScrollProgress by remember(collapseDistancePx) {
-        derivedStateOf {
-            (firstItemScrollOffset / collapseDistancePx).coerceIn(0f, 1f)
-        }
-    }
-
-    val heroScrollProgressProvider = remember { { heroScrollProgress } }
-    // the compact tops' cover glow fades out as the list scrolls up under the top bar
-    val topGlowVisibility = remember { { 1f - heroScrollProgress } }
-    // the glass layer only switches on or off once, so reading the raw progress would redraw the list on every scroll frame
-    val heroGlassActive = remember { derivedStateOf { heroScrollProgress > 0f } }
+    val heroScrollProgressProvider = remember(heroScrollProgress) { { heroScrollProgress.value } }
+    val topGlowVisibility = remember(heroScrollProgress) { { 1f - heroScrollProgress.value } }
+    // Only the threshold is read in composition; fractional progress stays in layer/draw callbacks.
+    val heroGlassActive = remember(heroScrollProgress) { derivedStateOf { heroScrollProgress.value > 0f } }
 
     // Home's own entry, the one a tap on its tab flags (onTabTapped only does that while Home is the
     // current page). Following the current entry instead recomposed all of Home on every navigation,
@@ -1175,13 +1171,8 @@ fun HomeScreen(
         }
     }
 
-    LaunchedEffect(mostPlayedSongsForHome) {
-        quickPicksLazyGridState.scrollToItem(0)
-    }
-
-    LaunchedEffect(forgottenFavorites) {
-        forgottenFavoritesLazyGridState.scrollToItem(0)
-    }
+    // Stable song keys let lazy grids retain the visible item when recommendations update.
+    // Do not scroll them to zero during a user's drag or when library metadata changes.
 
     val homeTypography = MaterialTheme.typography
 
@@ -1293,7 +1284,7 @@ fun HomeScreen(
                         ),
                         state = lazylistState,
                         contentPadding = PaddingValues(
-                            bottom = LocalPlayerAwareWindowInsets.current.asPaddingValues().calculateBottomPadding()
+                            bottom = if (showArtworkFooter) 0.dp else bottomChrome
                         )
                     ) {
                 when (homeStyle) {
@@ -1710,8 +1701,14 @@ fun HomeScreen(
                     }
                 }
 
-                item(key = "bottom_spacer", contentType = "spacer") {
-                    Spacer(modifier = Modifier.height(30.dp))
+                if (showArtworkFooter) {
+                    item(key = HomeArtworkKey, contentType = "home_artwork") {
+                        HomeArtworkFooter(artworkRotation, bottomChrome)
+                    }
+                } else {
+                    item(key = "bottom_spacer", contentType = "spacer") {
+                        Spacer(modifier = Modifier.height(30.dp))
+                    }
                 }
             }
             }
@@ -1720,7 +1717,7 @@ fun HomeScreen(
                 modifier = Modifier.fillMaxWidth()
             ) {
 
-                val showHeroOverlay by remember { derivedStateOf { heroScrollProgressProvider() > 0.01f } }
+                val showHeroOverlay by remember(heroScrollProgress) { derivedStateOf { heroScrollProgress.value > 0.01f } }
                 if (showHeroOverlay) {
                     Box(
                         modifier = Modifier
@@ -1776,20 +1773,17 @@ fun HomeScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    val isScrolled by remember { derivedStateOf { heroScrollProgress > 0.5f } }
+                    val isScrolled by remember(heroScrollProgress) { derivedStateOf { heroScrollProgress.value > 0.5f } }
                     val topBarProgress by animateFloatAsState(
                         targetValue = if (isScrolled) 1f else 0f,
-                        animationSpec = tween(durationMillis = 600, easing = FastOutSlowInEasing),
+                        animationSpec = tween(durationMillis = 260, easing = FastOutSlowInEasing),
                         label = "topBarProgress"
                     )
 
                     // the brand mark over the hero, swapped for a bold "Home" once the hero scrolls away.
                     // it's also where the launch intro lands the splash mark
                     Box(contentAlignment = Alignment.CenterStart) {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_mochy_mark),
-                            contentDescription = "Pippo",
-                            tint = Color.White,
+                        PippoAppBadge(
                             modifier = Modifier
                                 .launchMarkTarget()
                                 .size(HomeMarkWidth, HomeMarkHeight)
@@ -1799,7 +1793,6 @@ fun HomeScreen(
                                     scaleX = scale
                                     scaleY = scale
                                     transformOrigin = TransformOrigin(0f, 0.5f)
-                                    renderEffect = BlurEffectCache.element(topBarProgress * 15f)
                                 }
                         )
 
@@ -1810,7 +1803,6 @@ fun HomeScreen(
                             maxLines = 1,
                             modifier = Modifier.graphicsLayer {
                                 alpha = topBarProgress
-                                renderEffect = BlurEffectCache.element((1f - topBarProgress) * 15f)
                             }
                         )
                     }

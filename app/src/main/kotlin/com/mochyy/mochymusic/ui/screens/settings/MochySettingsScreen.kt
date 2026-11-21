@@ -4,6 +4,8 @@ package com.mochyy.mochymusic.ui.screens.settings
 
 import com.mochyy.mochymusic.ui.component.navigateToTab
 import androidx.activity.compose.BackHandler
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
@@ -109,6 +111,7 @@ private val LocalizedSettingsTitles = mapOf(
     "Audio format badge" to R.string.appearance_format_badge,
     "Show sample rate" to R.string.appearance_sample_rate,
     "Always enable Youtube background" to R.string.appearance_youtube_background,
+    "Disable player video" to R.string.settings_disable_player_video,
     "Enable animated canvas" to R.string.appearance_canvas,
     "High quality bloom" to R.string.appearance_bloom,
     "Audio Pass" to R.string.audiopass_hub_title,
@@ -211,6 +214,7 @@ private val SettingsIndex = listOf(
     SettingsEntry("Video quality", "Now playing", NowPlayingSettingsRoute, "video quality resolution 1080p 720p 480p sharp", R.string.video_quality),
     SettingsEntry("Disable auto-playing YouTube video", "Now playing", NowPlayingSettingsRoute, "music video live autoplay cover"),
     SettingsEntry("Studio version for music videos", "Now playing", NowPlayingSettingsRoute, "music video mv omv audio studio album version skit sound effects official", R.string.settings_studio_for_videos),
+    SettingsEntry("Disable player video", "Now playing", NowPlayingSettingsRoute, "disable video canvas loops still artwork"),
     SettingsEntry("Enable animated canvas", "Now playing", NowPlayingSettingsRoute, "canvas animation spotify looping visual"),
     SettingsEntry("Canvas order", "Now playing", NowPlayingSettingsRoute, "canvas order apple music tidal spotify source priority", R.string.canvas_order),
     SettingsEntry("Canvas on Wi-Fi only", "Now playing", NowPlayingSettingsRoute, "canvas wifi mobile data", R.string.appearance_canvas_wifi),
@@ -277,14 +281,27 @@ internal val IconBgColor = Color(0xFF333338)
 @Composable
 fun MochySettingsScreen(navController: NavController, pane: SettingsPane? = null) {
     val focusManager = LocalFocusManager.current
+    val keyboard = LocalSoftwareKeyboardController.current
+    var query by remember { mutableStateOf(TextFieldValue()) }
+    var isSearchFocused by remember { mutableStateOf(false) }
+    val isSearching = isSearchFocused || query.text.isNotBlank()
+    val currentEntry by navController.currentBackStackEntryAsState()
+
+    fun closeSearch() {
+        keyboard?.hide()
+        focusManager.clearFocus()
+        isSearchFocused = false
+        query = TextFieldValue()
+    }
     val sheets = com.mochyy.mochymusic.ui.component.LocalZoomOutOverlayState.current
     val devices = com.mochyy.mochymusic.ui.screens.devices.rememberDevicesLink()
     // on a wide screen the list stays put and its pages open beside it; device integration is a sheet over either
     val open: (String) -> Unit = { route ->
+        if (isSearching) closeSearch()
         when {
             route == com.mochyy.mochymusic.ui.screens.devices.DeviceIntegrationRoute -> sheets.showDeviceIntegration(devices)
             pane != null -> navController.openSettingsPage(route)
-            else -> navController.navigate(route)
+            else -> navController.navigate(route) { launchSingleTop = true }
         }
     }
     val selected = pane?.selectedRoute
@@ -293,16 +310,12 @@ fun MochySettingsScreen(navController: NavController, pane: SettingsPane? = null
 
     val (profilePicUri) = rememberPreference(ProfilePicUriKey, "")
 
-    var query by remember { mutableStateOf(TextFieldValue()) }
-    var isSearchFocused by remember { mutableStateOf(false) }
-
-    val isSearching = isSearchFocused || query.text.isNotBlank()
-
-    BackHandler(enabled = isSearching) {
-        query = TextFieldValue()
-        isSearchFocused = false
-        focusManager.clearFocus()
-    }
+    // A wide screen keeps the list composed next to the options page.
+    // Only the active list may intercept Back to dismiss its search.
+    BackHandler(
+        enabled = isSearching && currentEntry?.destination?.route == SettingsListRoute,
+        onBack = ::closeSearch,
+    )
 
     val context = LocalContext.current
     // picked again each time the list opens, so a tip that was just followed stops showing

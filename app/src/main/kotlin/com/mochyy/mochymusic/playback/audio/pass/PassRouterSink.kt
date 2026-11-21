@@ -2,6 +2,7 @@
 
 package com.mochyy.mochymusic.playback.audio.pass
 
+import com.mochyy.mochymusic.playback.finishOutputDrain
 import android.media.AudioDeviceInfo
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.AuxEffectInfo
@@ -31,6 +32,8 @@ class PassRouterSink(
 
     // the sink that played the last song and is playing out what it holds before the next one writes
     private var retiring: AudioSink? = null
+    private var retiringAtMs = 0L
+    private var clock: Clock = Clock.DEFAULT
     private var lastFormat: Format? = null
     private var lastBufferSize = 0
     private var lastChannels: IntArray? = null
@@ -64,6 +67,7 @@ class PassRouterSink(
             if (retiring === target) target.reset()
             // both play to the same dac: the old one finishes what it holds before the new one opens it
             retiring = active
+            retiringAtMs = clock.elapsedRealtime()
             active = target
             configureSink(target, format)
         } else if (fresh) {
@@ -79,8 +83,8 @@ class PassRouterSink(
         // an effect, the switch or the dac changed mid-song: the song carries on wherever it may go now
         if (decidedAt != pass.generation && retiring == null) lastFormat?.let { route(it, fresh = false) }
         retiring?.let { old ->
-            old.playToEndOfStream()
-            if (!old.isEnded) return false
+            val ended = runCatching { old.playToEndOfStream(); old.isEnded }.getOrDefault(true)
+            if (!finishOutputDrain(ended, clock.elapsedRealtime() - retiringAtMs)) return false
             old.reset()
             retiring = null
             if (playing) active.play()
@@ -176,7 +180,10 @@ class PassRouterSink(
     }
 
     override fun setPlayerId(playerId: PlayerId?) = normal.setPlayerId(playerId)
-    override fun setClock(clock: Clock) = normal.setClock(clock)
+    override fun setClock(clock: Clock) {
+        this.clock = clock
+        normal.setClock(clock)
+    }
     override fun setPlaybackParameters(playbackParameters: PlaybackParameters) = normal.setPlaybackParameters(playbackParameters)
     override fun getPlaybackParameters(): PlaybackParameters = normal.playbackParameters
     override fun setSkipSilenceEnabled(skipSilenceEnabled: Boolean) {

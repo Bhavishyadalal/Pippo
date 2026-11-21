@@ -7,6 +7,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -39,7 +41,7 @@ class ForcedRoute(val providerId: String, @Volatile var freshStream: SourceStrea
 sealed interface ProviderSwitchState {
     data object Idle : ProviderSwitchState
     data class Working(val providerId: String, val attempt: Int, val of: Int) : ProviderSwitchState
-    data class Failed(val providerId: String) : ProviderSwitchState
+    data class Failed(val providerId: String, val attempts: Int) : ProviderSwitchState
     data class Done(val providerId: String) : ProviderSwitchState
 }
 
@@ -72,46 +74,72 @@ class ProviderSwitch(private val scope: () -> CoroutineScope, private val host: 
 
     fun force(providerId: String) {
         val mediaId = host.currentMediaId() ?: return
+        val wasPlaying = host.holdPlayback() || (heldMediaId == mediaId && resumeAfterSwitch)
         job?.cancel()
-        job = scope().launch {
-            val replacingSwitch = _state.value is ProviderSwitchState.Working && heldMediaId == mediaId
-            val wasPlaying = host.holdPlayback() || (replacingSwitch && resumeAfterSwitch)
-            heldMediaId = mediaId
-            resumeAfterSwitch = wasPlaying
-            _state.value = ProviderSwitchState.Working(providerId, 1, MaxTries)
+        heldMediaId = mediaId
+        resumeAfterSwitch = wasPlaying
+        _state.value = ProviderSwitchState.Working(providerId, 1, MaxTries)
+
+        val serviceScope = scope()
+        job = serviceScope.launch {
+            var attempts = 0
             val route = withTimeoutOrNull(DeadlineMs) {
-                var found: ForcedRoute? = null
                 for (attempt in 1..MaxTries) {
+                    attempts = attempt
                     _state.value = ProviderSwitchState.Working(providerId, attempt, MaxTries)
-                    found = runCatching { host.resolve(providerId, mediaId) }
-                        .onFailure {
-                            // Cancellation belongs to the request/deadline, not to a failed provider.
-                            if (it is CancellationException) throw it
-                            Timber.tag(Tag).w(it, "$providerId try $attempt failed for $mediaId")
+                    // Wait separately from the module call. A blocking module cannot delay a
+                    // replacement tap, cancellation, or the deadline.
+                    val fetch = serviceScope.async(Dispatchers.IO) {
+                        try {
+                            host.resolve(providerId, mediaId)
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            Timber.tag(Tag).w(e, "$providerId try $attempt failed for $mediaId")
+                            null
                         }
-                        .getOrNull()
-                    if (found != null) break
-                    // a little longer between each try, so a server that's waking up gets the chance
-                    delay((attempt * 400L).coerceAtMost(3_000L))
+                    }
+                    val found = try {
+                        withTimeoutOrNull(AttemptMs) { fetch.await() }
+                    } catch (_: CancellationException) {
+                        currentCoroutineContext().ensureActive()
+                        null
+                    } finally {
+                        fetch.cancel()
+                    }
+                    if (found != null) return@withTimeoutOrNull found
+                    if (attempt < MaxTries) delay((attempt * 400L).coerceAtMost(3_000L))
                 }
-                found
+                null
             }
-            // Some providers finish work even after cancellation; an old request must not resume
-            // playback or overwrite the provider chosen by a newer request.
             currentCoroutineContext().ensureActive()
-            // the song changed under the switch: nothing to move any more
+            heldMediaId = null
+            resumeAfterSwitch = false
             if (host.currentMediaId() != mediaId) {
                 _state.value = ProviderSwitchState.Idle
-                return@launch
-            }
-            if (route == null) {
-                _state.value = ProviderSwitchState.Failed(providerId)
+            } else if (route == null) {
+                _state.value = ProviderSwitchState.Failed(providerId, attempts)
                 if (wasPlaying) host.resumePlayback()
-                return@launch
+            } else {
+                host.switchTo(mediaId, route, wasPlaying)
+                _state.value = ProviderSwitchState.Done(providerId)
             }
-            host.switchTo(mediaId, route, wasPlaying)
-            _state.value = ProviderSwitchState.Done(providerId)
         }
+    }
+
+    fun cancel() {
+        val mediaId = heldMediaId ?: return
+        job?.cancel()
+        job = null
+        heldMediaId = null
+        val resume = resumeAfterSwitch
+        resumeAfterSwitch = false
+        _state.value = ProviderSwitchState.Idle
+        if (resume && host.currentMediaId() == mediaId) host.resumePlayback()
+    }
+
+    fun onMediaChanged(mediaId: String?) {
+        if (heldMediaId != null && heldMediaId != mediaId) cancel()
     }
 
     /** the sheet closed: a finished or failed switch has said what it had to */
@@ -123,5 +151,6 @@ class ProviderSwitch(private val scope: () -> CoroutineScope, private val host: 
         private const val Tag = "ProviderSwitch"
         const val MaxTries = 20
         const val DeadlineMs = 60_000L
+        private const val AttemptMs = 9_000L
     }
 }

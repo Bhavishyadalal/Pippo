@@ -86,6 +86,7 @@
     <string name="pc_about_looking">Looking…</string>
     <string name="pc_about_nothing_yet">Nothing about this song yet</string>
     <string name="pc_force_title">Play from</string>
+    <string name="pc_force_switch_hint">Playback pauses during the fetch. Pick another provider or tap Cancel at any time.</string>
     <string name="pc_force_hint">The song stops while it\'s fetched from the one you pick.</string>
     <string name="pc_force_fetching">Fetching from %1$s…</string>
     <string name="pc_force_try_of">Try %1$d of %2$d, up to a minute</string>

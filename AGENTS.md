@@ -8,4 +8,10 @@
 - The owner removed the four experimental Cassette, Midnight Glass, Pippo Duo and CD Walkman player screens. Keep the existing player screens; do not reintroduce the removed designs unless requested.
 - Do not build or publish another APK, or launch GitHub Actions, until the owner explicitly asks for that again.
 
-- This design-system pass belongs on `design/pippo-design-system`. Preserve `main` and `backup/pre-design-system-2026-11-17` as the starting app code; merge only when the owner requests it.
+- The tested design-system pass was merged into main at bd58eae8 at the owner's request. Current customization work belongs on `preview-beta-v0.1.2`; preserve main and the backup branch, and merge only when requested.
+
+- Latest authorized work: playback/network/Bluetooth reliability and module URL copying on `preview-beta-v0.1.2`. The owner explicitly authorized logic/function testing for these fixes. Keep main, stable and backup untouched unless requested. Preserve the restored design; do not reintroduce the reverted mini-player or cozy-settings redesigns.
+
+- The owner clarified that the ENTIRE first customization expansion (bb0a4fef), including its extra settings and backing behavior, must be removed from beta and stable. Preserve later playback/Bluetooth fixes, module URL copying, automatic refresh-rate work, startup changes and icon-preview files. Do not restore a whole old repository snapshot or reintroduce the removed settings sections. Main remains untouched.
+
+- Latest requested beta work: the startup portrait and Home badge must match the selected app icon; do not restore the equalizer morph. Preserve existing Home design while correcting scroll-state capture and forced recommendation-row resets. Main and stable remain untouched for this work; no APK/Actions/tests are authorized by the edit request.

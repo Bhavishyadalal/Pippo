@@ -20,10 +20,12 @@ import androidx.media3.exoplayer.drm.MediaDrmCallback
 import androidx.media3.exoplayer.drm.ExoMediaDrm
 import androidx.media3.exoplayer.drm.DefaultDrmSessionManager
 import androidx.media3.exoplayer.drm.FrameworkMediaDrm
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
@@ -70,25 +72,24 @@ class DynamicResolvingMediaSource(
             val mediaId = originalMediaItem.mediaId
             val result = try {
                 fetcherAction(mediaId)
-            } catch (e: androidx.media3.common.PlaybackException) {
-
-                fetchError = java.io.IOException(e)
-                null
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
+                ensureActive()
                 Timber.e(e, "Failed to fetch stream for mediaId: $mediaId")
-                fetchError = if (e is java.io.IOException) e else java.io.IOException(e)
-                null
+                playbackHandler?.post {
+                    if (gen == generation) fetchError = if (e is IOException) e else IOException(e)
+                }
+                return@launch
             }
 
-            // a failed lookup plays from nowhere: announcing YouTube for it would be wrong
-            if (fetchError == null) onSourceResolved(mediaId, result?.source ?: "YouTube Music")
+            ensureActive()
+            playbackHandler?.post {
+                if (gen == generation) onSourceResolved(mediaId, result?.source ?: "YouTube Music")
+            }
 
             if (result == null) {
-                if (fetchError == null) {
-
-                    prepareChild(gen, mediaSourceFactoryProvider(null), originalMediaItem)
-                }
-
+                prepareChild(gen, mediaSourceFactoryProvider(null), originalMediaItem)
                 return@launch
             }
 

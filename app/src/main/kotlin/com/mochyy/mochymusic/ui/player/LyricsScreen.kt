@@ -235,6 +235,7 @@ fun LyricsScreen(
     showHeader: Boolean = true,
 
     modifier: Modifier = Modifier,
+    immersivePresentation: Boolean = false,
 ) {
     val playerConnection = LocalPlayerConnection.current ?: return
     val viewModel: LyricsScreenViewModel = hiltViewModel()
@@ -258,10 +259,10 @@ fun LyricsScreen(
     val context = LocalContext.current
     val fallbackColorInt = MaterialTheme.colorScheme.primary.toArgb()
     var accentColor by remember { mutableStateOf<Color?>(null) }
-    LaunchedEffect(mediaMetadata?.thumbnailUrl) {
+    LaunchedEffect(mediaMetadata?.thumbnailUrl, immersivePresentation) {
         val thumbnailUrl = mediaMetadata?.thumbnailUrl
         accentColor = null
-        if (thumbnailUrl == null) return@LaunchedEffect
+        if (immersivePresentation || thumbnailUrl == null) return@LaunchedEffect
         withContext(Dispatchers.IO) {
             try {
                 val request = ImageRequest.Builder(context)
@@ -335,7 +336,7 @@ fun LyricsScreen(
         com.mochyy.mochymusic.constants.LyricsMotionStyleKey,
         defaultValue = com.mochyy.mochymusic.constants.LyricsMotionStyle.MOTION,
     )
-    val cascade = motionStyle.risesWords
+    val cascade = motionStyle.risesWords && !immersivePresentation
 
     // Opens already on the playing line. Starting at the top and scrolling down to it fought the
     // open transition - the line the card grows into would still be moving.
@@ -362,7 +363,7 @@ fun LyricsScreen(
     }
 
     val stagger = remember(rows) { LyricsStagger(rows.size + 1) }
-    LaunchedEffect(stagger) { stagger.run() }
+    LaunchedEffect(stagger, immersivePresentation) { if (!immersivePresentation) stagger.run() }
 
     var isAutoScrolling by remember { mutableStateOf(false) }
 
@@ -383,16 +384,17 @@ fun LyricsScreen(
         }
     }
 
-    var immersive by remember { mutableStateOf(false) }
+    var immersive by remember(immersivePresentation) { mutableStateOf(immersivePresentation) }
 
-    LaunchedEffect(userScrolling, immersive) {
-        if (!userScrolling && !immersive) {
+    LaunchedEffect(userScrolling, immersive, immersivePresentation) {
+        if (!immersivePresentation && !userScrolling && !immersive) {
             delay(ImmersiveDelayMs)
             immersive = true
         }
     }
 
-    LaunchedEffect(listState) {
+    LaunchedEffect(listState, immersivePresentation) {
+        if (immersivePresentation) return@LaunchedEffect
         var previous = -1L
         snapshotFlow {
             listState.firstVisibleItemIndex.toLong() * 1_000_000L +
@@ -400,7 +402,7 @@ fun LyricsScreen(
         }.collect { now ->
             val last = previous
             previous = now
-            if (last < 0L || isAutoScrolling) return@collect
+            if (last < 0L || isAutoScrolling || !userScrolling) return@collect
             val delta = now - last
             if (delta > ScrollDirectionThresholdPx) immersive = true
             else if (delta < -ScrollDirectionThresholdPx) immersive = false
@@ -501,7 +503,7 @@ fun LyricsScreen(
     val mirrored = rememberLyricsMirrored(lines)
 
     // the boring and plain styles are styles 1 and 2 with the shader left out
-    val lyricsWaveAnimation = motionStyle.shaded
+    val lyricsWaveAnimation = motionStyle.shaded && !immersivePresentation
     // the lines' blur by their distance from the sung one is an element blur, the glass blur switch doesn't touch it
     val (lineBlurAllowed) = rememberPreference(com.mochyy.mochymusic.constants.ElementBlurKey, defaultValue = true)
     val (lyricsHighBloom) = rememberPreference(LyricsHighBloomKey, defaultValue = true)
@@ -688,7 +690,7 @@ fun LyricsScreen(
                                     // recompose this row on every playback tick.
                                     positionProvider = positionProvider,
                                     bloom = lyricsWaveAnimation,
-                                    highBloom = lyricsHighBloom,
+                                    highBloom = lyricsHighBloom && !immersivePresentation,
                                     visible = activeInterlude == row.afterIndex,
                                     collapseEasing = recenterEasingFor(motionStyle),
                                     // The gap belongs to whoever sings next, so it waits on that
@@ -710,7 +712,7 @@ fun LyricsScreen(
                                     }
                                 }
                                 val state = look.state
-                                val blurStage = if (suppressEffects || !lineBlurAllowed) 0 else look.blurStage
+                                val blurStage = if (immersivePresentation || suppressEffects || !lineBlurAllowed) 0 else look.blurStage
 
                                 val shown = rememberShownLyric(entry)
                                 val rowIndex = rowOfLine[index]
@@ -793,7 +795,9 @@ fun LyricsScreen(
                                     onClick = {
                                         // Untimed lines have nowhere to seek to.
                                         if (!unsynced) {
-                                            playerConnection.player.seekTo(entry.time)
+                                            if (immersivePresentation) {
+                                                playerConnection.seekTo((entry.time - lyricsOffsetMs).coerceAtLeast(0L))
+                                            } else playerConnection.player.seekTo(entry.time)
                                             followPlayback = true
                                         }
                                     },

@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pippo_master_group_brand">Default</string>
+    <string name="pippo_master_group_lettering">Lettering</string>
+    <string name="pippo_master_group_illustrations">Illustrated Picks</string>
+    <string name="pippo_master_group_glass">Glass Collection</string>
+    <string name="pippo_master_black_ribbon_p_label">Black Ribbon P</string>
+    <string name="pippo_master_01_cobalt_wax_label">Cobalt Wax</string>
+    <string name="pippo_master_02_graphite_script_label">Graphite Script</string>
+    <string name="pippo_master_03_pink_pastel_label">Pink Pastel</string>
+    <string name="pippo_master_04_black_ink_brush_label">Black Ink Brush</string>
+    <string name="pippo_master_05_mint_pencil_label">Mint Pencil</string>
+    <string name="pippo_master_06_yellow_retro_bubble_label">Yellow Retro Bubble</string>
+    <string name="pippo_master_07_teal_peach_marker_label">Teal Peach Marker</string>
+    <string name="pippo_master_08_lavender_paper_cut_label">Lavender Paper Cut</string>
+    <string name="pippo_master_09_peach_dry_brush_label">Peach Dry Brush</string>
+    <string name="pippo_master_10_sage_woodcut_label">Sage Woodcut</string>
+    <string name="pippo_master_11_approved_blue_scrapbook_label">Approved Blue Scrapbook</string>
+    <string name="pippo_master_blue_crayon_original_label">Blue Crayon Original</string>
+    <string name="pippo_master_01_spider_red_label">Spider Red</string>
+    <string name="pippo_master_02_sage_doodle_label">Sage Doodle</string>
+    <string name="pippo_master_03_vintage_sepia_label">Vintage Sepia</string>
+    <string name="pippo_master_04_burgundy_gothic_label">Burgundy Gothic</string>
+    <string name="pippo_master_05_sakura_night_label">Sakura Night</string>
+    <string name="pippo_master_06_rainy_blue_label">Rainy Blue</string>
+    <string name="pippo_master_07_scrapbook_label">Scrapbook</string>
+    <string name="pippo_master_08_noir_moon_label">Noir Moon</string>
+    <string name="pippo_master_09_emerald_floral_label">Emerald Floral</string>
+    <string name="pippo_master_10_pastel_sunset_label">Pastel Sunset</string>
+    <string name="pippo_master_anime_duo_label">Anime Duo</string>
+    <string name="pippo_master_anime_girl_label">Anime Girl</string>
+    <string name="pippo_master_11_original_sakura_cat_label">Original Sakura Cat</string>
+    <string name="pippo_master_12_crimson_web_glass_label">Crimson Web Glass</string>
+    <string name="pippo_master_13_sage_glass_label">Sage Glass</string>
+    <string name="pippo_master_14_antique_gold_glass_label">Antique Gold Glass</string>
+    <string name="pippo_master_15_neon_rain_glass_label">Neon Rain Glass</string>
+    <string name="pippo_master_16_emerald_celestial_glass_label">Emerald Celestial Glass</string>
+    <string name="pippo_master_17_sunset_glass_label">Sunset Glass</string>
+    <string name="pippo_master_monochrome_cat_label">Monochrome Cat</string>
+
+    <color name="pippo_master_black_ribbon_p_bg">#000000</color>
+    <color name="pippo_master_01_cobalt_wax_bg">#000000</color>
+    <color name="pippo_master_02_graphite_script_bg">#000101</color>
+    <color name="pippo_master_03_pink_pastel_bg">#000100</color>
+    <color name="pippo_master_04_black_ink_brush_bg">#000000</color>
+    <color name="pippo_master_05_mint_pencil_bg">#010101</color>
+    <color name="pippo_master_06_yellow_retro_bubble_bg">#000000</color>
+    <color name="pippo_master_07_teal_peach_marker_bg">#000100</color>
+    <color name="pippo_master_08_lavender_paper_cut_bg">#010101</color>
+    <color name="pippo_master_09_peach_dry_brush_bg">#000000</color>
+    <color name="pippo_master_10_sage_woodcut_bg">#000100</color>
+    <color name="pippo_master_11_approved_blue_scrapbook_bg">#000000</color>
+    <color name="pippo_master_blue_crayon_original_bg">#000000</color>
+    <color name="pippo_master_01_spider_red_bg">#0A090A</color>
+    <color name="pippo_master_02_sage_doodle_bg">#0E0E0E</color>
+    <color name="pippo_master_03_vintage_sepia_bg">#100F0F</color>
+    <color name="pippo_master_04_burgundy_gothic_bg">#0E0E0D</color>
+    <color name="pippo_master_05_sakura_night_bg">#0C0D0D</color>
+    <color name="pippo_master_06_rainy_blue_bg">#212E3D</color>
+    <color name="pippo_master_07_scrapbook_bg">#2E1E14</color>
+    <color name="pippo_master_08_noir_moon_bg">#0A0A0A</color>
+    <color name="pippo_master_09_emerald_floral_bg">#0B0C0C</color>
+    <color name="pippo_master_10_pastel_sunset_bg">#1C1619</color>
+    <color name="pippo_master_anime_duo_bg">#13111B</color>
+    <color name="pippo_master_anime_girl_bg">#1A1A26</color>
+    <color name="pippo_master_11_original_sakura_cat_bg">#01000B</color>
+    <color name="pippo_master_12_crimson_web_glass_bg">#050507</color>
+    <color name="pippo_master_13_sage_glass_bg">#050507</color>
+    <color name="pippo_master_14_antique_gold_glass_bg">#050507</color>
+    <color name="pippo_master_15_neon_rain_glass_bg">#030406</color>
+    <color name="pippo_master_16_emerald_celestial_glass_bg">#030305</color>
+    <color name="pippo_master_17_sunset_glass_bg">#050406</color>
+    <color name="pippo_master_monochrome_cat_bg">#000000</color>
+
+    <style name="Theme.App.Starting.Master01CobaltWax" parent="Theme.App.Starting">
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/pippo_master_01_cobalt_wax</item>
+    </style>
+    <style name="Theme.App.Starting.Master02GraphiteScript" parent="Theme.App.Starting">
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/pippo_master_02_graphite_script</item>
+    </style>
+    <style name="Theme.App.Starting.Master03PinkPastel" parent="Theme.App.Starting">
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/pippo_master_03_pink_pastel</item>
+    </style>
+    <style name="Theme.App.Starting.Master04BlackInkBrush" parent="Theme.App.Starting">
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/pippo_master_04_black_ink_brush</item>
+    </style>
+    <style name="Theme.App.Starting.Master05MintPencil" parent="Theme.App.Starting">
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/pippo_master_05_mint_pencil</item>
+    </style>
+    <style name="Theme.App.Starting.Master06YellowRetroBubble" parent="Theme.App.Starting">
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/pippo_master_06_yellow_retro_bubble</item>
+    </style>
+    <style name="Theme.App.Starting.Master07TealPeachMarker" parent="Theme.App.Starting">
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/pippo_master_07_teal_peach_marker</item>
+    </style>
+    <style name="Theme.App.Starting.Master08LavenderPaperCut" parent="Theme.App.Starting">
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/pippo_master_08_lavender_paper_cut</item>
+    </style>
+    <style name="Theme.App.Starting.Master09PeachDryBrush" parent="Theme.App.Starting">
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/pippo_master_09_peach_dry_brush</item>
+    </style>
+    <style name="Theme.App.Starting.Master10SageWoodcut" parent="Theme.App.Starting">
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/pippo_master_10_sage_woodcut</item>
+    </style>
+    <style name="Theme.App.Starting.Master11ApprovedBlueScrapbook" parent="Theme.App.Starting">
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/pippo_master_11_approved_blue_scrapbook</item>
+    </style>
+    <style name="Theme.App.Starting.MasterBlueCrayonOriginal" parent="Theme.App.Starting">
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/pippo_master_blue_crayon_original</item>
+    </style>
+    <style name="Theme.App.Starting.Master01SpiderRed" parent="Theme.App.Starting">
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/pippo_master_01_spider_red</item>
+    </style>
+    <style name="Theme.App.Starting.Master02SageDoodle" parent="Theme.App.Starting">
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/pippo_master_02_sage_doodle</item>
+    </style>
+    <style name="Theme.App.Starting.Master03VintageSepia" parent="Theme.App.Starting">
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/pippo_master_03_vintage_sepia</item>
+    </style>
+    <style name="Theme.App.Starting.Master04BurgundyGothic" parent="Theme.App.Starting">
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/pippo_master_04_burgundy_gothic</item>
+    </style>
+    <style name="Theme.App.Starting.Master05SakuraNight" parent="Theme.App.Starting">
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/pippo_master_05_sakura_night</item>
+    </style>
+    <style name="Theme.App.Starting.Master06RainyBlue" parent="Theme.App.Starting">
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/pippo_master_06_rainy_blue</item>
+    </style>
+    <style name="Theme.App.Starting.Master07Scrapbook" parent="Theme.App.Starting">
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/pippo_master_07_scrapbook</item>
+    </style>
+    <style name="Theme.App.Starting.Master08NoirMoon" parent="Theme.App.Starting">
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/pippo_master_08_noir_moon</item>
+    </style>
+    <style name="Theme.App.Starting.Master09EmeraldFloral" parent="Theme.App.Starting">
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/pippo_master_09_emerald_floral</item>
+    </style>
+    <style name="Theme.App.Starting.Master10PastelSunset" parent="Theme.App.Starting">
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/pippo_master_10_pastel_sunset</item>
+    </style>
+    <style name="Theme.App.Starting.MasterAnimeDuo" parent="Theme.App.Starting">
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/pippo_master_anime_duo</item>
+    </style>
+    <style name="Theme.App.Starting.MasterAnimeGirl" parent="Theme.App.Starting">
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/pippo_master_anime_girl</item>
+    </style>
+    <style name="Theme.App.Starting.Master11OriginalSakuraCat" parent="Theme.App.Starting">
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/pippo_master_11_original_sakura_cat</item>
+    </style>
+    <style name="Theme.App.Starting.Master12CrimsonWebGlass" parent="Theme.App.Starting">
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/pippo_master_12_crimson_web_glass</item>
+    </style>
+    <style name="Theme.App.Starting.Master13SageGlass" parent="Theme.App.Starting">
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/pippo_master_13_sage_glass</item>
+    </style>
+    <style name="Theme.App.Starting.Master14AntiqueGoldGlass" parent="Theme.App.Starting">
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/pippo_master_14_antique_gold_glass</item>
+    </style>
+    <style name="Theme.App.Starting.Master15NeonRainGlass" parent="Theme.App.Starting">
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/pippo_master_15_neon_rain_glass</item>
+    </style>
+    <style name="Theme.App.Starting.Master16EmeraldCelestialGlass" parent="Theme.App.Starting">
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/pippo_master_16_emerald_celestial_glass</item>
+    </style>
+    <style name="Theme.App.Starting.Master17SunsetGlass" parent="Theme.App.Starting">
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/pippo_master_17_sunset_glass</item>
+    </style>
+    <style name="Theme.App.Starting.MasterMonochromeCat" parent="Theme.App.Starting">
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/pippo_master_monochrome_cat</item>
+    </style>
+</resources>

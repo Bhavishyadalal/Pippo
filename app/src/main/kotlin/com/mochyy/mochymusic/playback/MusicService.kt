@@ -274,6 +274,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.plus
 import kotlinx.coroutines.runBlocking
@@ -517,12 +518,33 @@ class MusicService :
         audioOutputs.select(deviceId)
     }
 
-    // every player follows the picked output: crossmix and crossfade make new ones, which used to fall back to the default
+    private var lastAudioRoute: AudioRouteIdentity? = null
+    private var routeRefreshJob: Job? = null
+
+    // Update every live sink; re-open a stale Android AudioTrack after a settled Bluetooth handover.
     private fun applyOutputRoute(device: AudioDeviceInfo?) {
-        playerCrossmixProcessors.keys.forEach { (it as? ExoPlayer)?.setPreferredAudioDevice(device) }
-        if (::player.isInitialized) player.setPreferredAudioDevice(device)
-        secondaryPlayer?.setPreferredAudioDevice(device)
-        fadingPlayer?.setPreferredAudioDevice(device)
+        val players = (playerCrossmixProcessors.keys.toList().mapNotNull { it as? ExoPlayer } +
+            listOfNotNull(if (::player.isInitialized) player else null, secondaryPlayer, fadingPlayer)).distinct()
+        players.forEach { it.setPreferredAudioDevice(device) }
+        audioPass.onOutputRouteChanged()
+        val active = audioOutputs.activeDevice()
+        val route = active?.let { AudioRouteIdentity(it.id,
+            com.mochyy.mochymusic.playback.audio.AudioOutputs.kindOf(it.type) == com.mochyy.mochymusic.playback.audio.AudioOutputs.Kind.BLUETOOTH) }
+        val changed = needsBluetoothRouteRefresh(lastAudioRoute, route)
+        lastAudioRoute = route
+        if (!changed || !::player.isInitialized) return
+        routeRefreshJob?.cancel()
+        val target = player
+        val mediaId = target.currentMediaItem?.mediaId
+        routeRefreshJob = scope.launch {
+            delay(400) // Android may announce a headset before its media route has settled.
+            if (player !== target || lastAudioRoute != route ||
+                !mayResumeRecovery(mediaId, target.currentMediaItem?.mediaId, target.playWhenReady,
+                    castConnectionHandler?.isCasting?.value == true) ||
+                target.playbackState != Player.STATE_READY || transport.isFading || isCrossfading || crossmixDirector.isTransitioning) return@launch
+            // A same-position seek flushes/recreates the AudioTrack without replacing the queue or forcing play.
+            target.seekTo(target.currentMediaItemIndex, target.currentPosition.coerceAtLeast(0L))
+        }
     }
 
     lateinit var sleepTimer: SleepTimer
@@ -749,8 +771,8 @@ class MusicService :
         override fun onAudioDevicesAdded(addedDevices: Array<out AudioDeviceInfo>?) {
             super.onAudioDevicesAdded(addedDevices)
             val hasBluetooth = addedDevices?.any {
-                it.type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP ||
-                it.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO
+                com.mochyy.mochymusic.playback.audio.AudioOutputs.kindOf(it.type) ==
+                    com.mochyy.mochymusic.playback.audio.AudioOutputs.Kind.BLUETOOTH
             } == true
 
             if (hasBluetooth) {
@@ -1696,23 +1718,28 @@ class MusicService :
         }
 
         waitingForNetworkConnection.value = true
-        com.mochyy.mochymusic.ui.component.TopToaster.error("Stream failed: no internet connection")
+        com.mochyy.mochymusic.ui.component.TopToaster.error(getString(
+            if (isNetworkConnected.value) R.string.stream_retry_connected else R.string.stream_retry_offline))
 
         retryJob?.cancel()
+        val target = player
+        val failedMediaId = target.currentMediaItem?.mediaId
         retryJob = scope.launch {
 
             val delayMs = minOf(3000L * (1 shl retryCount), 30000L)
             Timber.tag(TAG).d("Waiting ${delayMs}ms before retry attempt ${retryCount + 1}/$MAX_RETRY_COUNT")
             delay(delayMs)
 
+            if (player !== target || target.currentMediaItem?.mediaId != failedMediaId) return@launch
             if (isNetworkConnected.value && waitingForNetworkConnection.value) {
-                retryCount++
                 triggerRetry()
             }
         }
     }
 
     private fun triggerRetry() {
+        if (!waitingForNetworkConnection.value) return
+        retryCount++
         waitingForNetworkConnection.value = false
         retryJob?.cancel()
 
@@ -2956,6 +2983,12 @@ class MusicService :
         mediaItem: MediaItem?,
         reason: Int,
     ) {
+        providerSwitch.onMediaChanged(mediaItem?.mediaId)
+        // A recovery belongs to the old item; it must not prepare or skip a newly selected song.
+        retryJob?.cancel()
+        retryJob = null
+        retryCount = 0
+        waitingForNetworkConnection.value = false
         clearStreamFailure()
         if (!promotingCrossmix) crossmixDirector.onItemChanged()
 
@@ -3313,7 +3346,6 @@ class MusicService :
         }
         return error.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED ||
                 error.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT ||
-                error.errorCode == PlaybackException.ERROR_CODE_IO_INVALID_HTTP_CONTENT_TYPE ||
                 error.cause is java.net.ConnectException ||
                 error.cause is java.net.UnknownHostException ||
                 (error.cause as? PlaybackException)?.errorCode == PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED
@@ -3331,6 +3363,18 @@ class MusicService :
 
         if (!playerInitialized.value) {
             Timber.tag(TAG).e(error, "Player error occurred but player not initialized")
+            return
+        }
+
+        // AudioTrack failures are local output failures, not a bad provider or corrupt stream.
+        // Recover before provider fallback/cache eviction can discard a healthy song.
+        if (isAudioRendererError(error)) {
+            lastPlaybackError = error
+            val failedId = player.currentMediaItem?.mediaId
+            if (failedId != null && hasExceededRetryLimit(failedId)) {
+                stopOnError()
+                showBanner(getString(R.string.audio_output_reconnect))
+            } else handleAudioRendererError(failedId)
             return
         }
 
@@ -3401,11 +3445,6 @@ class MusicService :
         }
 
         when {
-            isAudioRendererError(error) -> {
-                Timber.tag(TAG).d("AudioTrack error detected (${error.errorCode}), performing safe recovery")
-                handleAudioRendererError(mediaId)
-                return
-            }
             isRangeNotSatisfiableError(error) -> {
                 Timber.tag(TAG).d("Range Not Satisfiable (416) detected, performing strict recovery")
                 handleRangeNotSatisfiableError(mediaId)
@@ -3434,6 +3473,7 @@ class MusicService :
         // the clear above has just dropped: a fresh try plays. It used to give up on the spot.
         if (error.errorCode == PlaybackException.ERROR_CODE_IO_UNSPECIFIED ||
             error.errorCode == PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS ||
+            error.errorCode == PlaybackException.ERROR_CODE_IO_INVALID_HTTP_CONTENT_TYPE ||
             isContainerParseError(error)) {
             Timber.tag(TAG).d("IO error detected (${error.errorCode}), attempting recovery")
             handleGenericIOError(mediaId)
@@ -3515,7 +3555,9 @@ class MusicService :
 
         // whether it was playing, read before the pause below wipes it: the recovery used to go
         // by the audio-focus flag instead, so it re-prepared the song and left it paused
+        val target = player
         val resume = player.playWhenReady || wasPlayingBeforeAudioFocusLoss
+        val pauseGeneration = transport.pauseGeneration
         retryJob?.cancel()
         retryJob = scope.launch {
             try {
@@ -3525,7 +3567,8 @@ class MusicService :
 
                 delay(RETRY_DELAY_MS * 3)
 
-                if (!playerInitialized.value) {
+                if (!playerInitialized.value || player !== target || player.currentMediaItem?.mediaId != mediaId ||
+                    transport.pauseGeneration != pauseGeneration) {
                     Timber.tag(TAG).w("Player no longer initialized, aborting AudioTrack recovery")
                     return@launch
                 }
@@ -3535,22 +3578,20 @@ class MusicService :
 
                     val currentPosition = player.currentPosition
                     player.seekTo(currentIndex, currentPosition)
-                    player.prepare()
-
+                    val shouldResume = mayResumeRecovery(mediaId, target.currentMediaItem?.mediaId,
+                        resume || target.playWhenReady, castConnectionHandler?.isCasting?.value == true,
+                        pauseGeneration, transport.pauseGeneration)
+                    // Restore intent BEFORE prepare: READY cancels retryJob, so waiting after prepare
+                    // could cancel the only code that would ever press play again.
+                    target.playWhenReady = shouldResume && (hasAudioFocus || requestAudioFocus())
+                    target.prepare()
                     Timber.tag(TAG).d("Retrying playback for $mediaId after AudioTrack error")
-
-                    if (resume) {
-                        delay(500)
-                        if ((hasAudioFocus || requestAudioFocus()) && playerInitialized.value) {
-                            if (castConnectionHandler?.isCasting?.value != true) {
-                                player.play()
-                            }
-                        }
-                    }
                 } else {
                     Timber.tag(TAG).w("Invalid media item index during AudioTrack recovery")
                     handleFinalFailure()
                 }
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
             } catch (e: Exception) {
                 Timber.tag(TAG).e(e, "Error during AudioTrack error recovery")
                 handleFinalFailure()
@@ -3572,11 +3613,14 @@ class MusicService :
         val fromStart = (currentMediaIdRetryCount[mediaId] ?: 0) > 1
 
         retryJob?.cancel()
+        val target = player
         retryJob = scope.launch {
 
             performAggressiveCacheClear(mediaId)
 
             delay(RETRY_DELAY_MS)
+            if (player !== target || target.currentMediaItem?.mediaId != mediaId ||
+                target.currentMediaItemIndex == C.INDEX_UNSET) return@launch
 
             val currentIndex = player.currentMediaItemIndex
             player.seekTo(currentIndex, if (fromStart) 0 else player.currentPosition)
@@ -3595,12 +3639,15 @@ class MusicService :
         incrementRetryCount(mediaId)
 
         retryJob?.cancel()
+        val target = player
         retryJob = scope.launch {
             Timber.tag(TAG).d("Handling page reload error for $mediaId")
 
             performAggressiveCacheClear(mediaId)
 
             delay(RETRY_DELAY_MS)
+            if (player !== target || target.currentMediaItem?.mediaId != mediaId ||
+                target.currentMediaItemIndex == C.INDEX_UNSET) return@launch
 
             val currentPosition = player.currentPosition
             val currentIndex = player.currentMediaItemIndex
@@ -3629,8 +3676,11 @@ class MusicService :
         }
 
         retryJob?.cancel()
+        val target = player
         retryJob = scope.launch {
             delay(RETRY_DELAY_MS)
+            if (player !== target || target.currentMediaItem?.mediaId != mediaId ||
+                target.currentMediaItemIndex == C.INDEX_UNSET) return@launch
 
             val currentPosition = player.currentPosition
             val currentIndex = player.currentMediaItemIndex
@@ -3650,9 +3700,12 @@ class MusicService :
         incrementRetryCount(mediaId)
 
         retryJob?.cancel()
+        val target = player
         retryJob = scope.launch {
             performAggressiveCacheClear(mediaId)
             delay(RETRY_DELAY_MS)
+            if (player !== target || target.currentMediaItem?.mediaId != mediaId ||
+                target.currentMediaItemIndex == C.INDEX_UNSET) return@launch
 
             val currentPosition = player.currentPosition
             val currentIndex = player.currentMediaItemIndex
@@ -4161,6 +4214,7 @@ class MusicService :
                     fetcherAction = { mediaId ->
                         val forced = forcedRoutes.containsKey(mediaId)
                         ((if (forced) null else deviceStream(mediaItem)) ?: routeStream(mediaId)).also { stream ->
+                            currentCoroutineContext().ensureActive()
                             if (stream != null) playingStreams[mediaId] = stream else playingStreams.remove(mediaId)
                         }
                     },
@@ -4410,6 +4464,7 @@ class MusicService :
     override fun onDestroy() {
         isRunning = false
 
+        routeRefreshJob?.cancel()
         audioManager.unregisterAudioDeviceCallback(audioDeviceCallback)
         audioOutputs.release()
         audioPass.release()
@@ -5093,11 +5148,12 @@ class MusicService :
         // offline: no provider is asked; the song plays if it's cached, and is skipped if not.
         // An imported file is never looked for online, even one whose file has gone missing.
         if (com.mochyy.mochymusic.utils.OfflineMode.isOn || mediaId.startsWith("LOCAL_")) return null
-        forcedRoutes[mediaId]?.let { forced ->
+        while (true) {
+            val forced = forcedRoutes[mediaId] ?: break
             if (forced.providerId == com.mochyy.mochymusic.modules.SourceModules.YouTubeId) return youTubeRoute(mediaId)
             forcedModuleStream(mediaId, forced)?.let { return it }
-            // the picked provider doesn't have it any more: the usual order takes over
-            forcedRoutes.remove(mediaId)
+            // Fall back only if this is still the chosen route. A newer route takes priority.
+            if (forcedRoutes.remove(mediaId, forced)) break
         }
         val skip = recentFailures(mediaId)
         // a fresh lookup: a notice from one that never got to play no longer holds
@@ -5195,8 +5251,9 @@ class MusicService :
         val module = sourceModules.module(forced.providerId) ?: return null
         val stream = forced.freshStream?.also { forced.freshStream = null }
             ?: runCatching { resolveWith(module, mediaId) }.getOrNull()
-            ?: return null
-        return moduleStream(mediaId, module, stream)
+        currentCoroutineContext().ensureActive()
+        if (forcedRoutes[mediaId] !== forced) return null
+        return stream?.let { moduleStream(mediaId, module, it) }
     }
 
     private inner class ProviderSwitchHost : ProviderSwitch.Host {
@@ -5228,9 +5285,9 @@ class MusicService :
             val position = player.currentPosition
             // stopping releases the song's source; preparing again fetches it, now from the picked provider
             player.stop()
-            player.prepare()
             player.seekTo(index, position)
             player.playWhenReady = play
+            player.prepare()
         }
     }
 

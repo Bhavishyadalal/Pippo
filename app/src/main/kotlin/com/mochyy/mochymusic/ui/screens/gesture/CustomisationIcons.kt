@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -33,6 +34,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.mochyy.mochymusic.R
@@ -62,6 +65,7 @@ internal fun IconsSection() {
             try {
                 withContext(Dispatchers.IO) { AppIcons.apply(context.applicationContext, icon) }
                 picked = icon
+                AppIcons.syncSplash(context)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {
@@ -96,7 +100,7 @@ internal fun IconsSection() {
                     Spacer(Modifier.height(12.dp))
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         items(AppIcon.entries.filter { it.family == family }, key = { it.name }) { icon ->
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Column(Modifier.width(92.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                                 AsyncImage(
                                     model = icon.foreground, contentDescription = stringResource(icon.label),
                                     contentScale = ContentScale.Crop,
@@ -106,7 +110,14 @@ internal fun IconsSection() {
                                         .clickable(enabled = !applying) { pick(icon) },
                                 )
                                 Spacer(Modifier.height(6.dp))
-                                Text(stringResource(icon.label).substringBefore(" ·"), color = Color.White, style = MaterialTheme.typography.labelMedium)
+                                Text(
+                                    text = stringResource(icon.label).substringBefore(" ·"),
+                                    color = Color.White,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    textAlign = TextAlign.Center,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
                             }
                         }
                     }

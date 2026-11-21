@@ -1,8 +1,8 @@
 # Pippo
 
-An Android music player with cozy original character artwork, twenty selectable anime launcher icons, phone/tablet and Android TV interfaces, local music, downloads, lyrics, and optional music integrations.
+An Android music player with cozy original character artwork, 53 launcher icons, phone/tablet and Android TV interfaces, local music, downloads, lyrics, and optional music integrations.
 
-Pippo's characters are selected randomly once per app process. They stay consistent while navigating and recomposing screens. The default launcher uses icon 01; the other portraits and named variants are available in **Customisation → Icons**.
+Pippo's characters are selected randomly once per app process. They stay consistent while navigating and recomposing screens. The black Ribbon P is the default launcher icon. Pick lettering, illustrated, glass, or earlier portrait designs in **Customisation → Icons**.
 
 ## APK builds
 

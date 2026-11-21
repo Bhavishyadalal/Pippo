@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="immersive_mode">Immersive mode</string>
+    <string name="immersive_classic">Classic</string>
+    <string name="immersive_classic_description">Song artwork and synced lyrics</string>
+    <string name="immersive_cinema">Artwork Cinema</string>
+    <string name="immersive_cinema_description">Full screen album artwork</string>
+    <string name="immersive_lyrics_focus">Lyrics Focus</string>
+    <string name="immersive_lyrics_description">Synced lyrics on a quiet backdrop</string>
+    <string name="immersive_exit">Exit immersive mode</string>
+    <string name="immersive_show_controls">Show playback controls</string>
+    <string name="immersive_hide_controls">Hide playback controls</string>
+    <string name="immersive_previous">Previous track</string>
+    <string name="immersive_next">Next track</string>
+    <string name="immersive_selected">Selected</string>
+</resources>

@@ -41,6 +41,8 @@ class MochyWidgetManager @Inject constructor(
             .build()
     }
 
+    private val artworkWidgets = ArtworkWidgets(context)
+
     private var cachedArtworkUri: String? = null
     private var cachedAlbumArt: Bitmap? = null
     private var cachedCircularAlbumArt: Bitmap? = null
@@ -84,7 +86,11 @@ class MochyWidgetManager @Inject constructor(
         val widgetIds = appWidgetManager.getAppWidgetIds(componentName)
         val turntableComponentName = ComponentName(context, TurntableWidgetReceiver::class.java)
         val turntableWidgetIds = if (progressOnly) IntArray(0) else appWidgetManager.getAppWidgetIds(turntableComponentName)
-        if (widgetIds.isEmpty() && turntableWidgetIds.isEmpty()) return
+        val placedArtwork = artworkWidgets.placed()
+        if (progressOnly) {
+            placedArtwork.forEach { (_, ids) -> artworkWidgets.updateProgress(ids, duration, currentPosition) }
+        }
+        if (widgetIds.isEmpty() && turntableWidgetIds.isEmpty() && (progressOnly || placedArtwork.isEmpty())) return
 
         val albumArt: Bitmap?
         val circularAlbumArt: Bitmap?
@@ -115,6 +121,12 @@ class MochyWidgetManager @Inject constructor(
                     currentPosition
                 )
                 appWidgetManager.updateAppWidget(widgetId, views)
+            }
+        }
+
+        if (!progressOnly) {
+            placedArtwork.forEach { (style, ids) ->
+                artworkWidgets.update(style, ids, title, artist, albumArt, isPlaying, isLiked, duration, currentPosition)
             }
         }
 
