@@ -6,6 +6,7 @@ import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
 import android.content.Context
 import android.content.Intent
+import android.os.Bundle
 import com.mochyy.mochymusic.playback.MusicService
 
 class TurntableWidgetReceiver : AppWidgetProvider() {
@@ -21,6 +22,15 @@ class TurntableWidgetReceiver : AppWidgetProvider() {
         } else {
             MochyWidgetManager(context).updateEmpty(appWidgetManager, appWidgetIds, turntable = true)
         }
+    }
+
+    override fun onAppWidgetOptionsChanged(
+        context: Context,
+        appWidgetManager: AppWidgetManager,
+        appWidgetId: Int,
+        newOptions: Bundle,
+    ) {
+        onUpdate(context, appWidgetManager, intArrayOf(appWidgetId))
     }
 
     override fun onReceive(context: Context, intent: Intent) {

@@ -523,6 +523,7 @@ class MusicService :
     }
 
     private var lastAudioRoute: AudioRouteIdentity? = null
+    private var bluetoothRouteWasMissing = false
     private var routeRefreshJob: Job? = null
 
     // Update every live sink; re-open a stale Android AudioTrack after a settled Bluetooth handover.
@@ -534,7 +535,14 @@ class MusicService :
         val active = audioOutputs.activeDevice()
         val route = active?.let { AudioRouteIdentity(it.id,
             com.mochyy.mochymusic.playback.audio.AudioOutputs.kindOf(it.type) == com.mochyy.mochymusic.playback.audio.AudioOutputs.Kind.BLUETOOTH) }
-        val changed = needsBluetoothRouteRefresh(lastAudioRoute, route)
+        if (route == null) {
+            bluetoothRouteWasMissing = lastAudioRoute?.bluetooth == true
+            routeRefreshJob?.cancel()
+            return
+        }
+        val changed = needsBluetoothRouteRefresh(lastAudioRoute, route) ||
+            (bluetoothRouteWasMissing && route.bluetooth)
+        bluetoothRouteWasMissing = false
         lastAudioRoute = route
         if (!changed || !::player.isInitialized) return
         routeRefreshJob?.cancel()
@@ -1761,8 +1769,11 @@ class MusicService :
         }
 
         waitingForNetworkConnection.value = true
-        com.mochyy.mochymusic.ui.component.TopToaster.error(getString(
-            if (isNetworkConnected.value) R.string.stream_retry_connected else R.string.stream_retry_offline))
+        if (!isNetworkConnected.value || retryCount >= 2) {
+            com.mochyy.mochymusic.ui.component.TopToaster.error(getString(
+                if (isNetworkConnected.value) R.string.stream_retry_connected else R.string.stream_retry_offline,
+            ))
+        }
 
         retryJob?.cancel()
         val target = player
@@ -1882,14 +1893,22 @@ class MusicService :
 
     /** A failed stream the player has given up on: says so, and skips after the timeout unless that's turned off. */
     private fun failStream() {
-        player.pause()
+        val target = player
+        val occurrence = providerOccurrence
+        val pauseGeneration = transport.pauseGeneration
+        val wasPlaying = target.playWhenReady
+        target.pause()
         announceStreamFailure()
         clearStreamFailure()
+        if (!wasPlaying) return
+        fun canRecover(): Boolean = player === target && providerOccurrence == occurrence &&
+            transport.pauseGeneration == pauseGeneration && castConnectionHandler?.isCasting?.value != true
         if (dataStore.get(DontSkipOnFailureKey, false)) {
             // staying on it means trying it again every few seconds until it plays: loading it
             // again ends this job, and a failure starts the next wait
             failureJob = scope.launch {
                 delay(STREAM_RETRY_INTERVAL_MS)
+                if (!canRecover()) return@launch
                 Timber.tag(TAG).d("Retrying the failed stream")
                 player.prepare()
                 player.play()
@@ -1903,6 +1922,7 @@ class MusicService :
         failureJob = scope.launch {
             delay(timeoutMs)
             streamFailure.value = null
+            if (!canRecover()) return@launch
             Timber.tag(TAG).d("Stream failure timed out, skipping to next track")
             skipAfterFailure()
         }
@@ -3027,6 +3047,8 @@ class MusicService :
         reason: Int,
     ) {
         // The same ID can occupy two queue entries or loop back to the start.
+        bufferingRecoveryJob?.cancel()
+        bufferingRecoveryJob = null
         providerOccurrence++
         providerSwitch.onMediaChanged()
         // A recovery belongs to the old item; it must not prepare or skip a newly selected song.
@@ -3160,10 +3182,69 @@ class MusicService :
         }
     }
 
+    private var bufferingRecoveryJob: Job? = null
+    private var bufferingRecoveredOccurrence = -1L
+
+    private fun watchForPlaybackStall(target: Player) {
+        if (target !== player) return
+        if (!target.playWhenReady || target.playbackState != Player.STATE_BUFFERING ||
+            target.playbackSuppressionReason != Player.PLAYBACK_SUPPRESSION_REASON_NONE
+        ) {
+            bufferingRecoveryJob?.cancel()
+            bufferingRecoveryJob = null
+            if (target.playbackState == Player.STATE_READY) bufferingRecoveredOccurrence = -1L
+            return
+        }
+        val mediaId = target.currentMediaItem?.mediaId ?: return
+        val occurrence = providerOccurrence
+        if (bufferingRecoveryJob?.isActive == true) return
+        bufferingRecoveryJob = scope.launch {
+            delay(25_000L)
+            bufferingRecoveryJob = null
+            if (player !== target || providerOccurrence != occurrence || !target.playWhenReady ||
+                target.playbackState != Player.STATE_BUFFERING ||
+                target.playbackSuppressionReason != Player.PLAYBACK_SUPPRESSION_REASON_NONE ||
+                handoffFor(mediaId) != null ||
+                castConnectionHandler?.isCasting?.value == true || waitingForNetworkConnection.value
+            ) return@launch
+
+            if (bufferingRecoveredOccurrence == occurrence) {
+                if (!connectivityObserver.isCurrentlyConnected()) {
+                    target.stop()
+                    waitOnNetworkError()
+                } else if (!forceFallBack(mediaId, includeYouTube = true, announce = false)) {
+                    lastPlaybackError = PlaybackException(
+                        getString(R.string.pippo_playback_stalled), null, PlaybackException.ERROR_CODE_TIMEOUT,
+                    )
+                    failStream()
+                }
+                return@launch
+            }
+
+            val index = target.currentMediaItemIndex
+            if (index == C.INDEX_UNSET) return@launch
+            bufferingRecoveredOccurrence = occurrence
+            val position = target.contentPosition.coerceAtLeast(0L)
+            songUrlCache.remove(mediaId)
+            target.stop()
+            target.seekTo(index, position)
+            target.prepare()
+        }
+    }
+
     override fun onEvents(
         player: Player,
         events: Player.Events,
     ) {
+        if (events.containsAny(
+                Player.EVENT_PLAYBACK_STATE_CHANGED,
+                Player.EVENT_PLAY_WHEN_READY_CHANGED,
+                Player.EVENT_PLAYBACK_SUPPRESSION_REASON_CHANGED,
+                Player.EVENT_MEDIA_ITEM_TRANSITION,
+            )
+        ) {
+            watchForPlaybackStall(player)
+        }
         if (player === this.player && player.playbackState == Player.STATE_READY &&
             events.containsAny(Player.EVENT_PLAYBACK_STATE_CHANGED, Player.EVENT_TRACKS_CHANGED, Player.EVENT_TIMELINE_CHANGED)
         ) {
