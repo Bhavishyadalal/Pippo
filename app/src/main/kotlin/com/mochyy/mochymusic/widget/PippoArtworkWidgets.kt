@@ -12,13 +12,16 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.LinearGradient
 import android.graphics.Paint
+import android.graphics.Typeface
 import android.graphics.Path
 import android.graphics.RadialGradient
 import android.graphics.RectF
 import android.graphics.Shader
+import android.os.Build
 import android.os.Bundle
 import android.util.LruCache
 import android.util.SizeF
+import android.util.TypedValue
 import android.view.View
 import android.widget.RemoteViews
 import androidx.annotation.StringRes
@@ -28,12 +31,16 @@ import com.mochyy.mochymusic.playback.MusicService
 import com.mochyy.mochymusic.utils.makeTimeString
 import kotlin.math.roundToInt
 
-internal enum class ArtworkWidgetStyle(val receiver: Class<out ArtworkWidgetReceiver>, @StringRes val label: Int) {
-    VINYL(VinylCollageWidget::class.java, R.string.widget_vinyl_collage),
-    CLOUD(CloudNotesWidget::class.java, R.string.widget_cloud_notes),
-    NOIR(NoirSleeveWidget::class.java, R.string.widget_noir_sleeve),
-    WARM(AmberFrameWidget::class.java, R.string.widget_amber_frame),
-    NEON(CoralGlowWidget::class.java, R.string.widget_coral_glow),
+internal enum class ArtworkWidgetStyle(
+    val receiver: Class<out ArtworkWidgetReceiver>,
+    @StringRes val label: Int,
+    val detailColor: Long,
+) {
+    VINYL(VinylCollageWidget::class.java, R.string.widget_vinyl_collage, 0xFFE8CDD4),
+    CLOUD(CloudNotesWidget::class.java, R.string.widget_cloud_notes, 0xFFD1EAF7),
+    NOIR(NoirSleeveWidget::class.java, R.string.widget_noir_sleeve, 0xFFE2E1F1),
+    WARM(AmberFrameWidget::class.java, R.string.widget_amber_frame, 0xFFFFDBB6),
+    NEON(CoralGlowWidget::class.java, R.string.widget_coral_glow, 0xFFFFCAD5),
 }
 
 abstract class ArtworkWidgetReceiver : AppWidgetProvider() {
@@ -120,19 +127,43 @@ internal class ArtworkWidgets(private val context: Context) {
         return RemoteViews(context.packageName, R.layout.widget_pippo_artwork).apply {
             setImageViewBitmap(R.id.art_widget_background, chrome)
             val metrics = context.resources.displayMetrics
-            val fontScale = context.resources.configuration.fontScale
+            val compact = size.height < 132 || size.width < 178
             val inset = if (size.width < 180) 8 else 12
-            // Keep controls over the sleeve. At narrow widths reserve less room for the disc.
+            val vertical = if (compact) 6 else 8
             val rightInset = if (style == ArtworkWidgetStyle.VINYL) {
                 maxOf(inset, (minOf(size.width, size.height) * .24f).roundToInt().coerceAtMost(size.width / 5))
             } else inset
             fun px(dp: Int) = (dp * metrics.density).roundToInt()
-            setViewPadding(R.id.art_widget_controls, px(inset), px(8), px(rightInset), px(8))
-            val showArtist = size.height >= 67 + 31 * fontScale
-            val showTimes = size.height >= 82 + 45 * fontScale && size.width >= 105 * fontScale
-            val showTimeline = size.height >= 69 + 19 * fontScale
+            setViewPadding(R.id.art_widget_controls, px(inset), px(vertical), px(rightInset), px(vertical))
+
+            val buttonHeight = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && compact) 36 else 44
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                for (button in intArrayOf(R.id.art_widget_previous, R.id.art_widget_toggle, R.id.art_widget_next)) {
+                    setViewLayoutHeight(button, buttonHeight.toFloat(), TypedValue.COMPLEX_UNIT_DIP)
+                }
+            }
+            val titleSp = if (compact) 13 else 14
+            val artistSp = if (compact) 10 else 11
+            val titleHeight = widgetLineHeight(context, titleSp, bold = true)
+            val artistHeight = widgetLineHeight(context, artistSp)
+            val textWidth = size.width - inset - rightInset
+            val headRoom = (size.height - 2 * vertical - buttonHeight).coerceAtLeast(0)
+            val showLike = textWidth >= 110 && headRoom >= 40
+            val likeHeight = if (showLike) 36 else 0
+            val showArtist = artist.isNotBlank() && headRoom >= maxOf(likeHeight, titleHeight + artistHeight) + 10
+            val headerHeight = maxOf(likeHeight, titleHeight + if (showArtist) artistHeight else 0)
+            val timelineRoom = headRoom - headerHeight
+            val showTimeline = timelineRoom >= 9
+            val showTimes = showTimeline && timelineRoom >= widgetLineHeight(context, 10) + 11 && textWidth >= 94
+
+            setTextViewTextSize(R.id.art_widget_title, TypedValue.COMPLEX_UNIT_SP, titleSp.toFloat())
+            setTextViewTextSize(R.id.art_widget_artist, TypedValue.COMPLEX_UNIT_SP, artistSp.toFloat())
+            val detailColor = style.detailColor.toInt()
+            setTextColor(R.id.art_widget_artist, detailColor)
+            setTextColor(R.id.art_widget_elapsed, detailColor)
+            setTextColor(R.id.art_widget_remaining, detailColor)
             setViewVisibility(R.id.art_widget_progress, if (showTimeline) View.VISIBLE else View.GONE)
-            setViewVisibility(R.id.art_widget_like, if (size.width >= 104 + 20 * fontScale) View.VISIBLE else View.GONE)
+            setViewVisibility(R.id.art_widget_like, if (showLike) View.VISIBLE else View.GONE)
             setViewVisibility(R.id.art_widget_artist, if (showArtist) View.VISIBLE else View.GONE)
             setViewVisibility(R.id.art_widget_times, if (showTimes) View.VISIBLE else View.GONE)
             setTextViewText(R.id.art_widget_title, title)
@@ -164,6 +195,16 @@ internal class ArtworkWidgets(private val context: Context) {
         setTextViewText(R.id.art_widget_elapsed, makeTimeString(played))
         setTextViewText(R.id.art_widget_remaining, if (duration > 0L) "−" + makeTimeString(duration - played) else "")
     }
+}
+
+internal fun widgetLineHeight(context: Context, sp: Int, bold: Boolean = false): Int {
+    val metrics = context.resources.displayMetrics
+    val paint = Paint().apply {
+        textSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, sp.toFloat(), metrics)
+        typeface = if (bold) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
+    }
+    // Include a little room for fallback glyphs used by CJK and Indic titles.
+    return kotlin.math.ceil(paint.fontSpacing / metrics.density + 2f).toInt()
 }
 
 internal data class WidgetSize(val width: Int, val height: Int)

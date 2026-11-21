@@ -90,6 +90,11 @@ class ProviderSwitch(private val scope: () -> CoroutineScope, private val host: 
         suspend fun switchTo(target: Target, route: ForcedRoute): HandoffResult
     }
 
+    internal data class Attempt(val quality: String? = null, val opened: Boolean = false, val failure: ProviderSwitchState.Failed? = null)
+
+    private val _attempts = MutableStateFlow<Map<String, Attempt>>(emptyMap())
+    internal val attempts = _attempts.asStateFlow()
+
     private val _state = MutableStateFlow<ProviderSwitchState>(ProviderSwitchState.Idle)
     val state: StateFlow<ProviderSwitchState> = _state.asStateFlow()
 
@@ -100,6 +105,7 @@ class ProviderSwitch(private val scope: () -> CoroutineScope, private val host: 
         val target = host.currentTarget() ?: return
         job?.cancel()
         this.target = target
+        _attempts.value = _attempts.value - providerId
         _state.value = ProviderSwitchState.Working(providerId, 1, MaxTries)
 
         val serviceScope = scope()
@@ -137,9 +143,16 @@ class ProviderSwitch(private val scope: () -> CoroutineScope, private val host: 
             }
 
             currentCoroutineContext().ensureActive()
-            _state.value = when {
+            val finalState = when {
                 host.currentTarget() != target -> ProviderSwitchState.Idle
                 result is Resolution.Found -> {
+                    val quality = result.route.freshStream?.qualityLabel?.takeIf { it.isNotBlank() }
+                        ?: result.route.freshYouTube?.format?.let { format ->
+                            val codec = StreamFacts.codecOf(format.mimeType.substringBefore(';'), format.mimeType.substringAfter("codecs=", "").trim('"'))
+                            listOfNotNull(codec, format.bitrate.takeIf { it > 0 }?.let { "${it / 1000} kbps" })
+                                .joinToString(" · ").ifBlank { null }
+                        }
+                    _attempts.value = _attempts.value + (providerId to Attempt(quality = quality))
                     _state.value = ProviderSwitchState.Starting(providerId)
                     val switched = try {
                         host.switchTo(target, result.route)
@@ -158,6 +171,17 @@ class ProviderSwitch(private val scope: () -> CoroutineScope, private val host: 
                 }
                 else -> ProviderSwitchState.Failed(providerId, attempts, (result as? Resolution.Rejected)?.reason)
             }
+            when (finalState) {
+                is ProviderSwitchState.Done -> _attempts.value[providerId]?.let {
+                    _attempts.value = _attempts.value + (providerId to it.copy(opened = true))
+                }
+                is ProviderSwitchState.Failed -> {
+                    val previous = _attempts.value[providerId] ?: Attempt()
+                    _attempts.value = _attempts.value + (providerId to previous.copy(failure = finalState))
+                }
+                else -> Unit
+            }
+            _state.value = finalState
             this@ProviderSwitch.target = null
         }
     }
@@ -179,7 +203,9 @@ class ProviderSwitch(private val scope: () -> CoroutineScope, private val host: 
     }
 
     fun onMediaChanged() {
+        _attempts.value = emptyMap()
         if (target != null && host.currentTarget() != target) cancel()
+        else if (target == null) acknowledge()
     }
 
     fun acknowledge() {

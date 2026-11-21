@@ -166,10 +166,11 @@ class MochyWidgetManager @Inject constructor(
     }
 
     private fun WidgetSize.legacyLayout(): Int {
-        val fontScale = context.resources.configuration.fontScale
+        val fullText = widgetLineHeight(context, 16, bold = true) + widgetLineHeight(context, 13)
+        val compactText = widgetLineHeight(context, 14, bold = true) + widgetLineHeight(context, 12)
         return when {
-            width >= 205 && height >= 72 + 32 * fontScale -> R.layout.widget_music_player
-            width >= 164 && height >= maxOf(48f, 12 + 31 * fontScale) -> R.layout.widget_compact_wide
+            width >= 205 && height >= 78 + fullText -> R.layout.widget_music_player
+            width >= 164 && height >= maxOf(48, 10 + compactText) -> R.layout.widget_compact_wide
             else -> R.layout.widget_compact_square
         }
     }

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <plurals name="pippo_repair_count">
+        <item quantity="one">Repair %d download</item>
+        <item quantity="other">Repair %d downloads</item>
+    </plurals>
+    <string name="pippo_repair_title">Repair downloads</string>
+    <string name="pippo_repair_description">Retry missing or failed tracks using your current download quality.</string>
+    <string name="pippo_repair_lossless_unavailable">No downloadable FLAC or ALAC was available</string>
+    <string name="pippo_repair_failed">Download failed</string>
+    <string name="pippo_repair_missing">Missing from this device</string>
+    <string name="pippo_repair_offline">Turn off Offline mode to retry downloads.</string>
+    <string name="pippo_repair_retry_error">Could not queue every download. Try again.</string>
+    <string name="pippo_repair_retry">Retry downloads</string>
+    <string name="pippo_provider_opened_quality">Opened %1$s</string>
+    <string name="pippo_provider_found_quality">Found %1$s</string>
+    <string name="pippo_playback_stalled">The stream took too long to start</string>
+</resources>

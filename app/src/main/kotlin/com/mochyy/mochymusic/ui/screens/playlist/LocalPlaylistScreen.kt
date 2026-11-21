@@ -613,6 +613,12 @@ fun LocalPlaylistScreen(
             }
         }
 
+        if (!isSearching && songs.isNotEmpty()) {
+            item(key = "repair_downloads") {
+                PlaylistRepair(songs.map { it.song }, downloadUtil)
+            }
+        }
+
         itemsIndexed(
             items = if (isSearching) filteredSongs else mutableSongs,
             key = { _, song -> song.map.id },
