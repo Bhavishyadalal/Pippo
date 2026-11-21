@@ -9,6 +9,7 @@ import com.music.innertube.pages.NextResult
 import com.mochyy.mochymusic.extensions.toMediaItem
 import com.mochyy.mochymusic.models.MediaMetadata
 import com.mochyy.mochymusic.utils.NotRecommended
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -26,7 +27,7 @@ class YouTubeQueue(
 
             for (attempt in 0..MAX_RETRIES) {
                 try {
-                    var nextResult = YouTube.next(endpoint, continuation).getOrThrow()
+                    var nextResult = YouTube.next(endpoint).getOrThrow()
 
                     // A bare videoId endpoint without personalization (fresh install, no account)
                     // often comes back as just the song itself, with no automix and no continuation.
@@ -42,6 +43,7 @@ class YouTubeQueue(
                     val mix = isMix()
                     endpoint = nextResult.endpoint
                     continuation = nextResult.continuation
+                    failedPageLoads = 0
                     val items = nextResult.items.map { it.toMediaItem() }
                     val index = nextResult.currentIndexFor(preloadItem?.id ?: endpoint.videoId)
                     if (!mix) {
@@ -54,6 +56,8 @@ class YouTubeQueue(
                         items = items.filterIndexed { i, item -> i == index || item.mediaId !in hidden },
                         mediaItemIndex = index - items.take(index).count { it.mediaId in hidden },
                     )
+                } catch (e: CancellationException) {
+                    throw e
                 } catch (e: Exception) {
                     lastException = e
                     radioEndpoint()?.let { endpoint = it }
@@ -75,10 +79,12 @@ class YouTubeQueue(
                 try {
                     val nextResult = YouTube.next(endpoint, currentContinuation).getOrThrow()
                     endpoint = nextResult.endpoint
-                    continuation = nextResult.continuation
+                    continuation = nextResult.continuation?.takeUnless { it == currentContinuation }
                     failedPageLoads = 0
                     val items = nextResult.items.map { it.toMediaItem() }
                     return@withContext if (isMix()) items.filter { it.mediaId !in NotRecommended } else items
+                } catch (e: CancellationException) {
+                    throw e
                 } catch (e: Exception) {
                     lastException = e
                     if (attempt < MAX_RETRIES) delay(RETRY_DELAY_MS * (attempt + 1))
@@ -106,7 +112,7 @@ class YouTubeQueue(
     }
 
     private fun NextResult.currentIndexFor(videoId: String?): Int =
-        currentIndex
+        currentIndex?.takeIf { it in items.indices }
             ?: videoId?.let { id -> items.indexOfFirst { it.id == id }.takeIf { it >= 0 } }
             ?: 0
 

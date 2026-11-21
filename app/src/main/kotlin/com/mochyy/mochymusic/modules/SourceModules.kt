@@ -106,7 +106,7 @@ class SourceModules @Inject constructor(
         if (!isEnabled(id)) return false
         if (id == YouTubeId) return true
         val source = module(id) ?: return false
-        return source.signIn == null || source.accountState() is AccountState.SignedIn
+        return source.signIn == null || runCatching { source.accountState() }.getOrNull() is AccountState.SignedIn
     }
 
     /** whether [id] can give a download: youtube always, since downloads have always fallen back to it, a module when on and signed in */

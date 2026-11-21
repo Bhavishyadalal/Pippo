@@ -20,15 +20,15 @@ class YouTubeAlbumRadio(
             playlistId = playlistId
         )
 
-    private var albumSongCount = 0
+    private var albumSongIds = emptySet<String>()
     private var continuation: String? = null
     private var firstTimeLoaded: Boolean = false
 
     override suspend fun getInitialStatus(): Queue.Status = withContext(IO) {
         val albumSongs = YouTube.albumSongs(playlistId).getOrThrow()
-        albumSongCount = albumSongs.size
+        albumSongIds = albumSongs.map { it.id }.toSet()
         Queue.Status(
-            title = albumSongs.first().album?.name.orEmpty(),
+            title = albumSongs.firstOrNull()?.album?.name.orEmpty(),
             items = albumSongs.map { it.toMediaItem() },
             mediaItemIndex = 0
         )
@@ -37,11 +37,12 @@ class YouTubeAlbumRadio(
     override fun hasNextPage(): Boolean = !firstTimeLoaded || continuation != null
 
     override suspend fun nextPage(): List<MediaItem> = withContext(IO) {
-        val nextResult = YouTube.next(endpoint, continuation).getOrThrow()
-        continuation = nextResult.continuation
+        val previous = continuation
+        val nextResult = YouTube.next(endpoint, previous).getOrThrow()
+        continuation = nextResult.continuation?.takeUnless { it == previous }
         if (!firstTimeLoaded) {
             firstTimeLoaded = true
-            nextResult.items.drop(albumSongCount).map { it.toMediaItem() }
+            nextResult.items.filterNot { it.id in albumSongIds }.map { it.toMediaItem() }
         } else {
             nextResult.items.map { it.toMediaItem() }
         }
