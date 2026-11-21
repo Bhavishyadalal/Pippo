@@ -32,6 +32,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.NavController
+import com.mochyy.mochymusic.ui.theme.LocalPureBlack
 import com.mochyy.mochymusic.ui.menu.rememberResyncAll
 import com.mochyy.mochymusic.LocalPlayerAwareWindowInsets
 import com.mochyy.mochymusic.R
@@ -61,7 +62,7 @@ import com.music.innertube.models.YTItem
 fun LibraryHomeScreen(
     navController: NavController,
     modifier: Modifier = Modifier,
-    pureBlack: Boolean = false,
+    pureBlack: Boolean = LocalPureBlack.current,
 ) {
     val viewModel: LibraryHomeViewModel = hiltViewModel()
     val importViewModel: LibraryImportViewModel = hiltViewModel()

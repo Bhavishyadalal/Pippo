@@ -6,6 +6,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.Role
 
+import com.mochyy.mochymusic.ui.theme.LocalPureBlack
 import com.mochyy.mochymusic.ui.theme.PippoColors
 import com.mochyy.mochymusic.ui.theme.PippoSpacing
 import com.mochyy.mochymusic.ui.theme.PippoSize
@@ -111,10 +112,16 @@ val SearchTopClearance = 18.dp
 
 /** Compatibility names shared by Search, Library and Settings; values live in the design system. */
 object SearchColors {
-    val Field = PippoColors.Surface
-    val FieldFocused = PippoColors.SurfaceRaised
-    val Tile = PippoColors.Surface
-    val TileHigh = PippoColors.SurfaceRaised
+    val Field: Color
+        @Composable get() =
+            if (LocalPureBlack.current) MaterialTheme.colorScheme.surfaceContainerHigh else PippoColors.Surface
+    val FieldFocused: Color
+        @Composable get() =
+            if (LocalPureBlack.current) MaterialTheme.colorScheme.surfaceContainerHighest else PippoColors.SurfaceRaised
+    val Tile: Color
+        @Composable get() = Field
+    val TileHigh: Color
+        @Composable get() = FieldFocused
     val Divider = PippoColors.Divider
     val Primary = PippoColors.Text
     val Secondary = PippoColors.SecondaryText
@@ -608,11 +615,12 @@ fun MoodTile(
 
     var titleWraps by remember(title) { mutableStateOf(false) }
 
-    val tileBrush = remember(tint) {
+    val tileColor = SearchColors.Tile
+    val tileBrush = remember(tint, tileColor) {
         Brush.linearGradient(
             colors = listOf(
-                blendOver(tint.copy(alpha = 0.55f), SearchColors.Tile),
-                blendOver(tint.copy(alpha = 0.16f), SearchColors.Tile),
+                blendOver(tint.copy(alpha = 0.55f), tileColor),
+                blendOver(tint.copy(alpha = 0.16f), tileColor),
             )
         )
     }

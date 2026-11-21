@@ -1,40 +1,143 @@
 package com.mochyy.mochymusic.ui.screens.update
 
+import androidx.annotation.DrawableRes
+import androidx.annotation.StringRes
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import coil3.compose.AsyncImage
 import com.mochyy.mochymusic.BuildConfig
 import com.mochyy.mochymusic.R
-import com.mochyy.mochymusic.ui.brand.PippoCharacter
-import com.mochyy.mochymusic.ui.brand.PippoPose
 import com.mochyy.mochymusic.ui.component.PopupSheetState
+import com.mochyy.mochymusic.ui.component.TopToaster
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-/** Offline app information. No remote releases, profiles or donation services. */
+private data class AboutLink(
+    @StringRes val label: Int,
+    val account: String,
+    val url: String,
+    @DrawableRes val icon: Int,
+    val accent: Color,
+)
+
+private val aboutLinks = listOf(
+    AboutLink(
+        R.string.pippo_about_instagram, "@bhavishya_dalal_",
+        "https://www.instagram.com/bhavishya_dalal_/", R.drawable.insert_photo, Color(0xFFF1B2CE),
+    ),
+    AboutLink(
+        R.string.pippo_about_github, "Bhavishyadalal",
+        "https://github.com/Bhavishyadalal", R.drawable.github, Color(0xFFC9C3F6),
+    ),
+    AboutLink(
+        R.string.pippo_about_source, "Bhavishyadalal/Pippo",
+        "https://github.com/Bhavishyadalal/Pippo", R.drawable.library_music_outlined, Color(0xFFBCDCCA),
+    ),
+)
+
 fun PopupSheetState.showAboutSheet(onOpenDevSpace: (Int) -> Unit = {}) {
     val popup = this
-    show(buttonBar = { SheetPrimaryButton(stringResource(R.string.done), popup::dismiss) }) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp)) {
-            PippoCharacter(PippoPose.Thanks, Modifier.fillMaxWidth().height(230.dp))
-            Text("Pippo", style = MaterialTheme.typography.headlineLarge)
-            Text(BuildConfig.VERSION_NAME, style = MaterialTheme.typography.bodyMedium)
-            Text(stringResource(R.string.pippo_about_description), Modifier.padding(top = 16.dp))
-            Text(stringResource(R.string.pippo_manual_updates), Modifier.padding(top = 12.dp))
-            TextButton(onClick = { popup.showPippoLicense() }) { Text("GNU GPL v3 · License") }
+    show(fullBleed = true, surface = Color.Black, buttonBar = { SheetPrimaryButton(stringResource(R.string.done), popup::dismiss) }) {
+        Column(
+            Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            AboutHero()
+            Text(stringResource(R.string.pippo_about_description), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(4.dp))
+            aboutLinks.forEach { link -> AboutLinkBadge(link) }
+            TextButton(onClick = { popup.showPippoLicense() }) { Text(stringResource(R.string.pippo_about_license)) }
         }
+    }
+}
+
+@Composable
+private fun AboutHero() {
+    Box(
+        Modifier.fillMaxWidth().heightIn(min = 148.dp).clip(RoundedCornerShape(24.dp)),
+    ) {
+        AsyncImage(
+            model = R.drawable.pippo_home_scene_07,
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.matchParentSize(),
+        )
+        Box(
+            Modifier.matchParentSize().background(
+                Brush.verticalGradient(listOf(Color.Black.copy(alpha = .10f), Color(0xE6141013))),
+            ),
+        )
+        Column(Modifier.align(Alignment.BottomStart).padding(18.dp)) {
+            Text("Pippo", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold, color = Color.White)
+            Text(
+                stringResource(R.string.pippo_about_version, BuildConfig.VERSION_NAME),
+                style = MaterialTheme.typography.labelMedium,
+                color = Color(0xFFEBD4CD),
+            )
+        }
+    }
+}
+
+@Composable
+private fun AboutLinkBadge(link: AboutLink) {
+    val uriHandler = LocalUriHandler.current
+    val openError = stringResource(R.string.pippo_about_link_error)
+    Row(
+        Modifier.fillMaxWidth()
+            .heightIn(min = 64.dp)
+            .clip(RoundedCornerShape(20.dp))
+            .background(link.accent.copy(alpha = .095f))
+            .clickable(role = Role.Button) {
+                runCatching { uriHandler.openUri(link.url) }.onFailure { TopToaster.error(openError) }
+            }
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            Modifier.size(40.dp).clip(RoundedCornerShape(13.dp)).background(link.accent.copy(alpha = .16f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(painterResource(link.icon), contentDescription = null, tint = link.accent, modifier = Modifier.size(20.dp))
+        }
+        Column(Modifier.weight(1f)) {
+            Text(stringResource(link.label), style = MaterialTheme.typography.titleSmall, color = Color.White)
+            Text(link.account, style = MaterialTheme.typography.bodySmall, color = link.accent)
+        }
+        Icon(painterResource(R.drawable.web_link), contentDescription = null, tint = link.accent, modifier = Modifier.size(17.dp))
     }
 }
 

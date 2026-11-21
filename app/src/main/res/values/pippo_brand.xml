@@ -45,4 +45,10 @@
     <color name="pippo_icon_bg_20">#F8E1D0</color>
     <string name="pippo_icon_label_20">20 · Wink · 06 · Pippo</string>
     <string name="pippo_icon_apply_failed">Could not change the app icon. Please try again.</string>
+    <string name="pippo_about_instagram">Instagram</string>
+    <string name="pippo_about_github">GitHub profile</string>
+    <string name="pippo_about_source">Pippo source code</string>
+    <string name="pippo_about_version">Version %1$s</string>
+    <string name="pippo_about_license">GNU GPL v3 · License</string>
+    <string name="pippo_about_link_error">Couldn’t open this link.</string>
 </resources>

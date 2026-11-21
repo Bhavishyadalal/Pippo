@@ -35,6 +35,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.mochyy.mochymusic.ui.theme.LocalPureBlack
 import com.mochyy.mochymusic.LocalPlayerAwareWindowInsets
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
@@ -78,7 +79,7 @@ fun LibraryGridScreen(
     onPlay: () -> Unit,
     onShuffle: () -> Unit,
     modifier: Modifier = Modifier,
-    pureBlack: Boolean = false,
+    pureBlack: Boolean = LocalPureBlack.current,
 ) {
     var query by remember { mutableStateOf(TextFieldValue()) }
     val listState = rememberLazyListState()

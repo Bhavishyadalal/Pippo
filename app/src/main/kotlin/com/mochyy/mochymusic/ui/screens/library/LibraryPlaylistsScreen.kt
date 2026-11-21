@@ -13,6 +13,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
+import com.mochyy.mochymusic.ui.theme.LocalPureBlack
 import com.mochyy.mochymusic.R
 import com.mochyy.mochymusic.importer.ImportSource
 import com.mochyy.mochymusic.ui.component.LocalMenuState
@@ -28,7 +29,7 @@ import com.mochyy.mochymusic.viewmodels.LibraryShelfKind
 fun LibraryPlaylistsScreen(
     navController: NavController,
     modifier: Modifier = Modifier,
-    pureBlack: Boolean = false,
+    pureBlack: Boolean = LocalPureBlack.current,
     shelf: LibraryShelfKind? = null,
     source: ImportSource? = null,
 ) {

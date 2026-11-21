@@ -2,6 +2,7 @@
 
 package com.mochyy.mochymusic.playback.audio.pass
 
+import android.os.SystemClock
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.AuxEffectInfo
 import androidx.media3.common.C
@@ -38,6 +39,9 @@ class PassSink(private val pass: AudioPass) : AudioSink {
     private var pendingSource: ByteBuffer? = null
     private var draining = false
     private var exact = true
+    private var nextProgressSampleMs = 0L
+    private var lastProgressMs = 0L
+    private var lastPlayedFrames = 0L
 
     /** whether this song can go out untouched right now */
     fun canTake(format: Format, source: Format?): Boolean = pass.canTake(format, source, this)
@@ -78,6 +82,7 @@ class PassSink(private val pass: AudioPass) : AudioSink {
         val frameBytes = output.channels * output.bits / 8
         writtenFrames += output.write(out) / frameBytes
         if (playing && !transportPlaying) startPlaying(output)
+        checkOutputProgress(output, out.hasRemaining())
         if (out.hasRemaining()) return false
         // only now is the decoder's buffer used up: if the output fails first, the router plays the whole buffer the normal way
         buffer.position(buffer.limit())
@@ -99,6 +104,30 @@ class PassSink(private val pass: AudioPass) : AudioSink {
     private fun startPlaying(output: PassTransport) {
         output.play()
         transportPlaying = true
+        lastProgressMs = SystemClock.elapsedRealtime()
+        nextProgressSampleMs = 0L
+    }
+
+    // A DAC can keep accepting calls without consuming frames. Treat that like a driver
+    // failure so the router can reopen playback through Android's normal output.
+    private fun checkOutputProgress(output: PassTransport, waitingToWrite: Boolean) {
+        if (!playing || !transportPlaying) return
+        val now = SystemClock.elapsedRealtime()
+        if (now < nextProgressSampleMs) return
+        nextProgressSampleMs = now + 250L
+        val played = try {
+            output.playedFrames()
+        } catch (failure: PassFailure) {
+            throw failure
+        } catch (failure: Exception) {
+            throw PassFailure("Couldn't read USB playback position", failure)
+        }
+        if (played != lastPlayedFrames || (!waitingToWrite && played >= writtenFrames)) {
+            lastPlayedFrames = played
+            lastProgressMs = now
+        } else if (now - lastProgressMs >= 3_000L) {
+            throw PassFailure("USB audio output did not advance")
+        }
     }
 
     private var scratch: ByteBuffer? = null
@@ -139,6 +168,7 @@ class PassSink(private val pass: AudioPass) : AudioSink {
             }
         }
         if (playing && !transportPlaying) startPlaying(output)
+        checkOutputProgress(output, pending != null)
     }
 
     override fun isEnded(): Boolean {
@@ -169,6 +199,7 @@ class PassSink(private val pass: AudioPass) : AudioSink {
         startUs = C.TIME_UNSET
         writtenFrames = 0
         queuedFrames = 0
+        lastPlayedFrames = 0L
         pending = null
         pendingSource = null
         draining = false
