@@ -1,5 +1,6 @@
 package com.mochyy.mochymusic.module
 
+import java.text.Normalizer
 import kotlin.math.abs
 
 /** A song in a service's catalog, as its search returns it. */
@@ -47,6 +48,30 @@ object TrackMatcher {
         return isDurationCompatible(query.durationMs, durationMs)
     }
 
+    fun isCompatible(query: TrackQuery, matched: MatchedTrack): Boolean {
+        if (!isCompatible(query, matched.title, matched.durationMs)) return false
+
+        val wanted = core(query.title)
+        val actual = core(matched.title)
+        // Some modules omit the title, and providers can use another script or translation.
+        // Reject a contradictory title when both are comparable Latin-script catalog entries.
+        if (wanted == actual || !wanted.hasLatinTitle() || !actual.hasLatinTitle()) return true
+        val titleSimilarity = similarity(wanted, actual)
+        if (titleSimilarity < 0.3f) return false
+        if (titleSimilarity >= 0.75f) return true
+
+        // Require corroboration from the credits for fuzzy titles only. The exact title may
+        // be filed under a singer on one service and a composer on another.
+        val artists = query.artists.flatMap(::words)
+        val credits = words(matched.artist)
+        return artists.isEmpty() || credits.isEmpty() || artists.any { it in credits }
+    }
+
+    private fun String.hasLatinTitle(): Boolean =
+        any { it.isLetter() } && filter { it.isLetter() }.all {
+            Character.UnicodeScript.of(it.code) == Character.UnicodeScript.LATIN
+        }
+
     fun isDurationCompatible(expectedMs: Long?, durationMs: Long?): Boolean {
         val wanted = expectedMs?.takeIf { it > 0 } ?: return true
         val actual = durationMs?.takeIf { it > 0 } ?: return true
@@ -92,8 +117,8 @@ object TrackMatcher {
         } ?: 0f
         if (artist < 0.5f) return 0f
 
-        val wantMs = query.durationMs
-        val haveMs = song.durationMs
+        val wantMs = query.durationMs?.takeIf { it > 0 }
+        val haveMs = song.durationMs?.takeIf { it > 0 }
         val duration = if (wantMs != null && haveMs != null) {
             val diff = abs(wantMs - haveMs) / 1000f
             when {
@@ -116,8 +141,12 @@ object TrackMatcher {
         return words(t).joinToString(" ")
     }
 
+    private val wordSeparator = Regex("""[^\p{L}\p{M}\p{N}]+""")
+
     private fun words(text: String): List<String> =
-        text.lowercase().split(Regex("""[^\p{L}\p{N}]+""")).filter { it.isNotEmpty() && it != "the" && it != "and" }
+        Normalizer.normalize(text.lowercase(), Normalizer.Form.NFC)
+            .split(wordSeparator)
+            .filter { it.isNotEmpty() && it != "the" && it != "and" }
 
     private fun similarity(a: String, b: String): Float {
         if (a == b) return 1f
