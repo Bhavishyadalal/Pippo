@@ -1001,7 +1001,8 @@ private fun PlayerSheet(
                     coverStyle = shownCoverStyle,
                     backgroundStyle = backgroundStyle,
                     stillArtworkBackdrop = studioSession,
-                    pauseBackdrop = showExpandMenu || showActionMenu || showProviderSwitch || showStreamInfo,
+                    pauseBackdrop = showExpandMenu || showActionMenu || showProviderSwitch || showStreamInfo ||
+                        showPlaybackSpeed || showDeviceOutput || showLyricsSource || showSongDetails,
                     artworkTopClearance = if (studioSession) StudioSessionTopClearance else 0.dp,
                     editMode = studioEngaged,
                     // the editor's top bar frosts what's under it, so the glass keeps capturing there
@@ -1407,9 +1408,9 @@ private fun PlayerSheet(
             // recomposed the whole player through the bar's hide/show animation at the end of every
             // open and the start of every close, for a value the card layout never uses. (The
             // volume bar reads its size as if it were showing, which stays put through all that.)
-            val showSessionVolume = studioSession && showDeck && !studioEngaged && screenHeight >= StudioSessionVolumeMinHeight
-            val sessionVolumeSpace = if (showSessionVolume) 30.dp else 0.dp
-            if (showSessionVolume && state.isExpanded && transition.page == PlayerPage.NONE) {
+            val sessionHasVolume = studioSession && showDeck && screenHeight >= StudioSessionVolumeMinHeight
+            val sessionVolumeSpace = if (sessionHasVolume) 30.dp else 0.dp
+            if (sessionHasVolume && state.isExpanded && !studioEngaged && transition.page == PlayerPage.NONE) {
                 Box(
                     Modifier.align(Alignment.BottomCenter).widthIn(max = 600.dp).fillMaxWidth()
                         .padding(start = 26.dp, end = 26.dp, bottom = PlayerDeckHeight + 2.dp),

@@ -20,7 +20,6 @@ import androidx.media3.exoplayer.drm.MediaDrmCallback
 import androidx.media3.exoplayer.drm.ExoMediaDrm
 import androidx.media3.exoplayer.drm.DefaultDrmSessionManager
 import androidx.media3.exoplayer.drm.FrameworkMediaDrm
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -72,9 +71,9 @@ class DynamicResolvingMediaSource(
             val mediaId = originalMediaItem.mediaId
             val result = try {
                 fetcherAction(mediaId)
-            } catch (e: CancellationException) {
-                throw e
             } catch (e: Exception) {
+                // A provider may cancel its own request. A live MediaSource still has to
+                // report that failure so ExoPlayer can recover from buffering.
                 ensureActive()
                 Timber.e(e, "Failed to fetch stream for mediaId: $mediaId")
                 playbackHandler?.post {

@@ -182,42 +182,45 @@ class SourceModules @Inject constructor(
         val startedAt = System.currentTimeMillis()
         val answers = if (track == null) emptyMap() else asked.mapNotNull { id ->
             val module = module(id) ?: return@mapNotNull null
-            val picks = picksFor(id, module)
-            id to (picks to resolveScope.async {
-                runCatching { module.resolve(track, picks) }
+            id to resolveScope.async {
+                runCatching {
+                    val picks = picksFor(id, module)
+                    val quality = streamQuality(module, picks)
+                    module.resolve(track, picks) to quality
+                }
                     .onFailure { if (it !is CancellationException) android.util.Log.w(Tag, "$id failed for ${track.title}", it) }
                     .getOrNull()
-            })
+            }
         }.toMap()
         try {
             for (id in asked) {
                 if (id == YouTubeId) return@withContext Route.YouTube
                 val module = module(id) ?: continue
-                val (picks, answer) = answers[id] ?: continue
+                val answer = answers[id] ?: continue
                 // timed on the waiting side, so a module stuck in a call that ignores cancelling can't hold the song either
                 val left = ModuleTimeoutMs - (System.currentTimeMillis() - startedAt)
-                val result = withTimeoutOrNull(left.coerceAtLeast(1L)) { answer.await() }
-                if (result == null && answer.isActive) android.util.Log.i(Tag, "$id took longer than ${ModuleTimeoutMs / 1000} s for ${track?.title}, moving on")
+                val response = withTimeoutOrNull(left.coerceAtLeast(1L)) { answer.await() }
+                if (response == null && answer.isActive) android.util.Log.i(Tag, "$id took longer than ${ModuleTimeoutMs / 1000} s for ${track?.title}, moving on")
+                val (result, quality) = response ?: continue
                 when (result) {
                     is ResolveResult.Found -> {
                         val matched = result.stream.matched
-                        if (track != null && !TrackMatcher.isCompatible(track, matched.title, matched.durationMs)) {
+                        if (track != null && !TrackMatcher.isCompatible(track, matched)) {
                             android.util.Log.i(Tag, "$id: ${track.title} did not match ${matched.title}")
                             continue
                         }
                         if (!accept(id, result.stream)) continue
                         android.util.Log.i(Tag, "$id: ${track?.title} -> ${result.stream.matched.title} (${result.stream.qualityLabel})")
-                        return@withContext Route.Module(module, result.stream, streamQuality(module, picks))
+                        return@withContext Route.Module(module, result.stream, quality)
                     }
                     is ResolveResult.NotFound -> android.util.Log.i(Tag, "$id: ${track?.title}: ${result.reason}")
                     is ResolveResult.Unavailable -> android.util.Log.i(Tag, "$id unavailable for ${track?.title}: ${result.reason}")
-                    null -> Unit
                 }
             }
             Route.Exhausted
         } finally {
             // the ones further down the order aren't needed once one has the song
-            answers.values.forEach { (_, answer) -> answer.cancel() }
+            answers.values.forEach { it.cancel() }
         }
     }
 
