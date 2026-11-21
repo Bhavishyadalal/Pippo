@@ -150,6 +150,7 @@ class TransportTransitions(
         val resumingFrom = if (phase == Phase.Pausing) currentLevel() else 0f
         if (phase != Phase.Pausing && player.playWhenReady && player.playbackState != Player.STATE_ENDED) {
             stopFade()
+            if (player.playbackState == Player.STATE_IDLE) player.prepare()
             return
         }
         if (!shouldFade(player)) {

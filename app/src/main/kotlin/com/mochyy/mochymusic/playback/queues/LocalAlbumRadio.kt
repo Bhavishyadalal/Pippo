@@ -23,6 +23,7 @@ class LocalAlbumRadio(
             playlistId = playlistId
         )
 
+    private val albumSongIds = albumWithSongs.songs.map { it.id }.toSet()
     private var continuation: String? = null
     private var firstTimeLoaded: Boolean = false
 
@@ -43,11 +44,12 @@ class LocalAlbumRadio(
             continuation = nextResult.continuation
             firstTimeLoaded = true
             return@withContext nextResult.items
-                .drop(albumWithSongs.songs.size)
+                .filterNot { it.id in albumSongIds }
                 .map { it.toMediaItem() }
         }
-        val nextResult = YouTube.next(endpoint, continuation).getOrThrow()
-        continuation = nextResult.continuation
+        val previous = continuation
+        val nextResult = YouTube.next(endpoint, previous).getOrThrow()
+        continuation = nextResult.continuation?.takeUnless { it == previous }
         nextResult.items.map { it.toMediaItem() }
     }
 }

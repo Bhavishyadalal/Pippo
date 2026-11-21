@@ -127,7 +127,7 @@ constructor(
     private class NoLosslessDownload : java.io.IOException("No downloadable FLAC or ALAC stream")
     private val repairLock = Mutex()
     // DownloadManager commands and their callbacks are serialized on the application thread.
-    private val pendingPlaylistRepairs = mutableSetOf<String>()
+    private val pendingDownloadRequests = mutableSetOf<String>()
     private val unavailableLossless = MutableStateFlow<Set<String>>(emptySet())
     internal val losslessFailures = unavailableLossless.asStateFlow()
 
@@ -277,7 +277,7 @@ constructor(
                         finalException: Exception?,
                     ) {
                         val id = download.request.id
-                        if (download.state != Download.STATE_REMOVING) pendingPlaylistRepairs.remove(id)
+                        if (download.state != Download.STATE_REMOVING) pendingDownloadRequests.remove(id)
                         downloads.update { it + (id to download) }
                         val unavailable = download.state == Download.STATE_FAILED &&
                             generateSequence<Throwable>(finalException) { it.cause }.any { it is NoLosslessDownload }
@@ -312,7 +312,7 @@ constructor(
 
                     override fun onDownloadRemoved(downloadManager: DownloadManager, download: Download) {
                         val id = download.request.id
-                        pendingPlaylistRepairs.remove(id)
+                        pendingDownloadRequests.remove(id)
                         downloads.update { it - id }
                         unavailableLossless.update { it - id }
                         songUrlCache.remove(id)
@@ -533,10 +533,20 @@ constructor(
             .setData(song.song.title.toByteArray())
             .build()
         kotlinx.coroutines.withContext(Dispatchers.Main) {
-            // android won't start the service from the background (a sync running behind another app), so the manager takes it straight then
-            runCatching {
-                androidx.media3.exoplayer.offline.DownloadService.sendAddDownload(context, ExoDownloadService::class.java, request, false)
-            }.onFailure { downloadManager.addDownload(request) }
+            val latest = downloads.value[songId]
+            if (OfflineMode.isOn || (latest != null && latest.state != Download.STATE_FAILED) ||
+                !pendingDownloadRequests.add(songId)
+            ) return@withContext
+
+            try {
+                downloadManager.addDownload(request)
+            } catch (e: Exception) {
+                pendingDownloadRequests.remove(songId)
+                android.util.Log.w(LOG_TAG, "Couldn't queue automatic download of $songId", e)
+                return@withContext
+            }
+            // The manager owns the request even when Android bars a background service start.
+            runCatching { DownloadService.start(context, ExoDownloadService::class.java) }
         }
     }
 
@@ -584,7 +594,7 @@ constructor(
                     val known = downloads.value[song.id]
                     if (!needsPlaylistRepair(known)) continue
                     val canSubmit = kotlinx.coroutines.withContext(Dispatchers.Main) {
-                        !OfflineMode.isOn && downloads.value[song.id] === known && song.id !in pendingPlaylistRepairs
+                        !OfflineMode.isOn && downloads.value[song.id] === known && song.id !in pendingDownloadRequests
                     }
                     if (!canSubmit) continue
                     if (known?.state == Download.STATE_FAILED) forgetStream(song.id)
@@ -595,7 +605,7 @@ constructor(
                         .build()
                     kotlinx.coroutines.withContext(Dispatchers.Main) submit@{
                         if (OfflineMode.isOn || downloads.value[song.id] !== known ||
-                            !pendingPlaylistRepairs.add(song.id)
+                            !pendingDownloadRequests.add(song.id)
                         ) return@submit
                         try {
                             if (known?.state == Download.STATE_COMPLETED) downloadManager.removeDownload(song.id)
@@ -603,7 +613,7 @@ constructor(
                             downloadManager.addDownload(request)
                             submitted++
                         } catch (e: Exception) {
-                            pendingPlaylistRepairs.remove(song.id)
+                            pendingDownloadRequests.remove(song.id)
                             throw e
                         }
                         if (submitted == 1) {
