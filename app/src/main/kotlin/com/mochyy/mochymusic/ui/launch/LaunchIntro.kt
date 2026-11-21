@@ -143,8 +143,6 @@ private const val SplashTimeoutMillis = 1_500L
 // A brief settling motion keeps the portrait recognizable throughout launch.
 private const val PreludeMillis = 180
 
-// Match the adaptive launcher foreground: 18% inset on each side of its 240dp layer.
-private const val IconLayerSize = 240f / 288f * 235f * .64f
 private const val IconCircleRadius = 80f / 288f * 235f
 
 // the system splash draws an icon with no background at 288dp, masked to a 192dp circle
@@ -407,6 +405,7 @@ private fun Density.placementAt(state: LaunchIntroState, size: IntSize): MarkPla
 }
 
 private class LaunchIconArt(context: Context, icon: AppIcon) {
+    private val artSize = 2f * IconCircleRadius * icon.foregroundScale
     private val fill = icon.background?.let { color -> Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = context.getColor(color) } }
     // Resolve once per intro, then reuse the same drawable for every frame.
     private val art = ContextCompat.getDrawable(context, icon.foreground)?.mutate()?.apply { setBounds(0, 0, ArtBox, ArtBox) }
@@ -421,8 +420,8 @@ private class LaunchIconArt(context: Context, icon: AppIcon) {
         canvas.clipPath(circle)
         fill?.let { canvas.drawPath(circle, it) }
         art?.let {
-            canvas.translate(Pivot.x - IconLayerSize / 2f, Pivot.y - IconLayerSize / 2f)
-            canvas.scale(IconLayerSize / ArtBox, IconLayerSize / ArtBox)
+            canvas.translate(Pivot.x - artSize / 2f, Pivot.y - artSize / 2f)
+            canvas.scale(artSize / ArtBox, artSize / ArtBox)
             it.draw(canvas)
         }
         canvas.restore()

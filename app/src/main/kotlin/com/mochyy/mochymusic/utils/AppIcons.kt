@@ -39,10 +39,13 @@ class AppIcon private constructor(
     @ColorRes val background: Int?,
     @StringRes val label: Int,
     @StyleRes val splashTheme: Int,
+    // A 108 dp adaptive layer is shown through a 72 dp viewport. The standard 18% inset
+    // leaves 96% of the viewport for the artwork. Ribbon P uses the 4% inset in ic_launcher.
+    internal val foregroundScale: Float = .96f,
 ) {
     companion object {
         val entries: List<AppIcon> = listOf(
-            AppIcon("Default", "IconDefault", AppIconFamily.Brand, R.drawable.pippo_master_black_ribbon_p, R.color.pippo_master_black_ribbon_p_bg, R.string.pippo_master_black_ribbon_p_label, R.style.Theme_App_Starting),
+            AppIcon("Default", "IconDefault", AppIconFamily.Brand, R.drawable.pippo_master_black_ribbon_p, R.color.pippo_master_black_ribbon_p_bg, R.string.pippo_master_black_ribbon_p_label, R.style.Theme_App_Starting, foregroundScale = 1.38f),
             AppIcon("Master_01_cobalt_wax", "PippoMaster01CobaltWax", AppIconFamily.Lettering, R.drawable.pippo_master_01_cobalt_wax, R.color.pippo_master_01_cobalt_wax_bg, R.string.pippo_master_01_cobalt_wax_label, R.style.Theme_App_Starting_Master01CobaltWax),
             AppIcon("Master_02_graphite_script", "PippoMaster02GraphiteScript", AppIconFamily.Lettering, R.drawable.pippo_master_02_graphite_script, R.color.pippo_master_02_graphite_script_bg, R.string.pippo_master_02_graphite_script_label, R.style.Theme_App_Starting_Master02GraphiteScript),
             AppIcon("Master_03_pink_pastel", "PippoMaster03PinkPastel", AppIconFamily.Lettering, R.drawable.pippo_master_03_pink_pastel, R.color.pippo_master_03_pink_pastel_bg, R.string.pippo_master_03_pink_pastel_label, R.style.Theme_App_Starting_Master03PinkPastel),

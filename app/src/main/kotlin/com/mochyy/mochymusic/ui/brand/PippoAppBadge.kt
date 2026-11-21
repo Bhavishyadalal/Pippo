@@ -9,6 +9,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.colorResource
 import coil3.compose.AsyncImage
@@ -24,7 +25,11 @@ fun PippoAppBadge(modifier: Modifier = Modifier) {
             model = icon.foreground,
             contentDescription = "Pippo",
             contentScale = ContentScale.Fit,
-            modifier = Modifier.fillMaxSize(.96f),
+            modifier = Modifier.fillMaxSize(icon.foregroundScale.coerceAtMost(1f)).graphicsLayer {
+                val overscan = icon.foregroundScale.coerceAtLeast(1f)
+                scaleX = overscan
+                scaleY = overscan
+            },
         )
     }
 }
