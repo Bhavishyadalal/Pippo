@@ -407,6 +407,11 @@ fun MorphingCover(
 
     backgroundStyle: PlayerBackgroundStyle = PlayerBackgroundStyle.COVER_GRADIENT,
 
+    // A soft still is enough for the Studio Session layout and costs no frame clock.
+    stillArtworkBackdrop: Boolean = false,
+    pauseBackdrop: Boolean = false,
+    artworkTopClearance: Dp = 0.dp,
+
     editMode: Boolean = false,
 
     onLongPressCover: (() -> Unit)? = null,
@@ -487,7 +492,7 @@ fun MorphingCover(
     val ambientBackdrop = ambient != null && !alternateStyle && backgroundStyle == PlayerBackgroundStyle.AMBIENT
     // the new flagship keeps the moving mirrors: its veil washes them in the colours instead
     val mirrorsOff = ambientBackdrop && !frostedCover
-    val feedsAmbient = ambient != null && !alternateStyle
+    val feedsAmbient = ambient != null && !alternateStyle && !stillArtworkBackdrop
     if (feedsAmbient && ambient != null) {
         FollowPicture(ambient, trackInfo.thumbnailUrl)
         LaunchedEffect(isVideoActive) { if (!isVideoActive) ambient.endLive() }
@@ -505,7 +510,7 @@ fun MorphingCover(
         label = "miniArtWidth"
     )
 
-    val endpoints = remember(maxWidth, maxHeight, statusBarTop, coverStyle, animatedMiniArtWidth, pillFrame) {
+    val endpoints = remember(maxWidth, maxHeight, statusBarTop, coverStyle, animatedMiniArtWidth, pillFrame, artworkTopClearance, stillArtworkBackdrop) {
         val miniHeight = pillFrame.height
         val miniArtWidth = animatedMiniArtWidth
         val miniArtHeight = 48.dp * miniScale
@@ -526,7 +531,8 @@ fun MorphingCover(
         val firstButtonX = if (pillFrame.withPrevious) miniPrevX else miniPlayX
         val miniTextWidth = (firstButtonX - 10.dp - miniTextX).coerceAtLeast(0.dp)
 
-        val artBox = coverArtBox(coverStyle, maxWidth, maxHeight, statusBarTop)
+        val coverHeight = if (stillArtworkBackdrop) maxHeight * StudioSessionArtHeight else maxHeight
+        val artBox = coverArtBox(coverStyle, maxWidth, coverHeight, statusBarTop + artworkTopClearance)
 
         MorphEndpoints(
             miniArtWidth = miniArtWidth,
@@ -630,16 +636,16 @@ fun MorphingCover(
     val currentCoverStyle by androidx.compose.runtime.rememberUpdatedState(coverStyle)
 
     // the backdrop draws its own shared warp, this only tells it whether the warp can run here
-    val warpShader = rememberWarpShader()
+    val warpShader = if (stillArtworkBackdrop) null else rememberWarpShader()
 
     val warpTimeState = remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
     // Started and stopped from a flow, not keyed on a derived state: read in composition, its flip
     // recomposed all of this in the first frames of every open.
     // the new flagship's open player hides the backdrop completely under its cover and mirror, so nothing there needs to move
     val backdropHidden = frostedCover && coverBlur && coverStyle == PlayerCoverStyle.EDGE_TO_EDGE
-    LaunchedEffect(editMode, alternateStyle, backdropHidden) {
+    LaunchedEffect(editMode, alternateStyle, backdropHidden, pauseBackdrop, stillArtworkBackdrop) {
         snapshotFlow {
-            !alternateStyle && !editMode && progressProvider() > 0.02f && lyricsProgressProvider() < 0.6f &&
+            !pauseBackdrop && !stillArtworkBackdrop && !alternateStyle && !editMode && progressProvider() > 0.02f && lyricsProgressProvider() < 0.6f &&
                 !(backdropHidden && progressProvider() >= 0.999f && lyricsProgressProvider() <= 0.001f)
         }
             .collectLatest { active ->
@@ -1101,7 +1107,7 @@ fun MorphingCover(
                                 trackInfo = info,
                                 alternateStyle = alternateStyle,
                                 isDiscStyle = isDiscStyle,
-                                editMode = editMode,
+                                editMode = editMode || pauseBackdrop,
                                 progressProvider = progressProvider,
                                 // a squared card keeps its canvas the whole way down, it only fades as it lands in the mini player
                                 sheetFade = if (squaredCards) ::squaredCanvasSheetFade else ::canvasSheetFade,
@@ -1115,7 +1121,7 @@ fun MorphingCover(
                             if (playing && !isDiscStyle && playVideoBackground && videoInfo != null && miniVideoShown) {
                                 YouTubeVideoBackground(
                                     video = videoInfo,
-                                    isPlaying = isPlaying,
+                                    isPlaying = isPlaying && !pauseBackdrop,
                                     glassState = if (mirrorsOff) null else videoGlassState,
                                     onFrameColors = if (feedsAmbient) ambient?.let { it::live } else null,
                                     onShowingChange = { shown -> liveVideoShown = shown },

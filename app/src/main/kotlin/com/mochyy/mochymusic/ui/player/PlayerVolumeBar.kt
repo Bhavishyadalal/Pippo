@@ -98,7 +98,7 @@ internal fun PlayerVolumeBar(
             .fillMaxWidth()
             .height(PlayerVolumeBarHeight),
     ) {
-        VolumeRow(listening = !preview)
+        PlayerVolumeLine(listening = !preview)
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
@@ -127,7 +127,7 @@ internal fun PlayerVolumeBar(
  * the quiet one turns into a muted speaker at zero.
  */
 @Composable
-private fun VolumeRow(listening: Boolean) {
+internal fun PlayerVolumeLine(listening: Boolean) {
     val volume = rememberMusicVolume(listening)
     val interactionSource = remember { MutableInteractionSource() }
     val dragged by interactionSource.collectIsDraggedAsState()

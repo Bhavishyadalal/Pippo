@@ -53,6 +53,11 @@ import androidx.compose.ui.graphics.Brush
 import com.mochyy.mochymusic.ui.player.PlayerProgressSlider
 import com.mochyy.mochymusic.ui.player.PlayerTransportRow
 import com.mochyy.mochymusic.ui.player.PlayerVolumeBar
+import com.mochyy.mochymusic.ui.player.PlayerVolumeLine
+import com.mochyy.mochymusic.ui.player.StudioSessionArtHeight
+import com.mochyy.mochymusic.ui.player.StudioSessionHeader
+import com.mochyy.mochymusic.ui.player.StudioSessionTopClearance
+import com.mochyy.mochymusic.ui.player.StudioSessionVolumeMinHeight
 import com.mochyy.mochymusic.ui.player.FlagshipCardLook
 import com.mochyy.mochymusic.ui.player.SongInfoRow
 import com.mochyy.mochymusic.ui.player.customize.DiscCoverStack
@@ -163,6 +168,7 @@ internal fun FlagshipPreview(
     // the new flagship: its own background and bar, its buttons, the cover melting into its colours
     flagship: Boolean = false,
     artworkFrame: Boolean = false,
+    studioSession: Boolean = false,
 ) {
     val connection = LocalPlayerConnection.current ?: return
     val track by connection.uiState.trackInfo.collectAsState()
@@ -209,7 +215,10 @@ internal fun FlagshipPreview(
                 modifier = Modifier.fillMaxSize(),
             )
         }
-        val box = coverArtBox(coverStyle, maxWidth, maxHeight, statusTop)
+        val artHeight = if (studioSession) maxHeight * StudioSessionArtHeight else maxHeight
+        val artTop = statusTop + if (studioSession) StudioSessionTopClearance else 0.dp
+        val box = coverArtBox(coverStyle, maxWidth, artHeight, artTop)
+        if (studioSession) StudioSessionHeader(Modifier.align(Alignment.TopCenter).padding(top = statusTop + 26.dp))
         Box(
             modifier = Modifier
                 .offset(box.x, box.y)
@@ -245,7 +254,14 @@ internal fun FlagshipPreview(
         }
 
         // what sits under the controls, by the live player's own sums, so the buttons land where they do there
-        val belowControls = when {
+        val showSessionVolume = studioSession && showDeck && maxHeight >= StudioSessionVolumeMinHeight
+        if (showSessionVolume) {
+            Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(horizontal = 26.dp)
+                .padding(bottom = PlayerDeckHeight + 2.dp)) {
+                PlayerVolumeLine(listening = false)
+            }
+        }
+        val belowControls = (if (showSessionVolume) 30.dp else 0.dp) + when {
             showVolumeBar && newBottomBar -> flagshipBarFootprint()
             showVolumeBar -> playerVolumeBarFootprint()
             showDeck -> PlayerDeckHeight
