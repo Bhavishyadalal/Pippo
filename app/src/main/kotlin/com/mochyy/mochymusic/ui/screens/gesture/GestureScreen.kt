@@ -127,6 +127,7 @@ private enum class CustomiseSection(@StringRes val titleRes: Int, val keys: List
     PLAYER(R.string.customise_player_styles, listOf("Player styles"), "player styles flagship turntable ipod poster timeline lyrics editor customize landscape sideways full cover square"),
     HOME(R.string.customise_home_styles, listOf("Home styles"), "home styles Pippo listen now hop in hero"),
     BLUR(R.string.appearance_blur, listOf("Blur", "Progressive blur", "Blur quality", "Blur strength"), "blur glass frosted progressive flat quality low high strength px"),
+    ARTWORK_BACKGROUND(R.string.player_artwork_background_strength, listOf("Artwork background"), "player blur tint contrast cover brightness dark amoled oled true black"),
     ELEMENT_BLUR(R.string.customise_element_blur, listOf("Element blur"), "element blur lyrics lines cover zoom titles menus page swipes"),
     ANIMATION(R.string.appearance_animation, listOf("Animation", "Animation speed"), "animation speed motion transitions off faster slower"),
     LYRICS(R.string.appearance_lyrics_animation, listOf("Lyrics animation"), "lyrics animation style 1 2 boring plain shader glow wave"),
@@ -207,6 +208,7 @@ private fun CustomiseSectionContent(section: CustomiseSection) {
     when (section) {
         CustomiseSection.ICONS -> IconsSection()
         CustomiseSection.AMOLED -> TrueBlackSection()
+        CustomiseSection.ARTWORK_BACKGROUND -> ArtworkBackgroundSection()
         CustomiseSection.NAVIGATION -> BottomNavigationSection()
         CustomiseSection.ROUNDING -> {
             val (coverRadiusPx, onCoverRadiusChange) = rememberPreference(ThumbnailCornerRadiusKey, defaultValue = DefaultCoverRadius)

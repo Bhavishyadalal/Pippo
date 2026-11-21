@@ -1,5 +1,7 @@
 package com.mochyy.mochymusic.ui.player.styles
 
+import com.mochyy.mochymusic.ui.player.customize.dimPlayerArtworkBackground
+import com.mochyy.mochymusic.ui.player.customize.playerArtworkBackgroundStrength
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
@@ -779,24 +781,23 @@ fun StyleStage(
     content: @Composable BoxScope.(landscape: Boolean) -> Unit,
 ) {
     val splits = remember { StyleSplits() }
-    // a new song's tones fade in rather than snap, read only while drawing so the fade repaints the background without recomposing the style
+    val artworkStrength = playerArtworkBackgroundStrength()
+    // Read the animated tones at draw time so fades don't recompose the style.
     val played = androidx.compose.animation.animateColorAsState(tones.played, tween(ToneFadeMs), label = "playedTone")
     val remaining = androidx.compose.animation.animateColorAsState(tones.remaining, tween(ToneFadeMs), label = "remainingTone")
     androidx.compose.foundation.layout.BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val landscape = maxWidth > maxHeight
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .then(
+        Box(Modifier.fillMaxSize()) {
+            Box(
+                Modifier.fillMaxSize().dimPlayerArtworkBackground(artworkStrength).then(
                     if (background != null) Modifier else Modifier.drawBehind {
                         val split = splits[landscape]
                         if (split == null) drawRect(played.value)
                         else drawSplit(played.value, remaining.value, vertical = !landscape, boundary = split())
-                    }
+                    },
                 ),
-        ) {
-            if (background != null) {
-                Box(modifier = Modifier.fillMaxSize(), content = background)
+            ) {
+                if (artworkStrength > 0f) background?.invoke(this)
             }
             androidx.compose.runtime.CompositionLocalProvider(LocalStyleSplits provides splits) {
                 Box(modifier = Modifier.fillMaxSize()) { content(landscape) }

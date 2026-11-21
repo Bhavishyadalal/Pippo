@@ -63,6 +63,7 @@ import com.mochyy.mochymusic.constants.BlurQuality
 import com.mochyy.mochymusic.ui.component.BlurEffectCache
 import com.mochyy.mochymusic.ui.component.DownscaledBlur
 import com.mochyy.mochymusic.ui.component.LocalBlurQuality
+import com.mochyy.mochymusic.ui.player.customize.dimPlayerArtworkBackground
 import com.mochyy.mochymusic.ui.player.CarouselCrossfade
 import com.mochyy.mochymusic.ui.player.CarouselPictures
 import com.mochyy.mochymusic.ui.player.LikeBurstState
@@ -153,6 +154,7 @@ internal fun FlagshipLandscape(
     // the Turntable: its record runs in from the left edge the way the poster's circle does, its arm still the seek bar
     turntable: Boolean = false,
     preferSquare: Boolean = false,
+    artworkStrength: Float = 1f,
 ) {
     val connection = LocalPlayerConnection.current ?: return
     val track by connection.uiState.trackInfo.collectAsState()
@@ -210,8 +212,12 @@ internal fun FlagshipLandscape(
         }
 
         // the playing song's cover, blurred once and laid over the whole player; it crossfades along the row as songs slide
-        CarouselCrossfade(carousel = carousel, fallbackUrl = track.thumbnailUrl, modifier = Modifier.fillMaxSize()) { url ->
-            BlurredCoverPicture(url = url, modifier = Modifier.fillMaxSize())
+        Box(Modifier.fillMaxSize().dimPlayerArtworkBackground(artworkStrength)) {
+            if (artworkStrength > 0f) {
+                CarouselCrossfade(carousel = carousel, fallbackUrl = track.thumbnailUrl, modifier = Modifier.fillMaxSize()) { url ->
+                    BlurredCoverPicture(url = url, modifier = Modifier.fillMaxSize())
+                }
+            }
         }
         val evenShade = look == CoverLook.SQUARE || look == CoverLook.RECORD
         Box(
