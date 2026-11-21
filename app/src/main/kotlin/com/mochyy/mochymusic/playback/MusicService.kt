@@ -2992,11 +2992,16 @@ class MusicService :
         clearStreamFailure()
         if (!promotingCrossmix) crossmixDirector.onItemChanged()
 
-        if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT) {
-            // round again: a mute or a low volume left by a mix or a fade went round with it and the loop played silent until a seek
+        val advancedNaturally = reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO ||
+            reason == Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT
+        if (!promotingCrossmix && (!isCrossfading || advancedNaturally)) {
+            // Clear a stale deck mute before it can carry over to the next song.
             playerCrossmixProcessors[player]?.clear()
-            transport.cancel()
-            player.volume = targetVolume()
+            if (advancedNaturally) {
+                crossfadeJob?.cancel()
+                transport.cancel()
+                player.volume = targetVolume()
+            }
         }
         // the songs either side of the new one get their first seconds fetched, for a blended skip
         prefetchNeighbours()
@@ -4944,6 +4949,8 @@ class MusicService :
             try {
                 rampCrossfade(durationMs, skipCurve, incomingFx)
             } finally {
+                // The effect must retire even when playback didn't start before the ramp timed out.
+                incomingFx?.finish()
                 runCatching {
                     fadingPlayer?.volume = 0f
                     player.volume = targetVolume()
@@ -5019,8 +5026,6 @@ class MusicService :
                 break
             }
         }
-        // the new song steps out of its effect once the blend is over
-        inFx?.finish()
     }
 
     // one side of a blended skip's layered effect; null with no effect picked or a renderer that can't mix this song

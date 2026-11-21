@@ -89,6 +89,7 @@ class CrossmixTransitionAudioProcessor : AudioProcessor {
     private var sampleRate = 0
     private var channels = 0
     private var outputBuffer = EmptyBuffer
+    private var buffer = EmptyBuffer
     private var inputEnded = false
 
     // the track's clock, in frames since its start
@@ -150,24 +151,28 @@ class CrossmixTransitionAudioProcessor : AudioProcessor {
     /** from the sink: the timestamp of the buffer about to be processed */
     fun onInputTimestamp(presentationTimeUs: Long) { pendingTimestampUs = presentationTimeUs }
 
-    fun onStreamOffset(offsetUs: Long) { streamOffsetUs = offsetUs }
+    fun onStreamOffset(offsetUs: Long) {
+        // A correction derived from the old stream offset can leave the next track muted.
+        if (offsetUs != streamOffsetUs) clockCorrectionMs = 0.0
+        streamOffsetUs = offsetUs
+    }
 
     override fun configure(inputAudioFormat: AudioProcessor.AudioFormat): AudioProcessor.AudioFormat {
         // anything but 16-bit mono or stereo (a 5.1 file, say) passes straight by: the processor
         // steps out of the chain, and Crossmix sees it can't render this track and doesn't try
-        supported = inputAudioFormat.encoding == C.ENCODING_PCM_16BIT && inputAudioFormat.channelCount in 1..2
+        val takes = inputAudioFormat.encoding == C.ENCODING_PCM_16BIT && inputAudioFormat.channelCount in 1..2
         format = "${inputAudioFormat.sampleRate} Hz, ${inputAudioFormat.channelCount} ch, encoding ${inputAudioFormat.encoding}"
-        if (!supported) {
-            sampleRate = 0
-            return AudioProcessor.AudioFormat.NOT_SET
-        }
-        sampleRate = inputAudioFormat.sampleRate
-        channels = inputAudioFormat.channelCount
-        if (script != null) dsp.ensure(sampleRate)
-        return inputAudioFormat
+        // Commit at flush so the last buffers of the old stream keep their rate and channels.
+        pendingRate = if (takes) inputAudioFormat.sampleRate else 0
+        pendingChannels = if (takes) inputAudioFormat.channelCount else 0
+        pendingSupported = takes
+        return if (takes) inputAudioFormat else AudioProcessor.AudioFormat.NOT_SET
     }
 
     @Volatile private var supported = true
+    @Volatile private var pendingSupported = true
+    private var pendingRate = 0
+    private var pendingChannels = 0
 
     /** the format the renderer was last set up for, for the log when it can't be mixed */
     @Volatile var format = "not set up yet"
@@ -182,13 +187,13 @@ class CrossmixTransitionAudioProcessor : AudioProcessor {
     /** whether this side can play a transition: its track is a format the renderer handles */
     val canRender: Boolean get() = supported && sampleRate > 0
 
-    override fun isActive(): Boolean = supported
+    override fun isActive(): Boolean = pendingSupported
 
     override fun queueInput(inputBuffer: ByteBuffer) {
         val size = inputBuffer.remaining()
         if (size == 0) return
         val output = replaceOutputBuffer(size)
-        val frames = size / (channels * 2)
+        val frames = if (channels > 0) size / (channels * 2) else 0
 
         val timestamp = pendingTimestampUs
         if (timestamp != Long.MIN_VALUE) {
@@ -225,6 +230,10 @@ class CrossmixTransitionAudioProcessor : AudioProcessor {
 
     @Deprecated("Deprecated in Java")
     override fun flush() {
+        sampleRate = pendingRate
+        channels = pendingChannels
+        supported = pendingSupported
+        if (script != null && sampleRate > 0) dsp.ensure(sampleRate)
         outputBuffer = EmptyBuffer
         inputEnded = false
         clockValid = false
@@ -238,6 +247,10 @@ class CrossmixTransitionAudioProcessor : AudioProcessor {
 
     @Deprecated("Deprecated in Java")
     override fun reset() {
+        pendingRate = 0
+        pendingChannels = 0
+        pendingSupported = true
+        buffer = EmptyBuffer
         flush()
         clear()
         sampleRate = 0
@@ -247,9 +260,10 @@ class CrossmixTransitionAudioProcessor : AudioProcessor {
     }
 
     private fun replaceOutputBuffer(size: Int): ByteBuffer {
-        if (outputBuffer.capacity() < size) outputBuffer = ByteBuffer.allocateDirect(size).order(ByteOrder.nativeOrder())
-        else outputBuffer.clear()
-        return outputBuffer
+        if (buffer.capacity() < size) buffer = ByteBuffer.allocateDirect(size).order(ByteOrder.nativeOrder())
+        else buffer.clear()
+        outputBuffer = buffer
+        return buffer
     }
 
     /** all the DSP state for one side. sized for the sample rate when a transition is armed */
