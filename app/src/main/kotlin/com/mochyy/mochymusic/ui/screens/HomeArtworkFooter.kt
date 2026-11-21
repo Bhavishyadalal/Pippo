@@ -37,6 +37,8 @@ import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -45,6 +47,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
 import coil3.compose.AsyncImagePainter
 import coil3.compose.rememberAsyncImagePainter
+import coil3.request.ImageRequest
 import com.mochyy.mochymusic.R
 import com.mochyy.mochymusic.ui.component.BlurEffectCache
 import com.mochyy.mochymusic.ui.utils.AppMotion
@@ -155,7 +158,14 @@ internal fun HomeArtworkFooter(rotation: HomeArtworkRotation, bottomChrome: Dp) 
     val artwork = rotation.artwork
     val reveal = remember(artwork) { Animatable(0f) }
     val reducedMotion = AppMotion.durationScale.scaleFactor <= 0f
-    val painter = rememberAsyncImagePainter(artwork)
+    val context = LocalContext.current
+    val screenWidth = LocalConfiguration.current.screenWidthDp
+    val decodeWidth = with(LocalDensity.current) { screenWidth.dp.roundToPx() }.coerceIn(320, 1600)
+    // Decode a screen-sized copy once; the sharp and blurred layers share the same painter.
+    val request = remember(context, artwork, decodeWidth) {
+        ImageRequest.Builder(context).data(artwork).size(decodeWidth).build()
+    }
+    val painter = rememberAsyncImagePainter(request)
     val imageState by painter.state.collectAsState()
     val loaded = imageState is AsyncImagePainter.State.Success
     LaunchedEffect(artwork, loaded, rotation.visited, reducedMotion) {

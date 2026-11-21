@@ -56,6 +56,7 @@ import com.mochyy.mochymusic.constants.AudioQualityKey
 import com.mochyy.mochymusic.module.ModuleFeature
 import com.mochyy.mochymusic.module.StreamOption
 import com.mochyy.mochymusic.modules.SourceModules
+import com.mochyy.mochymusic.playback.ProviderSwitch
 import com.mochyy.mochymusic.playback.ProviderSwitchState
 import com.mochyy.mochymusic.ui.player.menu.LocalMenuSheetClose
 import com.mochyy.mochymusic.ui.player.menu.MenuRowSurface
@@ -83,6 +84,7 @@ fun ForceProviderSheet(currentProviderId: String?, currentOption: String? = null
     val youTubeOn by modules.youTubeEnabled.collectAsState()
     val entries by modules.entries.collectAsState()
     val state by service.providerSwitch.state.collectAsState()
+    val attempts by service.providerSwitch.attempts.collectAsState()
     val (youTubeQuality) = rememberPreference(AudioQualityKey, AudioQuality.AUTO.name)
     val audioEntries = entries.filter { ModuleFeature.AudioSource in it.module.adds }
         .associateBy { it.id }
@@ -126,6 +128,7 @@ fun ForceProviderSheet(currentProviderId: String?, currentOption: String? = null
                         isCurrent = id == currentProviderId,
                         enabled = enabled,
                         available = available,
+                        attempt = attempts[id],
                         onEnabledChange = { service.setPlaybackProviderEnabled(id, it) },
                         options = when {
                             choice != null -> choice.options
@@ -208,6 +211,7 @@ private fun ProviderChoiceRow(
     isCurrent: Boolean,
     enabled: Boolean,
     available: Boolean,
+    attempt: ProviderSwitch.Attempt?,
     onEnabledChange: (Boolean) -> Unit,
     options: List<StreamOption>,
     selectedOption: String?,
@@ -252,6 +256,28 @@ private fun ProviderChoiceRow(
                 onCheckedChange = onEnabledChange,
                 modifier = Modifier.semantics { contentDescription = switchLabel },
             )
+        }
+        attempt?.let { result ->
+            val quality = result.quality
+            val failure = result.failure
+            if (quality != null || failure != null) {
+                Column(Modifier.fillMaxWidth().padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    if (quality != null) Text(
+                        stringResource(
+                            if (result.opened) R.string.pippo_provider_opened_quality else R.string.pippo_provider_found_quality,
+                            quality,
+                        ),
+                        color = InfoMuted, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                    )
+                    if (failure != null) Text(
+                        failure.reason ?: stringResource(
+                            if (failure.opening) R.string.pc_force_open_failed else R.string.pc_force_lookup_failed,
+                            name,
+                        ),
+                        color = InfoMuted, fontSize = 12.sp, maxLines = 3, overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
         }
         if (available && options.size > 1) {
             Spacer(Modifier.height(10.dp))

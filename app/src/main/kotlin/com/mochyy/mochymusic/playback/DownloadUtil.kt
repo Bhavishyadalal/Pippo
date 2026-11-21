@@ -12,11 +12,14 @@ import androidx.core.content.getSystemService
 import androidx.core.net.toUri
 import androidx.media3.database.DatabaseProvider
 import androidx.media3.datasource.ResolvingDataSource
+import androidx.media3.datasource.cache.ContentMetadata
 import androidx.media3.datasource.cache.ContentMetadataMutations
 import androidx.media3.datasource.cache.SimpleCache
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.offline.Download
 import androidx.media3.exoplayer.offline.DownloadManager
+import androidx.media3.exoplayer.offline.DownloadRequest
+import androidx.media3.exoplayer.offline.DownloadService
 import androidx.media3.exoplayer.offline.DownloadNotificationHelper
 import com.mochyy.mochymusic.utils.followAppProxy
 import com.music.innertube.YouTube
@@ -37,6 +40,7 @@ import java.net.Inet6Address
 import com.mochyy.mochymusic.db.MusicDatabase
 import com.mochyy.mochymusic.db.entities.FormatEntity
 import com.mochyy.mochymusic.db.entities.LyricsEntity
+import com.mochyy.mochymusic.db.entities.Song
 import com.mochyy.mochymusic.db.entities.SongEntity
 import com.mochyy.mochymusic.lyrics.LyricsHelper
 import com.mochyy.mochymusic.models.TransferBatch
@@ -80,7 +84,7 @@ import javax.inject.Singleton
 class DownloadUtil
 @Inject
 constructor(
-    @ApplicationContext context: Context,
+    @ApplicationContext private val context: Context,
     val database: MusicDatabase,
     val databaseProvider: DatabaseProvider,
     @DownloadCache val downloadCache: SimpleCache,
@@ -115,6 +119,11 @@ constructor(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     val downloads = MutableStateFlow<Map<String, Download>>(emptyMap())
+
+    private class NoLosslessDownload : java.io.IOException("No downloadable FLAC or ALAC stream")
+    private val repairLock = Mutex()
+    private val unavailableLossless = MutableStateFlow<Set<String>>(emptySet())
+    internal val losslessFailures = unavailableLossless.asStateFlow()
 
     private val _batch = MutableStateFlow(TransferBatch())
 
@@ -165,7 +174,7 @@ constructor(
                     .build()
             }
 
-            if (lossless) throw java.io.IOException("No downloadable FLAC or ALAC stream available for $mediaId")
+            if (lossless) throw NoLosslessDownload()
 
             // only while it still works. This used to keep the url's lifetime instead of when it ends,
             // and compare the wrong way round, so a dead url was reused for every retry of a download
@@ -276,7 +285,12 @@ constructor(
                             }
                         }
 
+                        val id = download.request.id
+                        val unavailable = download.state == Download.STATE_FAILED &&
+                            generateSequence<Throwable>(finalException) { it.cause }.any { it is NoLosslessDownload }
+                        unavailableLossless.update { if (unavailable) it + id else it - id }
                         scope.launch {
+                            if (downloads.value[id] !== download) return@launch
                             when (download.state) {
                                 Download.STATE_COMPLETED -> {
                                     database.updateDownloadedInfo(download.request.id, true, LocalDateTime.now())
@@ -287,7 +301,9 @@ constructor(
                                 }
                                 Download.STATE_FAILED -> {
                                     database.updateDownloadedInfo(download.request.id, false, null)
-                                    forgetStream(download.request.id)
+                                    repairLock.withLock {
+                                        if (downloads.value[id] === download) forgetStream(id)
+                                    }
                                     // kept by R8 in release builds, unlike Timber: the reason is the only clue
                                     android.util.Log.w(LOG_TAG, "Download of ${download.request.id} failed", finalException)
                                 }
@@ -539,6 +555,53 @@ constructor(
             progress = ((download?.percentDownloaded ?: 0f) / 100f).coerceIn(0f, 1f),
             songId = id,
         )
+
+    internal fun needsPlaylistRepair(download: Download?): Boolean = when (download?.state) {
+        null, Download.STATE_FAILED -> true
+        Download.STATE_COMPLETED -> {
+            val id = download.request.id
+            val length = download.contentLength.takeIf { it > 0 }
+                ?: ContentMetadata.getContentLength(downloadCache.getContentMetadata(id))
+            if (length > 0) !downloadCache.isCached(id, 0, length)
+            else downloadCache.getCachedSpans(id).isEmpty()
+        }
+        else -> false
+    }
+
+    internal suspend fun repairPlaylist(songs: List<Song>): Int =
+        kotlinx.coroutines.withContext(Dispatchers.IO) {
+            repairLock.withLock {
+                var submitted = 0
+                for (song in songs.distinctBy { it.id }) {
+                    if (OfflineMode.isOn) break
+                    if (song.song.isLocal) continue
+                    val known = downloads.value[song.id]
+                    if (!needsPlaylistRepair(known)) continue
+                    if (downloads.value[song.id] !== known) continue
+                    if (known?.state == Download.STATE_FAILED) forgetStream(song.id)
+                    failedProviders.remove(song.id)
+                    val request = known?.request ?: DownloadRequest.Builder(song.id, song.id.toUri())
+                        .setCustomCacheKey(song.id)
+                        .setData(song.song.title.toByteArray())
+                        .build()
+                    kotlinx.coroutines.withContext(Dispatchers.Main) submit@{
+                        if (OfflineMode.isOn || downloads.value[song.id] !== known) return@submit
+                        if (known?.state == Download.STATE_COMPLETED) {
+                            downloadManager.removeDownload(song.id)
+                            downloadManager.addDownload(request)
+                        } else {
+                            runCatching {
+                                DownloadService.sendAddDownload(
+                                    context, ExoDownloadService::class.java, request, false,
+                                )
+                            }.onFailure { downloadManager.addDownload(request) }
+                        }
+                        submitted++
+                    }
+                }
+                submitted
+            }
+        }
 
     fun getDownload(songId: String): Flow<Download?> =
         downloads.map { it[songId] }.distinctUntilChanged()
