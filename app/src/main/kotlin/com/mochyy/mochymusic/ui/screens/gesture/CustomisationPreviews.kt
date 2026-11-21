@@ -171,6 +171,11 @@ internal fun PlayerStylePreview(style: PlayerStyle) {
                         Box(Modifier.size(26.dp).background(ArtLight, CircleShape))
                     }
                 }
+            } else if (style == PlayerStyle.ARTWORK_FRAME) {
+                Box(
+                    Modifier.align(Alignment.CenterHorizontally).padding(top = 9.dp)
+                        .size(84.dp).clip(RoundedCornerShape(10.dp)).background(ArtFill),
+                )
             } else {
                 // the flagship's cover runs edge to edge across the top
                 Box(Modifier.fillMaxWidth().height(96.dp).background(ArtFill))
