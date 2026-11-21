@@ -256,6 +256,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -280,12 +282,14 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withTimeoutOrNull
-import kotlinx.coroutines.plus
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import timber.log.Timber
+import java.io.FileNotFoundException
 import java.io.ObjectInputStream
+import java.io.Serializable
+import java.util.concurrent.Executors
 import java.io.ObjectOutputStream
 import java.time.LocalDateTime
 import javax.inject.Inject
@@ -358,14 +362,13 @@ class MusicService :
     private var audioFocusRequest: AudioFocusRequest? = null
     private var legacyFocusListener: AudioManager.OnAudioFocusChangeListener? = null
     private var lastAudioFocusState = AudioManager.AUDIOFOCUS_NONE
-    private var wasPlayingBeforeAudioFocusLoss = false
+    private var focusResume: InterruptionResume? = null
     private var hasAudioFocus = false
     private var reentrantFocusGain = false
     private var mixWithOtherApps = false
-    private var wasPlayingBeforeCall = false
+    private var callResume: InterruptionResume? = null
     private val callWatcher by lazy { CallWatcher(this, ::onCallChanged) }
-    private var wasPlayingBeforeVolumeMute = false
-    private var isPausedByVolumeMute = false
+    private var muteResume: InterruptionResume? = null
     var preferredDeviceId: Int? = null
         private set
 
@@ -408,7 +411,8 @@ class MusicService :
         }
     }
 
-    private var scope = CoroutineScope(Dispatchers.Main) + Job()
+    private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+    private var destroying = false
 
     private val binder = MusicBinder()
 
@@ -811,6 +815,7 @@ class MusicService :
     private val audioDeviceCallback = object : AudioDeviceCallback() {
         override fun onAudioDevicesAdded(addedDevices: Array<out AudioDeviceInfo>?) {
             super.onAudioDevicesAdded(addedDevices)
+            if (destroying || !::player.isInitialized || castConnectionHandler?.isCasting?.value == true) return
             val hasBluetooth = addedDevices?.any {
                 com.mochyy.mochymusic.playback.audio.AudioOutputs.kindOf(it.type) ==
                     com.mochyy.mochymusic.playback.audio.AudioOutputs.Kind.BLUETOOTH
@@ -1302,85 +1307,27 @@ class MusicService :
             }
 
         if (dataStore.get(PersistentQueueKey, true)) {
-            val queueFile = filesDir.resolve(PERSISTENT_QUEUE_FILE)
-            if (queueFile.exists()) {
-                runCatching {
-                    queueFile.inputStream().use { fis ->
-                        ObjectInputStream(fis).use { oos ->
-                            oos.readObject() as PersistQueue
-                        }
-                    }
-                }.onSuccess { queue ->
-                    runCatching {
-
-                        val restoredQueue = queue.toQueue().withRestoredManualSongs()
-
-                        scope.launch {
-                            playerInitialized.first { it }
-                            if (isActive) {
-                                playQueue(
-                                    queue = restoredQueue,
-                                    playWhenReady = false,
-                                )
-                            }
-                        }
-                    }.onFailure { error ->
-                        Timber.tag(TAG).w(error, "Failed to restore persisted queue, clearing data")
-                        clearPersistedQueueFiles()
-                    }
-                }.onFailure { error ->
-                    Timber.tag(TAG).w(error, "Failed to read persisted queue, clearing data")
-                    clearPersistedQueueFiles()
-                }
+            val savedQueue = readQueueFile<PersistQueue>(PERSISTENT_QUEUE_FILE)
+            val savedAutomix = readQueueFile<PersistQueue>(PERSISTENT_AUTOMIX_FILE)
+            val savedState = readQueueFile<PersistPlayerState>(PERSISTENT_PLAYER_STATE_FILE)
+            if (savedAutomix != null) {
+                runCatching { savedAutomix.items.map { it.toMediaItem() } }
+                    .onSuccess { automixItems.value = it }
+                    .onFailure { Timber.tag(TAG).w(it, "Failed to restore automix queue") }
             }
-
-            val automixFile = filesDir.resolve(PERSISTENT_AUTOMIX_FILE)
-            if (automixFile.exists()) {
-                runCatching {
-                    automixFile.inputStream().use { fis ->
-                        ObjectInputStream(fis).use { oos ->
-                            oos.readObject() as PersistQueue
-                        }
-                    }
-                }.onSuccess { queue ->
-                    runCatching {
-                        automixItems.value = queue.items.map { it.toMediaItem() }
-                    }.onFailure { error ->
-                        Timber.tag(TAG).w(error, "Failed to restore automix queue, clearing data")
-                        clearPersistedQueueFiles()
-                    }
-                }.onFailure { error ->
-                    Timber.tag(TAG).w(error, "Failed to read automix queue, clearing data")
-                    clearPersistedQueueFiles()
-                }
+            // Apply saved position to the queue being restored. A delayed seek can affect a
+            // completely different song if the user starts playback during launch.
+            if (savedState != null && savedState.volume in MinRestoredVolume..1f) {
+                playerVolume.value = savedState.volume
             }
-
-            val playerStateFile = filesDir.resolve(PERSISTENT_PLAYER_STATE_FILE)
-            if (playerStateFile.exists()) {
+            if (savedQueue != null && savedQueue.items.isNotEmpty()) {
+                val start = savedQueue.mediaItemIndex.coerceIn(savedQueue.items.indices)
+                val resume = savedState?.takeIf { it.currentMediaItemIndex == start && it.currentPosition >= 0L }
                 runCatching {
-                    playerStateFile.inputStream().use { fis ->
-                        ObjectInputStream(fis).use { oos ->
-                            oos.readObject() as PersistPlayerState
-                        }
-                    }
-                }.onSuccess { playerState ->
-
-                    scope.launch {
-                        delay(1000)
-
-                        // older saves held the player's live volume (0 if it was muted or fading
-                        // when saved): only a real one is taken, and the slider's own saved value
-                        // (PlayerVolumeKey, read at start) stands otherwise
-                        if (playerState.volume >= MinRestoredVolume) playerVolume.value = playerState.volume
-
-                        if (playerState.currentMediaItemIndex < player.mediaItemCount) {
-                            player.seekTo(playerState.currentMediaItemIndex, playerState.currentPosition)
-                        }
-                    }
-                }.onFailure { error ->
-                    Timber.tag(TAG).w(error, "Failed to read player state, clearing data")
-                    clearPersistedQueueFiles()
-                }
+                    savedQueue.copy(mediaItemIndex = start, position = resume?.currentPosition ?: savedQueue.position)
+                        .toQueue().withRestoredManualSongs()
+                }.onSuccess { playQueue(it, playWhenReady = false) }
+                    .onFailure { Timber.tag(TAG).w(it, "Failed to restore persisted queue") }
             }
         }
 
@@ -1594,25 +1541,23 @@ class MusicService :
 
     private fun handleAudioFocusChange(focusChange: Int) {
         // a callback still on its way after mixing let go of focus, it would pause us for the other app
-        if (mixWithOtherApps) return
+        if (destroying || !::player.isInitialized || mixWithOtherApps) return
         when (focusChange) {
 
             AudioManager.AUDIOFOCUS_GAIN,
             AudioManager.AUDIOFOCUS_GAIN_TRANSIENT -> {
                 hasAudioFocus = true
 
-                if (wasPlayingBeforeAudioFocusLoss && !player.isPlaying && !reentrantFocusGain) {
+                if (focusResume != null && !reentrantFocusGain) {
                     reentrantFocusGain = true
                     scope.launch {
                         delay(300)
-                        if (hasAudioFocus && wasPlayingBeforeAudioFocusLoss && !player.isPlaying) {
-
-                            if (castConnectionHandler?.isCasting?.value != true) {
-                                player.play()
-                            }
-                            wasPlayingBeforeAudioFocusLoss = false
-                        }
                         reentrantFocusGain = false
+                        if (hasAudioFocus) {
+                            val pending = focusResume
+                            focusResume = null
+                            if (pending?.canResume() == true) transport.play()
+                        }
                     }
                 }
 
@@ -1621,28 +1566,21 @@ class MusicService :
             }
 
             AudioManager.AUDIOFOCUS_LOSS -> {
-                hasAudioFocus = false
-                wasPlayingBeforeAudioFocusLoss = player.isPlaying
-                if (player.isPlaying) {
-                    player.pause()
-                }
+                focusResume = null
+                if (player.playWhenReady) player.pause()
                 abandonAudioFocus()
                 lastAudioFocusState = focusChange
             }
 
             AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
                 hasAudioFocus = false
-                wasPlayingBeforeAudioFocusLoss = player.isPlaying
-                if (player.isPlaying) {
-                    player.pause()
-                }
+                pauseForInterruption()?.let { focusResume = it }
                 lastAudioFocusState = focusChange
             }
 
             AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
                 hasAudioFocus = false
-                wasPlayingBeforeAudioFocusLoss = player.isPlaying
-                if (player.isPlaying) {
+                if (player.playWhenReady) {
                     player.volume = if (isMuted.value) 0f else (playerVolume.value * 0.2f)
                 }
                 lastAudioFocusState = focusChange
@@ -1704,7 +1642,7 @@ class MusicService :
     // holding focus while mixing would get us faded out on android 12+ the moment another app starts
     private fun startMixingWithOtherApps() {
         abandonAudioFocus()
-        wasPlayingBeforeAudioFocusLoss = false
+        focusResume = null
         if (lastAudioFocusState == AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK) {
             player.volume = if (isMuted.value) 0f else playerVolume.value
         }
@@ -1714,32 +1652,46 @@ class MusicService :
 
     private fun stopMixingWithOtherApps() {
         callWatcher.stop()
-        wasPlayingBeforeCall = false
+        callResume = null
         if (player.playWhenReady) requestAudioFocus()
     }
 
-    // while mixing nothing else pauses us for a call, so do it here and pick the song back up after
+    private inner class InterruptionResume(val target: Player) {
+        private val occurrence = providerOccurrence
+        private val pauseGeneration = transport.pauseGeneration
+
+        fun canResume(): Boolean = stillCurrent() && !target.playWhenReady
+
+        fun stillCurrent(): Boolean = !destroying && player === target &&
+            providerOccurrence == occurrence && transport.pauseGeneration == pauseGeneration &&
+            castConnectionHandler?.isCasting?.value != true
+    }
+
+    private fun pauseForInterruption(): InterruptionResume? {
+        if (destroying || !player.playWhenReady || player.playbackState == Player.STATE_ENDED ||
+            castConnectionHandler?.isCasting?.value == true
+        ) return null
+        val resume = InterruptionResume(player)
+        player.pause()
+        return resume
+    }
+
+    // While mixing, Android audio focus does not pause us for a call.
     private fun onCallChanged(inCall: Boolean) {
+        if (destroying || !mixWithOtherApps) return
         if (inCall) {
-            wasPlayingBeforeCall = player.playWhenReady
-            if (wasPlayingBeforeCall) player.pause()
-            return
+            pauseForInterruption()?.let { callResume = it }
+        } else {
+            val pending = callResume
+            callResume = null
+            if (pending?.canResume() == true) transport.play()
         }
-        if (!wasPlayingBeforeCall) return
-        wasPlayingBeforeCall = false
-        if (castConnectionHandler?.isCasting?.value != true) player.play()
     }
 
     /** Marks the songs the user had queued by hand when the queue was saved, so a restart doesn't turn them into ordinary ones. */
     private fun Queue.withRestoredManualSongs(): Queue {
         if (this !is ListQueue) return this
-        val manual = runCatching {
-            val file = filesDir.resolve(PERSISTENT_MANUAL_QUEUE_FILE)
-            if (!file.exists()) return@runCatching emptySet<Int>()
-            file.inputStream().use { fis ->
-                ObjectInputStream(fis).use { ois -> (ois.readObject() as IntArray).toSet() }
-            }
-        }.getOrDefault(emptySet())
+        val manual = readQueueFile<IntArray>(PERSISTENT_MANUAL_QUEUE_FILE)?.toSet().orEmpty()
         if (manual.isEmpty()) return this
         return ListQueue(
             title = title,
@@ -1749,11 +1701,32 @@ class MusicService :
         )
     }
 
-    private fun clearPersistedQueueFiles() {
-        runCatching { filesDir.resolve(PERSISTENT_QUEUE_FILE).delete() }
-        runCatching { filesDir.resolve(PERSISTENT_AUTOMIX_FILE).delete() }
-        runCatching { filesDir.resolve(PERSISTENT_MANUAL_QUEUE_FILE).delete() }
-        runCatching { filesDir.resolve(PERSISTENT_PLAYER_STATE_FILE).delete() }
+    private inline fun <reified T> readQueueFile(name: String): T? = try {
+        filesDir.resolve(name).inputStream().use { input ->
+            ObjectInputStream(input).use { it.readObject() as T }
+        }
+    } catch (_: FileNotFoundException) {
+        null
+    } catch (e: Exception) {
+        Timber.tag(TAG).w(e, "Failed to read %s", name)
+        null
+    }
+
+    private fun writeQueueFile(name: String, value: Serializable) {
+        val file = androidx.core.util.AtomicFile(filesDir.resolve(name))
+        runCatching {
+            val stream = file.startWrite()
+            try {
+                ObjectOutputStream(stream).apply {
+                    writeObject(value)
+                    flush()
+                }
+                file.finishWrite(stream)
+            } catch (e: Exception) {
+                file.failWrite(stream)
+                throw e
+            }
+        }.onFailure { Timber.tag(TAG).e(it, "Failed to save %s", name) }
     }
 
     fun hasAudioFocusForPlayback(): Boolean {
@@ -1845,9 +1818,11 @@ class MusicService :
             audio?.channelCount?.takeIf { it > 0 }?.let { "$it ch" },
         ).joinToString(" ").ifBlank { "unknown format" }
         Timber.tag(TAG).w("No decoder on this phone for $mediaId's audio ($what)")
-        // not from inside the player's listener: the fallback stops and re-prepares the player
+        // Leave the callback before re-preparing the player, and only act on the same queue entry.
+        val target = player
+        val occurrence = providerOccurrence
         scope.launch {
-            if (player.currentMediaItem?.mediaId != mediaId) return@launch
+            if (player !== target || providerOccurrence != occurrence || target.currentMediaItem?.mediaId != mediaId) return@launch
             noteMissingDecoder(mediaId, StreamFacts.codecOf(audio?.sampleMimeType, audio?.codecs), audio?.sampleRate)
             if (forceFallBack(mediaId, announce = !decoderNotices.containsKey(mediaId))) return@launch
             lastPlaybackError = PlaybackException(
@@ -2089,7 +2064,7 @@ class MusicService :
         queue: Queue,
         playWhenReady: Boolean = true,
     ) {
-        if (!scope.isActive) scope = CoroutineScope(Dispatchers.Main) + Job()
+        if (destroying) return
 
         if (!playerInitialized.value) {
             Timber.tag(TAG).w("playQueue called before player initialization, queuing request")
@@ -2216,7 +2191,7 @@ class MusicService :
                 player.addMediaItems(items)
             }
         } else {
-            val startIndex = initialStatus.mediaItemIndex.coerceAtLeast(0)
+            val startIndex = initialStatus.mediaItemIndex.coerceIn(initialStatus.items.indices)
             // the songs the user queued play right after the one the queue starts on, ahead of the rest of it
             val items = if (manual.isEmpty()) {
                 initialStatus.items
@@ -3171,17 +3146,8 @@ class MusicService :
             return
         }
 
-        if (reason == Player.PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST) {
-            if (playWhenReady) {
-                isPausedByVolumeMute = false
-            }
-
-            if (!playWhenReady && !isPausedByVolumeMute) {
-                wasPlayingBeforeVolumeMute = false
-            }
-        }
-
         if (playWhenReady) {
+            muteResume = null
             setupLoudnessEnhancer()
         }
     }
@@ -3752,7 +3718,7 @@ class MusicService :
         // whether it was playing, read before the pause below wipes it: the recovery used to go
         // by the audio-focus flag instead, so it re-prepared the song and left it paused
         val target = player
-        val resume = player.playWhenReady || wasPlayingBeforeAudioFocusLoss
+        val resume = player.playWhenReady || focusResume?.stillCurrent() == true
         val pauseGeneration = transport.pauseGeneration
         retryJob?.cancel()
         retryJob = scope.launch {
@@ -3922,18 +3888,14 @@ class MusicService :
         super.onDeviceVolumeChanged(volume, muted)
         val pauseOnMute = dataStore.get(PauseOnMute, false)
 
-        if ((volume == 0 || muted) && pauseOnMute) {
-            if (player.isPlaying) {
-                wasPlayingBeforeVolumeMute = true
-                isPausedByVolumeMute = true
-                player.pause()
-            }
-        } else if (volume > 0 && !muted && pauseOnMute) {
-            if (wasPlayingBeforeVolumeMute && !player.isPlaying && castConnectionHandler?.isCasting?.value != true) {
-                wasPlayingBeforeVolumeMute = false
-                isPausedByVolumeMute = false
-                player.play()
-            }
+        if (!pauseOnMute) {
+            muteResume = null
+        } else if (volume == 0 || muted) {
+            pauseForInterruption()?.let { muteResume = it }
+        } else {
+            val pending = muteResume
+            muteResume = null
+            if (pending?.canResume() == true) transport.play()
         }
     }
 
@@ -4625,52 +4587,13 @@ class MusicService :
                 playbackState = player.playbackState
             )
 
-            scope.launch(Dispatchers.IO) {
-                if (persistQueue != null) runCatching {
-                    filesDir.resolve(PERSISTENT_QUEUE_FILE).outputStream().use { fos ->
-                        ObjectOutputStream(fos).use { oos ->
-                            oos.writeObject(persistQueue)
-                        }
-                    }
-                    Timber.tag(TAG).d("Queue saved successfully")
-                }.onFailure {
-                    Timber.tag(TAG).e(it, "Failed to save queue")
-                    reportException(it)
-                }
-
-                if (manualIndices != null) runCatching {
-                    filesDir.resolve(PERSISTENT_MANUAL_QUEUE_FILE).outputStream().use { fos ->
-                        ObjectOutputStream(fos).use { oos ->
-                            oos.writeObject(manualIndices)
-                        }
-                    }
-                }.onFailure {
-                    Timber.tag(TAG).e(it, "Failed to save manual queue marks")
-                }
-
-                if (persistAutomix != null) runCatching {
-                    filesDir.resolve(PERSISTENT_AUTOMIX_FILE).outputStream().use { fos ->
-                        ObjectOutputStream(fos).use { oos ->
-                            oos.writeObject(persistAutomix)
-                        }
-                    }
-                    Timber.tag(TAG).d("Automix saved successfully")
-                }.onFailure {
-                    Timber.tag(TAG).e(it, "Failed to save automix")
-                    reportException(it)
-                }
-
-                runCatching {
-                    filesDir.resolve(PERSISTENT_PLAYER_STATE_FILE).outputStream().use { fos ->
-                        ObjectOutputStream(fos).use { oos ->
-                            oos.writeObject(persistPlayerState)
-                        }
-                    }
-                    Timber.tag(TAG).d("Player state saved successfully")
-                }.onFailure {
-                    Timber.tag(TAG).e(it, "Failed to save player state")
-                    reportException(it)
-                }
+            // Serialize snapshots in production order. Atomic writes preserve the last complete
+            // file if Android kills the process mid-save, including during service destruction.
+            queueFileWriter.execute {
+                persistQueue?.let { writeQueueFile(PERSISTENT_QUEUE_FILE, it) }
+                manualIndices?.let { writeQueueFile(PERSISTENT_MANUAL_QUEUE_FILE, it) }
+                persistAutomix?.let { writeQueueFile(PERSISTENT_AUTOMIX_FILE, it) }
+                writeQueueFile(PERSISTENT_PLAYER_STATE_FILE, persistPlayerState)
             }
         } catch (e: Exception) {
             Timber.tag(TAG).e(e, "Error during queue save operation")
@@ -4679,6 +4602,7 @@ class MusicService :
     }
 
     override fun onDestroy() {
+        destroying = true
         isRunning = false
         providerHandoff = null
         providerSwitch.cancel()
@@ -4688,6 +4612,7 @@ class MusicService :
         retryJob?.cancel()
         clearStreamFailure()
         stopWidgetUpdates()
+        widgetRenderJob?.cancel()
         audioManager.unregisterAudioDeviceCallback(audioDeviceCallback)
         audioOutputs.release()
         audioPass.release()
@@ -4702,7 +4627,17 @@ class MusicService :
         callWatcher.stop()
         abandonAudioFocus()
         releaseLoudnessEnhancer()
+        transport.cancel()
         crossmixDirector.release()
+        scope.cancel()
+        // A plain crossfade can still own a second decoder when the service is stopped.
+        listOfNotNull(secondaryPlayer, fadingPlayer).distinct().forEach { deck ->
+            deck.removeListener(secondaryPlayerListener)
+            unregisterEqualizer(deck)
+            deck.release()
+        }
+        secondaryPlayer = null
+        fadingPlayer = null
         fadingLoudnessEnhancer?.runCatching { release() }
         fadingLoudnessEnhancer = null
         carLyrics?.stop()
@@ -4714,6 +4649,7 @@ class MusicService :
         player.removeListener(sleepTimer)
         playerSilenceProcessors.remove(player)
         playerReplayGain.remove(player)
+        unregisterEqualizer(player)
 
         player.release()
         super.onDestroy()
@@ -4762,36 +4698,39 @@ class MusicService :
 
     private val powerManager by lazy { getSystemService(android.os.PowerManager::class.java) }
 
-    private fun updateWidgetUI(progressOnly: Boolean = false) {
-        scope.launch {
-            try {
-                val queued = player.currentMetadata
-                val songData = currentSong.value?.takeIf { it.id == player.currentMediaItem?.mediaId }
-                val song = songData?.song
-                val songTitle = queued?.title ?: song?.title ?: getString(R.string.no_song_playing)
-                val artistName = queued?.artists?.joinToString(", ") { it.name }
-                    ?: songData?.artists?.joinToString(", ") { it.name } ?: getString(R.string.tap_to_open)
-                val isLiked = songData?.song?.liked == true
+    private var widgetRenderJob: Job? = null
 
-                widgetManager.updateWidgets(
-                    title = songTitle,
-                    artist = artistName,
-                    artworkUri = queued?.thumbnailUrl ?: song?.thumbnailUrl,
-                    isPlaying = transport.playIntent.value ?:
-                        (player.playWhenReady && player.playbackState != Player.STATE_ENDED),
-                    isLiked = isLiked,
-                    duration = if (player.duration != C.TIME_UNSET) player.duration else 0,
-                    currentPosition = player.currentPosition,
-                    progressOnly = progressOnly,
-                )
-                if (!progressOnly && player.isPlaying && widgetManager.hasTickingWidgets && widgetUpdateJob == null) {
-                    startWidgetUpdates()
-                }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                Timber.tag(TAG).w(e, "Widget update failed")
-            }
+    private fun updateWidgetUI() {
+        widgetRenderJob?.cancel()
+        widgetRenderJob = scope.launch {
+            renderWidgets(progressOnly = false)
+            if (player.isPlaying) startWidgetUpdates()
+        }
+    }
+
+    private suspend fun renderWidgets(progressOnly: Boolean) {
+        try {
+            val queued = player.currentMetadata
+            val songData = currentSong.value?.takeIf { it.id == player.currentMediaItem?.mediaId }
+            val song = songData?.song
+            val songTitle = queued?.title ?: song?.title ?: getString(R.string.no_song_playing)
+            val artistName = queued?.artists?.joinToString(", ") { it.name }
+                ?: songData?.artists?.joinToString(", ") { it.name } ?: getString(R.string.tap_to_open)
+            widgetManager.updateWidgets(
+                title = songTitle,
+                artist = artistName,
+                artworkUri = queued?.thumbnailUrl ?: song?.thumbnailUrl,
+                isPlaying = transport.playIntent.value ?:
+                    (player.playWhenReady && player.playbackState != Player.STATE_ENDED),
+                isLiked = song?.liked == true,
+                duration = if (player.duration != C.TIME_UNSET) player.duration else 0,
+                currentPosition = player.currentPosition,
+                progressOnly = progressOnly,
+            )
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Timber.tag(TAG).w(e, "Widget update failed")
         }
     }
 
@@ -4802,8 +4741,8 @@ class MusicService :
         widgetUpdateJob = scope.launch {
             while (isActive && widgetManager.hasTickingWidgets) {
                 // nobody sees a widget with the screen off, and redrawing it every second there was all cost
-                if (player.isPlaying && powerManager?.isInteractive != false) {
-                    updateWidgetUI(progressOnly = true)
+                if (player.isPlaying && powerManager?.isInteractive != false && widgetRenderJob?.isActive != true) {
+                    renderWidgets(progressOnly = true)
                 }
                 // the widget's progress bar moves in whole seconds anyway; more often only cost
                 // frames in the app
@@ -5178,15 +5117,15 @@ class MusicService :
             } finally {
                 // The effect must retire even when playback didn't start before the ramp timed out.
                 incomingFx?.finish()
-                runCatching {
-                    fadingPlayer?.volume = 0f
-                    player.volume = targetVolume()
+                if (!destroying) {
+                    runCatching {
+                        fadingPlayer?.volume = 0f
+                        player.volume = targetVolume()
+                    }
+                    runCatching { cleanupCrossfade() }
+                    isCrossfading = false
+                    runCatching { scheduleCrossfade() }
                 }
-                runCatching { cleanupCrossfade() }
-                // cleanup can stop partway on a player that's already gone; the flag still comes down
-                isCrossfading = false
-                // crossmix sat out the blend, so it plans the new song's ending now
-                runCatching { scheduleCrossfade() }
             }
         }
     }
@@ -5970,6 +5909,8 @@ class MusicService :
     }
 
     companion object {
+        private val queueFileWriter = Executors.newSingleThreadExecutor()
+
         const val ROOT = "root"
         const val SONG = "song"
         const val ARTIST = "artist"

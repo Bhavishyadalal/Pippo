@@ -94,14 +94,18 @@ constructor(
     private val connectivityManager = context.getSystemService<ConnectivityManager>()!!
     private val downloadQuality by enumPreference(context, DownloadQualityKey, DownloadQuality.HIGH)
     private val ipVersion by enumPreference(context, IpVersionKey, IpVersion.AUTO)
-    /** Each song's stream url and when it stops working (ms since 1970); read on the download threads. */
-    private val songUrlCache = java.util.concurrent.ConcurrentHashMap<String, Pair<String, Long>>()
+    private data class YouTubeDownload(
+        val url: String,
+        val expiresAt: Long,
+        val headers: Map<String, String>,
+        val quality: DownloadQuality,
+        val itag: Int,
+    )
 
-    // the providers each song's download already failed from, so its next try goes further down the download order
+    private val songUrlCache = java.util.concurrent.ConcurrentHashMap<String, YouTubeDownload>()
+
+    // The providers each song's download already failed from, so a retry can use another source.
     private val failedProviders = java.util.concurrent.ConcurrentHashMap<String, Set<String>>()
-
-    /** Per-track stream request headers, so a cached url is replayed with its client's Origin. */
-    private val songStreamHeaders = java.util.concurrent.ConcurrentHashMap<String, Map<String, String>>()
 
     /** a module's file for each song being downloaded from one, looked up once since the download opens it more than once */
     private class ModuleDownload(
@@ -180,10 +184,11 @@ constructor(
 
             // only while it still works. This used to keep the url's lifetime instead of when it ends,
             // and compare the wrong way round, so a dead url was reused for every retry of a download
-            songUrlCache[mediaId]?.takeIf { it.second > System.currentTimeMillis() }?.let {
+            songUrlCache[mediaId]?.takeIf { it.quality == quality && it.expiresAt > System.currentTimeMillis() }?.let {
+                rememberDownloadStream(mediaId, "youtube:${it.itag}", dataSpec.position)
                 return@Factory dataSpec
-                    .withUri(it.first.toUri())
-                    .withRequestHeaders(dataSpec.httpRequestHeaders + songStreamHeaders[mediaId].orEmpty())
+                    .withUri(it.url.toUri())
+                    .withRequestHeaders(dataSpec.httpRequestHeaders + it.headers)
             }
 
             val playbackData = runBlocking(Dispatchers.IO) {
@@ -218,27 +223,12 @@ constructor(
                     ),
                 )
 
-                val now = LocalDateTime.now()
-                val existing = getSongByIdBlocking(mediaId)?.song
-
-                val updatedSong = if (existing != null) {
-                    if (existing.dateDownload == null) {
-                        existing.copy(dateDownload = now)
-                    } else {
-                        existing
-                    }
-                } else {
-                    SongEntity(
-                        id = mediaId,
-                        title = playbackData.videoDetails?.title ?: "Unknown",
-                        duration = playbackData.videoDetails?.lengthSeconds?.toIntOrNull() ?: 0,
-                        thumbnailUrl = playbackData.videoDetails?.thumbnail?.thumbnails?.lastOrNull()?.url?.resize(1200, 1200),
-                        dateDownload = now,
-                        isDownloaded = false
-                    )
-                }
-
-                upsert(updatedSong)
+                val updatedSong = getSongByIdBlocking(mediaId)?.song ?: SongEntity(
+                    id = mediaId,
+                    title = playbackData.videoDetails?.title ?: "Unknown",
+                    duration = playbackData.videoDetails?.lengthSeconds?.toIntOrNull() ?: 0,
+                    thumbnailUrl = playbackData.videoDetails?.thumbnail?.thumbnails?.lastOrNull()?.url?.resize(1200, 1200),
+                ).also { insert(it) }
 
                 updatedSong.thumbnailUrl?.let { url ->
                     val request = ImageRequest.Builder(context)
@@ -254,8 +244,13 @@ constructor(
                 "${it}&range=0-${format.contentLength ?: 10000000}"
             }
 
-            songUrlCache[mediaId] = streamUrl to System.currentTimeMillis() + playbackData.streamExpiresInSeconds * 1000L
-            songStreamHeaders[mediaId] = playbackData.streamHeaders
+            songUrlCache[mediaId] = YouTubeDownload(
+                url = streamUrl,
+                expiresAt = System.currentTimeMillis() + playbackData.streamExpiresInSeconds * 1000L,
+                headers = playbackData.streamHeaders,
+                quality = quality,
+                itag = format.itag,
+            )
             dataSpec
                 .withUri(streamUrl.toUri())
                 .withRequestHeaders(dataSpec.httpRequestHeaders + playbackData.streamHeaders)
@@ -295,6 +290,7 @@ constructor(
                                     Download.STATE_COMPLETED -> {
                                         recordDownloadedLength(download)
                                         database.updateDownloadedInfo(id, true, LocalDateTime.now())
+                                        songUrlCache.remove(id)
                                         moduleDownloads.remove(id)
                                         failedProviders.remove(id)
                                     }
@@ -320,7 +316,6 @@ constructor(
                         downloads.update { it - id }
                         unavailableLossless.update { it - id }
                         songUrlCache.remove(id)
-                        songStreamHeaders.remove(id)
                         moduleDownloads.remove(id)
                         failedProviders.remove(id)
                         scope.launch {
@@ -385,7 +380,6 @@ constructor(
     // a failed download retries with a fresh stream from the next provider down, and drops its bytes so two formats never get glued together
     private fun forgetStream(mediaId: String) {
         songUrlCache.remove(mediaId)
-        songStreamHeaders.remove(mediaId)
         moduleDownloads.remove(mediaId)?.let { failed -> failedProviders.merge(mediaId, setOf(failed.providerId)) { a, b -> a + b } }
         runCatching { downloadCache.removeResource(mediaId) }
     }
@@ -420,7 +414,6 @@ constructor(
                     playbackUrl = null,
                 ),
             )
-            if (song.song.dateDownload == null) upsert(song.song.copy(dateDownload = LocalDateTime.now()))
         }
         return ModuleDownload(module.info.id, stream.url, stream.headers, stream.isLosslessDownload).also { moduleDownloads[mediaId] = it }
     }
