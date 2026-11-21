@@ -96,6 +96,10 @@ import com.mochyy.mochymusic.ui.player.flagship.FlagshipLandscape
 import com.mochyy.mochymusic.ui.player.flagship.FlagshipPillLook
 import com.mochyy.mochymusic.ui.player.flagship.FlagshipPillMorphSurface
 import com.mochyy.mochymusic.ui.player.flagship.FlagshipTransportRow
+import com.mochyy.mochymusic.ui.player.info.ForceProviderSheet
+import com.mochyy.mochymusic.ui.player.info.PlayerProviderMark
+import com.mochyy.mochymusic.ui.player.info.ProviderMarkRoom
+import com.mochyy.mochymusic.ui.player.info.rememberTrackProvider
 import com.mochyy.mochymusic.ui.player.flagship.ControlsShade
 import com.mochyy.mochymusic.ui.player.flagship.CoverFrost
 import com.mochyy.mochymusic.ui.player.flagship.flagshipBarFootprint
@@ -284,12 +288,13 @@ private fun PlayerSheet(
     // a look module with a player of its own puts that style first in the selector, for as long as it's on
     val onTv = com.mochyy.mochymusic.ui.utils.isTvLayout()
     val hasModuleStyle = !onTv && com.mochyy.mochymusic.modules.skin.ActiveSkin.current?.player != null
-    // the selector's columns, as indexes into PlayerStyle.entries: the flagship with its older layouts under it
-    val selectorColumns = remember(hasModuleStyle, onTv) {
+    val playerStyles = remember(hasModuleStyle) { PlayerStyle.entries.filter { it != PlayerStyle.MODULE || hasModuleStyle } }
+    // The selector uses indices in the available list, which can omit the module player.
+    val selectorColumns = remember(playerStyles, hasModuleStyle, onTv) {
         val columns = if (hasModuleStyle) listOf(listOf(PlayerStyle.MODULE)) + PlayerStyle.selectorColumns else PlayerStyle.selectorColumns
         // a tv only offers the looks made for it
         val shown = if (onTv) columns.map { column -> column.filter { it.availableOnTv } }.filter { it.isNotEmpty() } else columns
-        shown.map { column -> column.map { it.ordinal } }
+        shown.map { column -> column.map(playerStyles::indexOf) }
     }
     val studio = com.mochyy.mochymusic.ui.player.studio.rememberPlayerStudioState(selectorColumns)
     val studioAnchors = remember { com.mochyy.mochymusic.ui.player.studio.StudioAnchors() }
@@ -318,6 +323,7 @@ private fun PlayerSheet(
     // The title and artist's sheet: the artists, the album, about the song
     var showSongDetails by remember { mutableStateOf(false) }
     var showStreamInfo by remember { mutableStateOf(false) }
+    var showProviderSwitch by remember { mutableStateOf(false) }
 
     var showActionMenu by remember { mutableStateOf(false) }
     var immersiveOpen by rememberSaveable { mutableStateOf(false) }
@@ -374,16 +380,25 @@ private fun PlayerSheet(
     }
     // the Turntable is the flagship around a record player, whatever cover the flagship is set to
     val isTurntable = playerStyle == com.mochyy.mochymusic.constants.PlayerStyle.TURNTABLE
-    val shownCoverStyle = if (isTurntable) PlayerCoverStyle.TURNTABLE else coverStyle
+    val artworkFrame = playerStyle == PlayerStyle.ARTWORK_FRAME
+    val shownCoverStyle = when {
+        isTurntable -> PlayerCoverStyle.TURNTABLE
+        artworkFrame -> PlayerCoverStyle.SQUARED
+        else -> coverStyle
+    }
     val controlsDrawShift = if (shownCoverStyle == PlayerCoverStyle.EDGE_TO_EDGE) ControlsDrawShift else 0.dp
     // the new flagship: its own buttons and bottom bar, the cover frosting into moving colours
-    val isFlagship = playerStyle == PlayerStyle.FLAGSHIP
+    val isFlagship = playerStyle == PlayerStyle.FLAGSHIP || artworkFrame
     // the flagships' landscape layout draws the whole open player itself, the way the other styles do
     val landscapeFlagship = playerStyle.flagshipFamily && landscapeWindow
     // each flagship keeps its own background, the new one starting on the moving colours it was made with
     var classicBackground by rememberEnumPreference(PlayerBackgroundStyleKey, PlayerBackgroundStyle.COVER_GRADIENT)
     var flagshipBackground by rememberEnumPreference(FlagshipBackgroundStyleKey, PlayerBackgroundStyle.AMBIENT)
-    val backgroundStyle = if (isFlagship) flagshipBackground else classicBackground
+    val backgroundStyle = when {
+        artworkFrame -> PlayerBackgroundStyle.COVER_GRADIENT
+        isFlagship -> flagshipBackground
+        else -> classicBackground
+    }
     var transportLayout by rememberEnumPreference(FlagshipTransportLayoutKey, FlagshipTransportLayout.THREE)
     // the colours the new flagship's backdrop and cover fade drift between
     val ambient = rememberAmbientColors()
@@ -417,8 +432,6 @@ private fun PlayerSheet(
     LaunchedEffect(studioEngaged) {
         if (studioEngaged) transition.close()
     }
-    // the module style is last among the entries, so leaving it out keeps every other style's index
-    val playerStyles = remember(hasModuleStyle) { PlayerStyle.entries.filter { it != PlayerStyle.MODULE || hasModuleStyle } }
     val currentPlayerStyleForStudio by androidx.compose.runtime.rememberUpdatedState(playerStyle)
     val openStudio: () -> Unit = remember(studio) {
         {
@@ -555,6 +568,7 @@ private fun PlayerSheet(
         showSleepTimer = false
         showSongDetails = false
         showStreamInfo = false
+        showProviderSwitch = false
     }
 
     // A page open when the player closes stays open: next time the player opens, it opens on that
@@ -1131,6 +1145,7 @@ private fun PlayerSheet(
                 FlagshipLandscape(
                     pages = transition,
                     turntable = isTurntable,
+                    preferSquare = artworkFrame,
                     sheetShowing = sheetShowing,
                     interactive = remember(state) { { landscapeOpen } },
                     expanded = remember(state) { { state.isExpanded } },
@@ -1395,7 +1410,8 @@ private fun PlayerSheet(
             val transportSpacer = (transportGap - SeekBarLift - controlsDrawShift).coerceAtLeast(0.dp)
             // the buttons sit halfway between the seek bar and the bottom part: once the spacer above runs out they'd sit low, so they're lifted by half the difference
             val gapAboveButtons = transportSpacer + SeekBarLift + controlsDrawShift
-            val gapBelowButtons = transportGap.coerceAtLeast(0.dp)
+            val hasProviderMark = isFlagship && !onTv
+            val gapBelowButtons = transportGap.coerceAtLeast(if (hasProviderMark) ProviderMarkRoom else 0.dp)
             val buttonsLift = (gapAboveButtons - gapBelowButtons) / 2f
             // how far the editor's hold may move the controls, and pull the card taller
             androidx.compose.runtime.SideEffect {
@@ -1412,7 +1428,7 @@ private fun PlayerSheet(
                     .align(Alignment.BottomCenter)
                     .widthIn(max = 600.dp)
                     .fillMaxWidth()
-                    .padding(bottom = belowControls + transportGap.coerceAtLeast(0.dp))
+                    .padding(bottom = belowControls + gapBelowButtons)
                     // where the editor's hold put them; only placed, so a drag never recomposes
                     .offset { androidx.compose.ui.unit.IntOffset(0, layoutTweaks.controlsOffset().roundToInt()) }
                     .graphicsLayer {
@@ -1713,6 +1729,16 @@ private fun PlayerSheet(
                 }
             }
 
+            if (hasProviderMark && state.isExpanded && !studioEngaged && transition.page == PlayerPage.NONE) {
+                PlayerProviderMark(
+                    mediaId = trackInfo.mediaId,
+                    animate = !showProviderSwitch && !showStreamInfo && !showExpandMenu && !showActionMenu,
+                    onClick = { showProviderSwitch = true },
+                    modifier = Modifier.align(Alignment.BottomCenter)
+                        .padding(bottom = belowControls + 2.dp, start = 24.dp, end = 24.dp),
+                )
+            }
+
             // The Turntable's own controls, as its frame lays them out, above the card. They give
             // way to the flagship's (with the seek bar) while a page is up.
             if (isTurntable) {
@@ -1825,6 +1851,11 @@ private fun PlayerSheet(
 
         if (showStreamInfo) {
             com.mochyy.mochymusic.ui.player.info.StreamInfoSheet(onDismiss = { showStreamInfo = false })
+        }
+
+        if (showProviderSwitch) {
+            val currentProvider = rememberTrackProvider(trackInfo.mediaId)
+            ForceProviderSheet(currentProviderId = currentProvider?.providerId, onDismiss = { showProviderSwitch = false })
         }
 
         if (immersiveVisible) ImmersivePlayer(onExit = { immersiveOpen = false })
