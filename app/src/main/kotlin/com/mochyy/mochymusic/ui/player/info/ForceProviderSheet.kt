@@ -72,14 +72,14 @@ private fun qualityLabelRes(quality: AudioQuality): Int = when (quality) {
 
 /** "force change": plays this song from another of the providers that are switched on, at the quality picked */
 @Composable
-fun ForceProviderSheet(currentProviderId: String?, onDismiss: () -> Unit) {
+fun ForceProviderSheet(currentProviderId: String?, currentOption: String? = null, onDismiss: () -> Unit) {
     val service = LocalPlayerConnection.current?.service ?: return
     val modules = service.sourceModules
     val order by modules.order.collectAsState()
     val youTubeOn by modules.youTubeEnabled.collectAsState()
     val entries by modules.entries.collectAsState()
     val state by service.providerSwitch.state.collectAsState()
-    val (youTubeQuality, setYouTubeQuality) = rememberPreference(AudioQualityKey, AudioQuality.AUTO.name)
+    val (youTubeQuality) = rememberPreference(AudioQualityKey, AudioQuality.AUTO.name)
     // only what's switched on (and signed in) is offered: a provider that's off couldn't play it anyway
     val providers = remember(order, youTubeOn, entries) { order.filter { modules.isUsable(it) } }
 
@@ -111,7 +111,7 @@ fun ForceProviderSheet(currentProviderId: String?, onDismiss: () -> Unit) {
                 SwitchStatus(state, nameOf = modules::nameOf, onCancel = service.providerSwitch::cancel)
                 providers.forEach { id ->
                     val module = modules.module(id)
-                    val choice = module?.choices?.firstOrNull { it.id.contains("quality", ignoreCase = true) }
+                    val choice = module?.let(modules::qualityChoice)
                     val picked = choice?.let { c -> modules.picks(id)[c.id] ?: c.options.firstOrNull()?.id }
                     ProviderChoiceRow(
                         providerId = id,
@@ -122,12 +122,11 @@ fun ForceProviderSheet(currentProviderId: String?, onDismiss: () -> Unit) {
                             id == SourceModules.YouTubeId -> YouTubeQualities.map { StreamOption(it.name, stringResource(qualityLabelRes(it)), "") }
                             else -> emptyList()
                         },
-                        selectedOption = if (id == SourceModules.YouTubeId) youTubeQuality else picked,
+                        selectedOption = currentOption?.takeIf { id == currentProviderId }
+                            ?: if (id == SourceModules.YouTubeId) youTubeQuality else picked,
                         onPick = { option ->
-                            if (option != null) {
-                                if (id == SourceModules.YouTubeId) setYouTubeQuality(option) else choice?.let { modules.setPick(id, it.id, option) }
-                            }
-                            service.providerSwitch.force(id)
+                            val requested = option?.let { (choice?.id ?: SourceModules.QualityChoice) to it }
+                            service.providerSwitch.force(id, requested)
                         },
                     )
                     Spacer(Modifier.height(8.dp))
@@ -165,16 +164,22 @@ private fun SwitchStatus(state: ProviderSwitchState, nameOf: (String) -> String,
                         Text(stringResource(R.string.cancel), color = Color.White)
                     }
                 }
+                is ProviderSwitchState.Starting -> {
+                    Text(stringResource(R.string.pc_force_starting, nameOf(state.providerId)), color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    TextButton(onClick = onCancel, modifier = Modifier.align(Alignment.End)) {
+                        Text(stringResource(R.string.cancel), color = Color.White)
+                    }
+                }
                 is ProviderSwitchState.Failed -> {
                     Text(stringResource(R.string.pc_force_unavailable), color = Color(0xFFFF7A7A), fontSize = 14.sp, fontWeight = FontWeight.Bold)
                     Text(
-                        stringResource(R.string.pc_force_failed, nameOf(state.providerId), state.attempts),
+                        state.reason ?: stringResource(R.string.pc_force_failed, nameOf(state.providerId), state.attempts),
                         color = InfoMuted,
                         fontSize = 12.sp,
                     )
                 }
                 is ProviderSwitchState.Done -> {
-                    Text(stringResource(R.string.pc_force_now_playing, nameOf(state.providerId)), color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.pc_force_switched, nameOf(state.providerId)), color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                 }
                 ProviderSwitchState.Idle -> Unit
             }

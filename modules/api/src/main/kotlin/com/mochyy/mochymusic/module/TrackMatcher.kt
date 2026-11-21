@@ -21,11 +21,40 @@ class CatalogTrack(
  */
 object TrackMatcher {
 
-    private val versionWords = listOf(
-        "remix", "live", "acoustic", "instrumental", "karaoke", "sped up", "slowed", "nightcore",
-        "demo", "cover", "edit", "mix", "version", "unplugged", "orchestral", "piano",
-    )
-    private val versionPatterns = versionWords.map { Regex("""\b${Regex.escape(it)}\b""") }
+    private val versionPatterns = listOf(
+        "remix", "live", "acoustic|unplugged", "instrumental", "karaoke",
+        "sped[ -]up|speed[ -]up|nightcore", "slowed|slow[ -]down", "demo", "mash[ -]?up",
+        "(?:radio|extended) edit", "cover", "orchestral",
+    ).map { Regex("""\b(?:$it)\b""", RegexOption.IGNORE_CASE) }
+    private val previewPattern = Regex("""(?:^preview$|[(\[]\s*(?:song |track |audio )?preview\b|\s[-–]\s*preview\b)""", RegexOption.IGNORE_CASE)
+
+    private val contentVersion = Regex("""(?:[(\[]|\s[-–]\s*)(explicit|clean)\b""", RegexOption.IGNORE_CASE)
+
+    /** Reject clear mismatches while accepting providers that omit optional catalog fields. */
+    fun isCompatible(query: TrackQuery, title: String, durationMs: Long?): Boolean {
+        if (previewPattern.containsMatchIn(title) && !previewPattern.containsMatchIn(query.title)) return false
+
+        // A word in the song name itself is harmless when both titles contain it.
+        // Use title markers for the version check: catalog album names vary by service.
+        if (title.isNotBlank() && versionPatterns.any {
+                it.containsMatchIn(title) != it.containsMatchIn(query.title)
+            }
+        ) return false
+
+        val wantedVersion = contentVersion.find(query.title)?.groupValues?.get(1)
+        val actualVersion = contentVersion.find(title)?.groupValues?.get(1)
+        if (wantedVersion != null && actualVersion != null && !wantedVersion.equals(actualVersion, ignoreCase = true)) return false
+        return isDurationCompatible(query.durationMs, durationMs)
+    }
+
+    fun isDurationCompatible(expectedMs: Long?, durationMs: Long?): Boolean {
+        val wanted = expectedMs?.takeIf { it > 0 } ?: return true
+        val actual = durationMs?.takeIf { it > 0 } ?: return true
+        // Music videos sometimes have an intro/outro. Allow moderate drift on long tracks
+        // while rejecting catalog entries that are a small fraction of the original.
+        val tolerance = (wanted / 5).coerceIn(5_000L, 45_000L)
+        return abs(wanted - actual) <= tolerance
+    }
 
     class Scored(val track: CatalogTrack, val score: Float)
 
@@ -39,12 +68,18 @@ object TrackMatcher {
     fun ranked(query: TrackQuery, candidates: List<CatalogTrack>): List<Scored> {
         val isrc = query.isrc
         val scored = candidates.map { song ->
-            Scored(song, if (isrc != null && song.isrc.equals(isrc, ignoreCase = true)) 1f else score(query, song))
+            val score = when {
+                !isrc.isNullOrBlank() && song.isrc.equals(isrc, ignoreCase = true) ->
+                    if (isCompatible(query, song.title, song.durationMs)) 1f else 0f
+                else -> score(query, song)
+            }
+            Scored(song, score)
         }
         return scored.filter { it.score >= 0.7f }.sortedByDescending { it.score }
     }
 
     fun score(query: TrackQuery, song: CatalogTrack): Float {
+        if (!isCompatible(query, song.title, song.durationMs)) return 0f
         val qTitle = core(query.title)
         val sTitle = core(song.title)
         val title = similarity(qTitle, sTitle)
@@ -68,14 +103,7 @@ object TrackMatcher {
             }
         } else 0.6f
 
-        // a remix for an original (or the other way round) is a different recording; whole words
-        // only, so "Alive" isn't "live" and a remix isn't also a "mix"
-        val qRaw = query.title.lowercase()
-        val sRaw = song.title.lowercase()
-        val mismatch = versionPatterns.count { it.containsMatchIn(qRaw) != it.containsMatchIn(sRaw) }
-        val penalty = 0.25f * mismatch
-
-        return (0.5f * title + 0.3f * artist + 0.2f * duration - penalty).coerceIn(0f, 1f)
+        return (0.5f * title + 0.3f * artist + 0.2f * duration).coerceIn(0f, 1f)
     }
 
     /** the title without what sources hang on it */
