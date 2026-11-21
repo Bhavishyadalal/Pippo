@@ -274,6 +274,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.plus
 import kotlinx.coroutines.runBlocking
@@ -2982,6 +2983,7 @@ class MusicService :
         mediaItem: MediaItem?,
         reason: Int,
     ) {
+        providerSwitch.onMediaChanged(mediaItem?.mediaId)
         // A recovery belongs to the old item; it must not prepare or skip a newly selected song.
         retryJob?.cancel()
         retryJob = null
@@ -4212,6 +4214,7 @@ class MusicService :
                     fetcherAction = { mediaId ->
                         val forced = forcedRoutes.containsKey(mediaId)
                         ((if (forced) null else deviceStream(mediaItem)) ?: routeStream(mediaId)).also { stream ->
+                            currentCoroutineContext().ensureActive()
                             if (stream != null) playingStreams[mediaId] = stream else playingStreams.remove(mediaId)
                         }
                     },
@@ -5145,11 +5148,12 @@ class MusicService :
         // offline: no provider is asked; the song plays if it's cached, and is skipped if not.
         // An imported file is never looked for online, even one whose file has gone missing.
         if (com.mochyy.mochymusic.utils.OfflineMode.isOn || mediaId.startsWith("LOCAL_")) return null
-        forcedRoutes[mediaId]?.let { forced ->
+        while (true) {
+            val forced = forcedRoutes[mediaId] ?: break
             if (forced.providerId == com.mochyy.mochymusic.modules.SourceModules.YouTubeId) return youTubeRoute(mediaId)
             forcedModuleStream(mediaId, forced)?.let { return it }
-            // the picked provider doesn't have it any more: the usual order takes over
-            forcedRoutes.remove(mediaId)
+            // Fall back only if this is still the chosen route. A newer route takes priority.
+            if (forcedRoutes.remove(mediaId, forced)) break
         }
         val skip = recentFailures(mediaId)
         // a fresh lookup: a notice from one that never got to play no longer holds
@@ -5247,8 +5251,9 @@ class MusicService :
         val module = sourceModules.module(forced.providerId) ?: return null
         val stream = forced.freshStream?.also { forced.freshStream = null }
             ?: runCatching { resolveWith(module, mediaId) }.getOrNull()
-            ?: return null
-        return moduleStream(mediaId, module, stream)
+        currentCoroutineContext().ensureActive()
+        if (forcedRoutes[mediaId] !== forced) return null
+        return stream?.let { moduleStream(mediaId, module, it) }
     }
 
     private inner class ProviderSwitchHost : ProviderSwitch.Host {
@@ -5280,9 +5285,9 @@ class MusicService :
             val position = player.currentPosition
             // stopping releases the song's source; preparing again fetches it, now from the picked provider
             player.stop()
-            player.prepare()
             player.seekTo(index, position)
             player.playWhenReady = play
+            player.prepare()
         }
     }
 

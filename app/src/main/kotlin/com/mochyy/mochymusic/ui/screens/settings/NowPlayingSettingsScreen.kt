@@ -24,6 +24,7 @@ import com.mochyy.mochymusic.constants.CanvasOrderKey
 import com.mochyy.mochymusic.constants.CanvasSource
 import com.mochyy.mochymusic.constants.CanvasThumbnailAnimationKey
 import com.mochyy.mochymusic.constants.CanvasWifiOnlyKey
+import com.mochyy.mochymusic.constants.DisablePlayerVideoKey
 import com.mochyy.mochymusic.constants.DisableVideoAutoplayKey
 import com.mochyy.mochymusic.constants.LyricsHighBloomKey
 import com.mochyy.mochymusic.constants.LyricsMotionStyle
@@ -161,11 +162,20 @@ private fun lyricsItems(): List<SettingsItem> {
 
 @Composable
 private fun videoItems(): List<SettingsItem> {
+    val (disablePlayerVideo, onDisablePlayerVideoChange) = rememberPreference(DisablePlayerVideoKey, defaultValue = false)
     val (playVideoBackground, onPlayVideoBackgroundChange) = rememberPreference(PlayVideoBackgroundKey, defaultValue = false)
     val (lyricsSync, onLyricsSyncChange) = rememberPreference(YtVideoBackgroundLyricsSyncKey, defaultValue = true)
     val (disableVideoAutoplay, onDisableVideoAutoplayChange) = rememberPreference(DisableVideoAutoplayKey, defaultValue = false)
     val (studioForVideos, onStudioForVideosChange) = rememberPreference(StudioForVideosKey, defaultValue = false)
     return listOf(
+        switchItem(
+            key = "Disable player video",
+            title = stringResource(R.string.settings_disable_player_video),
+            description = stringResource(R.string.settings_disable_player_video_desc),
+            icon = painterResource(R.drawable.slow_motion_video),
+            checked = disablePlayerVideo,
+            onCheckedChange = onDisablePlayerVideoChange,
+        ),
         switchItem(
             key = "Always enable Youtube background",
             title = stringResource(R.string.appearance_youtube_background),

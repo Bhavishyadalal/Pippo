@@ -754,7 +754,9 @@ fun HomeScreen(
     val lazylistState = rememberLazyListState()
     val artworkRotation = rememberSaveable(saver = HomeArtworkRotation.Saver) { HomeArtworkRotation() }
     val showArtworkFooter = !launchHold && !isFirstLoad
+    val bottomChrome = LocalPlayerAwareWindowInsets.current.asPaddingValues().calculateBottomPadding()
     FollowHomeArtworkScroll(lazylistState, artworkRotation, showArtworkFooter)
+    BlendHomeArtworkIntoChrome(lazylistState, showArtworkFooter, bottomChrome)
 
     val carouselHeightDp = com.mochyy.mochymusic.ui.component.heroHeight()
     val collapseDistancePx = with(LocalDensity.current) {
@@ -1282,7 +1284,7 @@ fun HomeScreen(
                         ),
                         state = lazylistState,
                         contentPadding = PaddingValues(
-                            bottom = LocalPlayerAwareWindowInsets.current.asPaddingValues().calculateBottomPadding()
+                            bottom = if (showArtworkFooter) 0.dp else bottomChrome
                         )
                     ) {
                 when (homeStyle) {
@@ -1701,12 +1703,12 @@ fun HomeScreen(
 
                 if (showArtworkFooter) {
                     item(key = HomeArtworkKey, contentType = "home_artwork") {
-                        HomeArtworkFooter(artworkRotation)
+                        HomeArtworkFooter(artworkRotation, bottomChrome)
                     }
-                }
-
-                item(key = "bottom_spacer", contentType = "spacer") {
-                    Spacer(modifier = Modifier.height(30.dp))
+                } else {
+                    item(key = "bottom_spacer", contentType = "spacer") {
+                        Spacer(modifier = Modifier.height(30.dp))
+                    }
                 }
             }
             }

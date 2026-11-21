@@ -135,12 +135,30 @@ class SourceModules @Inject constructor(
         }
     }
 
-    /** the download order's walk: the first provider that gives one whole file this phone can play, else youtube */
-    suspend fun downloadRoute(track: TrackQuery?, skip: Set<String>): Route =
-        walk(_downloadOrder.value, track, skip, ::isUsableForDownload, { id, _ -> picks(id) }) { id, stream ->
-            // a download is saved as one file, so a stream in pieces or one only a cdm can open can't be kept
-            (stream.format == StreamFormat.Progressive && stream.drm == null && DeviceDecoders.canPlay(stream)).also { savable ->
-                if (!savable) android.util.Log.i(Tag, "$id: ${track?.title}: can't download a ${stream.format} ${stream.codec} stream, passing over")
+    /** The first compatible whole file from the download order. */
+    suspend fun downloadRoute(track: TrackQuery?, skip: Set<String>, lossless: Boolean = false): Route =
+        walk(
+            _downloadOrder.value,
+            track,
+            if (lossless) skip + YouTubeId else skip,
+            ::isUsableForDownload,
+            { id, module ->
+                val selected = picks(id)
+                if (!lossless) {
+                    selected
+                } else {
+                    val quality = module.choices.firstOrNull { it.id.contains("quality", ignoreCase = true) }
+                    val option = quality?.options?.firstOrNull { option ->
+                        val name = "${option.id} ${option.label}".lowercase()
+                        ("lossless" in name || "flac" in name || "alac" in name) && "lossy" !in name
+                    }
+                    if (quality != null && option != null) selected + (quality.id to option.id) else selected
+                }
+            },
+        ) { id, stream ->
+            (stream.format == StreamFormat.Progressive && stream.drm == null &&
+                (!lossless || stream.isLosslessDownload) && DeviceDecoders.canPlay(stream)).also { savable ->
+                if (!savable) android.util.Log.i(Tag, "$id: ${track?.title}: can't download a ${stream.format} ${stream.codec} stream at the requested quality")
             }
         }
 
@@ -262,3 +280,9 @@ class SourceModules @Inject constructor(
         private val KnownOrder = listOf(MonochromeModule.Id, AppleMusicModule.Id, YouTubeId)
     }
 }
+
+internal val SourceStream.isLosslessDownload: Boolean
+    get() = when (codec?.trim()?.uppercase()) {
+        "FLAC", "ALAC" -> true
+        else -> false
+    }

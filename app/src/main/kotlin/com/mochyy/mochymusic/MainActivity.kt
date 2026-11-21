@@ -616,6 +616,7 @@ class MainActivity : ComponentActivity() {
             ) {
                 val glassState = remember { GlassState() }
                 val hideAppChrome = remember { mutableStateOf(false) }
+                val homeArtworkChrome = remember { mutableStateOf<(() -> Float)?>(null) }
                 val detailAccentColor = remember { mutableStateOf<Color?>(null) }
                 val focusManager = LocalFocusManager.current
                 val density = LocalDensity.current
@@ -954,6 +955,7 @@ class MainActivity : ComponentActivity() {
                     LocalPlayerConnection provides playerConnection,
                     LocalGlassState provides glassState,
                     LocalHideAppChrome provides hideAppChrome,
+                    com.mochyy.mochymusic.ui.screens.LocalHomeArtworkChrome provides homeArtworkChrome,
                     LocalDetailAccentColor provides detailAccentColor,
                     LocalArtworkColor provides themeColor,
                     LocalPlayerAwareWindowInsets provides playerAwareWindowInsets,
@@ -1106,14 +1108,18 @@ class MainActivity : ComponentActivity() {
                                                 .height(bottomInset + navPadding + 40.dp)
                                                 // the tint fades over 500 ms, read it while drawing so the bar doesn't recompose
                                                 .drawBehind {
+                                                    val artworkCoverage = if (currentRoute == Screens.Home.route) {
+                                                        homeArtworkChrome.value?.invoke() ?: 0f
+                                                    } else 0f
+                                                    val strength = 1f - .67f * artworkCoverage
                                                     val tint = navScrimTint
                                                     drawRect(
                                                         androidx.compose.ui.graphics.Brush.verticalGradient(
                                                             colors = listOf(
                                                                 Color.Transparent,
-                                                                tint.copy(alpha = 0.5f),
-                                                                tint.copy(alpha = 0.9f),
-                                                                tint
+                                                                tint.copy(alpha = 0.5f * strength),
+                                                                tint.copy(alpha = 0.9f * strength),
+                                                                tint.copy(alpha = strength)
                                                             )
                                                         )
                                                     )
