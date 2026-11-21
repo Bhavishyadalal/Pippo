@@ -58,6 +58,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.NavController
 import coil3.compose.AsyncImage
+import com.mochyy.mochymusic.ui.theme.LocalPureBlack
 import com.mochyy.mochymusic.LocalPlayerAwareWindowInsets
 import com.mochyy.mochymusic.LocalPlayerConnection
 import com.mochyy.mochymusic.R
@@ -83,7 +84,7 @@ private val HeaderHeight = 300.dp
 @Composable
 fun GenreScreen(
     navController: NavController,
-    pureBlack: Boolean = false,
+    pureBlack: Boolean = LocalPureBlack.current,
     viewModel: GenreViewModel = hiltViewModel(),
 ) {
     val browseResult by viewModel.result.collectAsState()

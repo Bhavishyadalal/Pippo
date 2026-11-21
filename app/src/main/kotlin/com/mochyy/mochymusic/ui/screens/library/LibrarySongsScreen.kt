@@ -9,6 +9,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.navigation.NavController
+import com.mochyy.mochymusic.ui.theme.LocalPureBlack
 import com.mochyy.mochymusic.LocalPlayerConnection
 import com.mochyy.mochymusic.R
 import com.mochyy.mochymusic.extensions.toMediaItem
@@ -24,7 +25,7 @@ import com.mochyy.mochymusic.viewmodels.LibraryHomeViewModel
 fun LibrarySongsScreen(
     navController: NavController,
     modifier: Modifier = Modifier,
-    pureBlack: Boolean = false,
+    pureBlack: Boolean = LocalPureBlack.current,
 ) {
     val viewModel: LibraryHomeViewModel = hiltViewModel()
     val songs by viewModel.songs.collectAsState()

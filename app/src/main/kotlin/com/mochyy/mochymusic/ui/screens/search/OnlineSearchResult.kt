@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.WindowInsets
+import com.mochyy.mochymusic.ui.theme.LocalPureBlack
 import com.mochyy.mochymusic.ui.utils.stableStatusBars
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -124,7 +125,7 @@ private val SearchCategories = listOf(
 fun OnlineSearchResult(
     navController: NavController,
     viewModel: OnlineSearchViewModel = hiltViewModel(),
-    pureBlack: Boolean = false,
+    pureBlack: Boolean = LocalPureBlack.current,
 ) {
     val database = LocalDatabase.current
     val menuState = LocalMenuState.current

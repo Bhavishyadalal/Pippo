@@ -65,6 +65,7 @@ import androidx.compose.ui.unit.sp
 import com.mochyy.mochymusic.LocalPlayerAwareWindowInsets
 import com.mochyy.mochymusic.R
 import com.mochyy.mochymusic.ui.component.BlurEffectCache
+import com.mochyy.mochymusic.ui.theme.LocalPureBlack
 import com.mochyy.mochymusic.ui.theme.InterFontFamily
 import kotlin.math.roundToInt
 import com.mochyy.mochymusic.ui.utils.stableStatusBars
@@ -188,6 +189,7 @@ internal val LabArtOverhang = 64.dp
 /** the dotted backdrop with title and picture as one layer, it shrinks, rounds, dims and blurs as the sheet slides over it, blur only on android 12+ */
 @Composable
 private fun LabBackdrop(scroll: ScrollState, headerHeight: Int, content: @Composable BoxScope.() -> Unit) {
+    val backdrop = if (LocalPureBlack.current) Color.Black else PageBackdrop
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -207,7 +209,7 @@ private fun LabBackdrop(scroll: ScrollState, headerHeight: Int, content: @Compos
                     null
                 }
             }
-            .background(PageBackdrop)
+            .background(backdrop)
             .dotGrid(),
         content = content,
     )
