@@ -7,6 +7,7 @@ import com.music.innertube.YouTube
 import com.music.innertube.models.SongItem
 import com.mochyy.mochymusic.extensions.toMediaItem
 import com.mochyy.mochymusic.models.MediaMetadata
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -52,9 +53,11 @@ class YouTubePlaylistQueue(
             for (attempt in 0..MAX_RETRIES) {
                 try {
                     val continuationPage = YouTube.playlistContinuation(currentContinuation).getOrThrow()
-                    continuation = continuationPage.continuation
+                    continuation = continuationPage.continuation?.takeUnless { it == currentContinuation }
                     failedPageLoads = 0
                     return@withContext continuationPage.songs.map { it.toMediaItem() }
+                } catch (e: CancellationException) {
+                    throw e
                 } catch (e: Exception) {
                     lastException = e
                     if (attempt < MAX_RETRIES) delay(RETRY_DELAY_MS * (attempt + 1))

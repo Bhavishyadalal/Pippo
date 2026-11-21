@@ -1288,6 +1288,9 @@ interface DatabaseDao {
     @Query("SELECT * FROM song WHERE isDownloaded = 1 ORDER BY totalPlayTime")
     fun downloadedSongsByPlayTimeAsc(): Flow<List<Song>>
 
+    @Query("UPDATE song SET thumbnailUrl = :thumbnailUrl WHERE id = :songId AND isLocal = 1 AND thumbnailUrl IS :expected")
+    fun replaceLocalThumbnail(songId: String, expected: String?, thumbnailUrl: String?): Int
+
     @Query("UPDATE song SET isDownloaded = :downloaded, dateDownload = :date WHERE id = :songId")
     fun updateDownloadedInfo(songId: String, downloaded: Boolean, date: LocalDateTime?)
 

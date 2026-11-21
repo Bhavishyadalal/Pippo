@@ -22,13 +22,13 @@ object LocalArtwork {
         val folder = File(context.filesDir, FOLDER).apply { mkdirs() }
         val file = File(folder, "${songId.replace(UnsafeInName, "_")}.jpg")
         // write-then-rename, so a crash mid-write never leaves a broken picture behind
-        val temp = File(folder, "${file.name}.tmp")
-        temp.writeBytes(bytes)
-        if (!temp.renameTo(file)) {
-            file.writeBytes(bytes)
+        val temp = File.createTempFile("cover-", ".tmp", folder)
+        try {
+            temp.writeBytes(bytes)
+            if (temp.renameTo(file)) Uri.fromFile(file).toString() else null
+        } finally {
             temp.delete()
         }
-        Uri.fromFile(file).toString()
     }.getOrNull()
 
     /** true for a cover file on this phone that is gone, or that sits where it could vanish */
@@ -61,9 +61,8 @@ object LocalArtwork {
                     null
                 }
                 // a cover that's gone for good is cleared so the song shows the placeholder, and playing it tries the file again
-                if (newUrl != current && (newUrl != null || current != null)) {
-                    database.query { update(song.copy(thumbnailUrl = newUrl)) }
-                    if (newUrl != null) fixed++
+                if (newUrl != current && database.replaceLocalThumbnail(song.id, current, newUrl) > 0 && newUrl != null) {
+                    fixed++
                 }
             }
             fixed
@@ -74,9 +73,7 @@ object LocalArtwork {
         val path = thumbnailUrl?.toUri()?.path ?: return null
         val file = File(path)
         if (!file.exists()) return null
-        val saved = save(context, songId, file.readBytes()) ?: return null
-        file.delete()
-        return saved
+        return save(context, songId, file.readBytes())
     }
 
     private fun readFromFile(context: Context, songId: String, localUri: String?): String? {

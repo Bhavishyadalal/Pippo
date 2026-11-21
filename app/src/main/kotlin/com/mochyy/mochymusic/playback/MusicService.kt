@@ -1012,8 +1012,14 @@ class MusicService :
                     triggerRetry()
                 }
 
-                // a status that didn't go through while offline goes now, not at the next song
-                if (isConnected) discordPresence.nudge()
+                if (isConnected) {
+                    if (playerInitialized.value && player.playWhenReady) {
+                        // Time spent offline should not use up a playlist's pagination attempts.
+                        runwayRetries = 0
+                        ensureQueueRunway()
+                    }
+                    discordPresence.nudge()
+                }
             }
         }
 
@@ -1733,7 +1739,9 @@ class MusicService :
     }
 
     private fun waitOnNetworkError() {
-        if (waitingForNetworkConnection.value) return
+        if (!player.playWhenReady || castConnectionHandler?.isCasting?.value == true ||
+            waitingForNetworkConnection.value
+        ) return
 
         if (retryCount >= MAX_RETRY_COUNT) {
             Timber.tag(TAG).w("Max retry count ($MAX_RETRY_COUNT) reached, stopping playback")
@@ -1765,14 +1773,20 @@ class MusicService :
         }
     }
 
+    private fun clearNetworkWait() {
+        if (!waitingForNetworkConnection.value) return
+        waitingForNetworkConnection.value = false
+        retryJob?.cancel()
+        retryJob = null
+    }
+
     private fun triggerRetry() {
         if (!waitingForNetworkConnection.value) return
         val target = player
         val mediaId = target.currentMediaItem?.mediaId ?: return
         if (target.playbackState != Player.STATE_IDLE || handoffFor(mediaId) != null) return
 
-        waitingForNetworkConnection.value = false
-        retryJob?.cancel()
+        clearNetworkWait()
         if (!target.playWhenReady || castConnectionHandler?.isCasting?.value == true) return
         retryCount++
         if (retryCount > 3) {
@@ -2429,7 +2443,7 @@ class MusicService :
     private fun ensureQueueRunway() {
         if (!playerInitialized.value) return
         if (initialQueueLoading || runwayJob?.isActive == true) return
-        if (player.mediaItemCount == 0) return
+        if (player.mediaItemCount == 0 || !connectivityObserver.isCurrentlyConnected()) return
         if (dataStore.get(DisableLoadMoreWhenRepeatAllKey, false) && player.repeatMode == REPEAT_MODE_ALL) return
         val lowOnSongs = upcomingItemCount(QUEUE_RUNWAY_SIZE + 1) <= QUEUE_RUNWAY_SIZE
         val previewOnly = !lowOnSongs && wantsAutoplayPreview()
@@ -2463,6 +2477,8 @@ class MusicService :
                 // the user picked still play before the similar ones.
                 val insertAt = if (fromInfinite) player.mediaItemCount else upcomingAutoplayStart()
                 player.addMediaItems(insertAt, newItems)
+                runwayRetryJob?.cancel()
+                runwayRetryJob = null
                 runwayRetries = 0
                 if (player.shuffleModeEnabled) {
                     // A new page of the queue is shuffled in itself; Autoplay keeps the radio's order.
@@ -2470,7 +2486,10 @@ class MusicService :
                 }
                 if (endedWithNothingNext) advanceQueueAtEnd(player)
                 // That may have been the queue's last page, which is when Autoplay lines up.
-                if (!fromInfinite) scope.launch(SilentHandler) { ensureQueueRunway() }
+                if (!fromInfinite) {
+                    runwayJob = null
+                    ensureQueueRunway()
+                }
                 return@launch
             }
             if (previewOnly) {
@@ -2489,13 +2508,23 @@ class MusicService :
         val hideVideos = dataStore.get(HideVideoSongsKey, false)
 
         val queue = currentQueue
-        if (dataStore.get(AutoLoadMoreKey, true) && queue.hasNextPage()) {
-            val page = runCatching { withContext(Dispatchers.IO) { queue.nextPage() } }
-                .onFailure { Timber.tag(TAG).w(it, "Failed to load next queue page") }
-                .getOrDefault(emptyList())
-                .filterExplicit(hideExplicit)
-                .filterVideoSongs(hideVideos)
-            if (page.isNotEmpty()) return page to false
+        if (dataStore.get(AutoLoadMoreKey, true)) {
+            // Try a few pages when entire pages are hidden by filters, keeping their
+            // continuation ahead of generated Autoplay entries.
+            repeat(MAX_RUNWAY_ATTEMPTS) {
+                if (!queue.hasNextPage()) return@repeat
+                val page = try {
+                    withContext(Dispatchers.IO) { queue.nextPage() }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    Timber.tag(TAG).w(e, "Failed to load next queue page")
+                    if (queue.hasNextPage()) return null
+                    emptyList()
+                }.filterExplicit(hideExplicit).filterVideoSongs(hideVideos)
+                if (page.isNotEmpty()) return page to false
+            }
+            if (queue.hasNextPage()) return null
         }
 
         if (!isInfiniteQueueEnabled() || player.repeatMode != REPEAT_MODE_OFF) return null
@@ -3134,7 +3163,12 @@ class MusicService :
         @Player.State playbackState: Int,
     ) {
         // IDLE is where a failed stream sits; anything else means it's loading or playing again
-        if (playbackState != Player.STATE_IDLE) clearStreamFailure()
+        if (playbackState != Player.STATE_IDLE) {
+            clearStreamFailure()
+            // A manual Play or provider change can start a new prepare during network backoff.
+            // Its own failure must be allowed to create a new wait.
+            clearNetworkWait()
+        }
 
         if (playbackState == Player.STATE_ENDED) {
             val target = player
@@ -3171,6 +3205,7 @@ class MusicService :
     }
 
     override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+        if (!playWhenReady) clearNetworkWait()
 
         if (playWhenReady && castConnectionHandler?.isCasting?.value == true) {
             player.pause()
@@ -3643,6 +3678,7 @@ class MusicService :
         if (com.mochyy.mochymusic.utils.OfflineMode.isOn &&
             generateSequence<Throwable>(error) { it.cause }.any { it is com.music.innertube.OfflineModeException }
         ) {
+            if (!player.playWhenReady) return
             val next = nextOfflineIndex()
             if (next != C.INDEX_UNSET) {
                 playOfflineSong(next)
@@ -3653,10 +3689,10 @@ class MusicService :
             return
         }
 
-        // read before the cache clear below, which can take a cached song off the phone
         val onPhone = player.currentMediaItem?.let(::playsOffline) == true
         // no internet and this song needs it: waiting stopped the queue for good, so go on to the next song that's on the phone
-        if (!onPhone && !connectivityObserver.isCurrentlyConnected()) {
+        val connected = connectivityObserver.isCurrentlyConnected()
+        if (player.playWhenReady && !onPhone && !connected) {
             val next = nextOfflineIndex()
             if (next != C.INDEX_UNSET) {
                 Timber.tag(TAG).i("No internet for ${player.currentMediaItem?.mediaId}, moving on to the next song on the phone")
@@ -3671,7 +3707,7 @@ class MusicService :
             .filterIsInstance<NoProviderException>().firstOrNull()
         if (lookupFailure != null) {
             when {
-                !connectivityObserver.isCurrentlyConnected() && !onPhone -> waitOnNetworkError()
+                !connected && !onPhone -> waitOnNetworkError()
                 lookupFailure.retryable && retryProviderLookup() -> Unit
                 else -> {
                     val mediaId = player.currentMediaItem?.mediaId
@@ -3700,82 +3736,46 @@ class MusicService :
                 format?.sampleRate,
             )
         }
-        // a module's copy that won't parse would fail the same way every time that module is asked
-        if (mediaId != null && isContainerParseError(error)) dropModuleCache(mediaId)
+        if (!onPhone && !connected) {
+            Timber.tag(TAG).d("Network-related error detected, waiting for connection")
+            waitOnNetworkError()
+            return
+        }
+
+        val httpCode = getHttpResponseCode(error)
+        val badContainer = isContainerParseError(error)
+        val freshLink = httpCode == 401 || isExpiredUrlError(error) || isPageReloadError(error)
+        val rangeRejected = isRangeNotSatisfiableError(error)
+        val transientRead = !onPhone && isNetworkRelatedError(error)
+        val retryCount = mediaId?.let(currentMediaIdRetryCount::get) ?: 0
+        // A stale link, rejected range or dropped connection gets a fresh attempt on this source.
+        if (mediaId != null && retryCount == 0 && (freshLink || rangeRejected || transientRead)) {
+            retryStreamRead(mediaId, discardBytes = rangeRejected)
+            return
+        }
         if (mediaId != null && forceFallBack(mediaId, announce = !decoderNotices.containsKey(mediaId))) return
 
         if (mediaId != null && hasExceededRetryLimit(mediaId)) {
-            Timber.tag(TAG).w("Song $mediaId has exceeded retry limit, skipping")
             markSongAsFailed(mediaId)
             handleFinalFailure()
             return
         }
 
-        if (mediaId != null) {
-            performAggressiveCacheClear(mediaId)
-        }
-
-        when {
-            isRangeNotSatisfiableError(error) -> {
-                Timber.tag(TAG).d("Range Not Satisfiable (416) detected, performing strict recovery")
-                handleRangeNotSatisfiableError(mediaId)
-                return
-            }
-            isPageReloadError(error) -> {
-                Timber.tag(TAG).d("Page reload error detected, performing strict recovery")
-                handlePageReloadError(mediaId)
-                return
-            }
-            isExpiredUrlError(error) -> {
-                Timber.tag(TAG).d("Expired URL (403) detected, refreshing stream URL")
-                handleExpiredUrlError(mediaId)
-                return
-            }
-
-            // a song on the phone gets the usual retry below, the internet coming back would never fix it
-            isNetworkRelatedError(error) || (!isNetworkConnected.value && !onPhone) -> {
-                Timber.tag(TAG).d("Network-related error detected, waiting for connection")
-                waitOnNetworkError()
-                return
-            }
-        }
-
-        // A file that won't parse is almost always two streams glued together in the cache, which
-        // the clear above has just dropped: a fresh try plays. It used to give up on the spot.
-        if (error.errorCode == PlaybackException.ERROR_CODE_IO_UNSPECIFIED ||
-            error.errorCode == PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS ||
-            error.errorCode == PlaybackException.ERROR_CODE_IO_INVALID_HTTP_CONTENT_TYPE ||
-            isContainerParseError(error)) {
-            Timber.tag(TAG).d("IO error detected (${error.errorCode}), attempting recovery")
-            handleGenericIOError(mediaId)
+        if (mediaId != null && (freshLink || rangeRejected || transientRead || badContainer ||
+                error.errorCode == PlaybackException.ERROR_CODE_IO_UNSPECIFIED ||
+                error.errorCode == PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS ||
+                error.errorCode == PlaybackException.ERROR_CODE_IO_INVALID_HTTP_CONTENT_TYPE)
+        ) {
+            retryStreamRead(
+                mediaId,
+                discardBytes = badContainer || rangeRejected,
+                restartFromBeginning = rangeRejected && retryCount > 0,
+            )
             return
         }
 
         Timber.tag(TAG).d("Unrecoverable error, failing the stream")
         failStream()
-    }
-
-    private fun performAggressiveCacheClear(mediaId: String) {
-        Timber.tag(TAG).d("Performing aggressive cache clear for $mediaId")
-
-        songUrlCache.remove(mediaId)
-
-        try {
-            playerCache.removeResource(mediaId)
-            discardFailedRendition(playingStreams[mediaId]?.cacheKey)
-            Timber.tag(TAG).d("Cleared player cache for $mediaId")
-        } catch (e: Exception) {
-            Timber.tag(TAG).e(e, "Failed to clear player cache for $mediaId")
-        }
-
-        if (!mediaId.startsWith("LOCAL_")) {
-            try {
-                YTPlayerUtils.forceRefreshForVideo(mediaId)
-                Timber.tag(TAG).d("Cleared decryption caches for $mediaId")
-            } catch (e: Exception) {
-                Timber.tag(TAG).e(e, "Failed to clear decryption caches for $mediaId")
-            }
-        }
     }
 
     private fun isContainerParseError(error: PlaybackException) =
@@ -3788,13 +3788,6 @@ class MusicService :
             runCatching { playerCache.removeResource(cacheKey) }
                 .onFailure { Timber.tag(TAG).w(it, "Couldn't clear the failed audio rendition") }
         }
-    }
-
-    /** Every source module's cached copy of [mediaId], which lives under its own key. */
-    private fun dropModuleCache(mediaId: String) {
-        playerCache.keys
-            .filter { it.startsWith(ModuleCacheKeyPrefix) && it.endsWith("|$mediaId") }
-            .forEach { key -> runCatching { playerCache.removeResource(key) } }
     }
 
     private fun hasExceededRetryLimit(mediaId: String): Boolean {
@@ -3837,18 +3830,24 @@ class MusicService :
         // by the audio-focus flag instead, so it re-prepared the song and left it paused
         val target = player
         val resume = player.playWhenReady || focusResume?.stillCurrent() == true
+        val occurrence = providerOccurrence
         val pauseGeneration = transport.pauseGeneration
         retryJob?.cancel()
         retryJob = scope.launch {
             try {
 
-                player.pause()
+                if (player !== target || providerOccurrence != occurrence ||
+                    target.playbackState != Player.STATE_IDLE || transport.pauseGeneration != pauseGeneration ||
+                    handoffFor(mediaId) != null || castConnectionHandler?.isCasting?.value == true
+                ) return@launch
+                target.pause()
                 Timber.tag(TAG).d("Paused playback due to AudioTrack error")
 
                 delay(RETRY_DELAY_MS * 3)
 
-                if (!playerInitialized.value || player !== target || player.currentMediaItem?.mediaId != mediaId ||
-                    transport.pauseGeneration != pauseGeneration) {
+                if (!playerInitialized.value || player !== target || providerOccurrence != occurrence ||
+                    target.playbackState != Player.STATE_IDLE || transport.pauseGeneration != pauseGeneration ||
+                    handoffFor(mediaId) != null || castConnectionHandler?.isCasting?.value == true) {
                     Timber.tag(TAG).w("Player no longer initialized, aborting AudioTrack recovery")
                     return@launch
                 }
@@ -3879,120 +3878,37 @@ class MusicService :
         }
     }
 
-    private fun handleRangeNotSatisfiableError(mediaId: String?) {
-        if (mediaId == null) {
-            handleFinalFailure()
-            return
-        }
-
-        incrementRetryCount(mediaId)
-        // A song brought back after the app was closed asks its old, expired stream for the place
-        // it stopped, which is what answers 416. A fresh stream at the same place plays, so the
-        // first retry keeps it; going back to the start used to throw the restored progress away.
-        // Only a song that keeps failing starts over.
-        val fromStart = (currentMediaIdRetryCount[mediaId] ?: 0) > 1
-
-        retryJob?.cancel()
+    private fun retryStreamRead(
+        mediaId: String,
+        discardBytes: Boolean,
+        restartFromBeginning: Boolean = false,
+    ) {
         val target = player
-        retryJob = scope.launch {
-
-            performAggressiveCacheClear(mediaId)
-
-            delay(RETRY_DELAY_MS)
-            if (player !== target || target.currentMediaItem?.mediaId != mediaId ||
-                target.currentMediaItemIndex == C.INDEX_UNSET) return@launch
-
-            val currentIndex = player.currentMediaItemIndex
-            player.seekTo(currentIndex, if (fromStart) 0 else player.currentPosition)
-            player.prepare()
-
-            Timber.tag(TAG).d("Retrying playback for $mediaId after 416 error (${if (fromStart) "from the start" else "where it was"})")
-        }
-    }
-
-    private fun handlePageReloadError(mediaId: String?) {
-        if (mediaId == null) {
-            handleFinalFailure()
-            return
-        }
-
+        if (!target.playWhenReady) return
+        val occurrence = providerOccurrence
+        val pauseGeneration = transport.pauseGeneration
+        val fromDevice = resolvedSourceIds[mediaId] in setOf(PlayingFrom.Device, PlayingFrom.Downloads)
+        val cacheKey = playingStreams[mediaId]?.cacheKey ?: mediaId
         incrementRetryCount(mediaId)
-
         retryJob?.cancel()
-        val target = player
-        retryJob = scope.launch {
-            Timber.tag(TAG).d("Handling page reload error for $mediaId")
+        fun stillCurrent() = player === target && providerOccurrence == occurrence &&
+            target.playWhenReady && transport.pauseGeneration == pauseGeneration &&
+            target.playbackState == Player.STATE_IDLE && target.currentMediaItemIndex != C.INDEX_UNSET &&
+            handoffFor(mediaId) == null && castConnectionHandler?.isCasting?.value != true
 
-            performAggressiveCacheClear(mediaId)
-
-            delay(RETRY_DELAY_MS)
-            if (player !== target || target.currentMediaItem?.mediaId != mediaId ||
-                target.currentMediaItemIndex == C.INDEX_UNSET) return@launch
-
-            val currentPosition = player.currentPosition
-            val currentIndex = player.currentMediaItemIndex
-            player.seekTo(currentIndex, currentPosition)
-            player.prepare()
-
-            Timber.tag(TAG).d("Retrying playback for $mediaId after page reload error")
-        }
-    }
-
-    private fun handleExpiredUrlError(mediaId: String?) {
-        if (mediaId == null) {
-            handleFinalFailure()
-            return
-        }
-
-        incrementRetryCount(mediaId)
-
-        songUrlCache.remove(mediaId)
-        Timber.tag(TAG).d("Cleared cached URL for $mediaId")
-
-        try {
-            YTPlayerUtils.forceRefreshForVideo(mediaId)
-        } catch (e: Exception) {
-            Timber.tag(TAG).e(e, "Failed to clear decryption caches")
-        }
-
-        retryJob?.cancel()
-        val target = player
         retryJob = scope.launch {
             delay(RETRY_DELAY_MS)
-            if (player !== target || target.currentMediaItem?.mediaId != mediaId ||
-                target.currentMediaItemIndex == C.INDEX_UNSET) return@launch
-
-            val currentPosition = player.currentPosition
-            val currentIndex = player.currentMediaItemIndex
-            player.seekTo(currentIndex, currentPosition)
-            player.prepare()
-
-            Timber.tag(TAG).d("Retrying playback for $mediaId after 403 error")
-        }
-    }
-
-    private fun handleGenericIOError(mediaId: String?) {
-        if (mediaId == null) {
-            handleFinalFailure()
-            return
-        }
-
-        incrementRetryCount(mediaId)
-
-        retryJob?.cancel()
-        val target = player
-        retryJob = scope.launch {
-            performAggressiveCacheClear(mediaId)
-            delay(RETRY_DELAY_MS)
-            if (player !== target || target.currentMediaItem?.mediaId != mediaId ||
-                target.currentMediaItemIndex == C.INDEX_UNSET) return@launch
-
-            val currentPosition = player.currentPosition
-            val currentIndex = player.currentMediaItemIndex
-            player.seekTo(currentIndex, currentPosition)
-            player.prepare()
-
-            Timber.tag(TAG).d("Retrying playback for $mediaId after generic IO error")
+            if (!stillCurrent()) return@launch
+            songUrlCache.remove(mediaId)
+            if (discardBytes && !fromDevice) {
+                withContext(Dispatchers.IO) {
+                    runCatching { playerCache.removeResource(cacheKey) }
+                        .onFailure { Timber.tag(TAG).w(it, "Couldn't clear the failed audio rendition") }
+                }
+            }
+            if (!stillCurrent()) return@launch
+            target.seekTo(target.currentMediaItemIndex, if (restartFromBeginning) 0L else target.contentPosition)
+            target.prepare()
         }
     }
 

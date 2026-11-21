@@ -35,7 +35,10 @@ import com.mochyy.mochymusic.link.isTelevision
 import com.mochyy.mochymusic.playback.queues.Queue
 import com.mochyy.mochymusic.utils.NotRecommended
 import com.mochyy.mochymusic.utils.reportException
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -774,6 +777,7 @@ class PlayerConnection(
 
     override fun onMediaMetadataChanged(mediaMetadata: androidx.media3.common.MediaMetadata) {
         super.onMediaMetadataChanged(mediaMetadata)
+        if (attachedPlayer !== player) return
         val artworkData = mediaMetadata.artworkData ?: return
         val mediaItem = player.currentMediaItem ?: return
 
@@ -787,16 +791,19 @@ class PlayerConnection(
                 ) {
                     val newThumbnailUrl = com.mochyy.mochymusic.importer.LocalArtwork.save(context, mediaItem.mediaId, artworkData)
                         ?: return@launch
-                    database.query {
-                        upsert(songEntity.song.copy(thumbnailUrl = newThumbnailUrl))
-                    }
+                    if (database.replaceLocalThumbnail(mediaItem.mediaId, thumbnailUrl, newThumbnailUrl) == 0) return@launch
                     Timber.tag(TAG).d("Extracted local artwork to $newThumbnailUrl")
-
-                    val currentMetadata = queueMetadata
-                    if (currentMetadata?.id == mediaItem.mediaId) {
-                        showMetadata(currentMetadata.copy(thumbnailUrl = newThumbnailUrl))
+                    withContext(Dispatchers.Main) {
+                        val currentMetadata = queueMetadata
+                        if (currentMetadata?.id == mediaItem.mediaId &&
+                            (currentMetadata.thumbnailUrl == thumbnailUrl || currentMetadata.thumbnailUrl == null)
+                        ) {
+                            showMetadata(currentMetadata.copy(thumbnailUrl = newThumbnailUrl))
+                        }
                     }
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Timber.tag(TAG).e(e, "Error extracting local artwork")
             }
