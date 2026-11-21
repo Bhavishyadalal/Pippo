@@ -380,7 +380,8 @@ private fun PlayerSheet(
     }
     // the Turntable is the flagship around a record player, whatever cover the flagship is set to
     val isTurntable = playerStyle == com.mochyy.mochymusic.constants.PlayerStyle.TURNTABLE
-    val artworkFrame = playerStyle == PlayerStyle.ARTWORK_FRAME
+    val studioSession = playerStyle == PlayerStyle.STUDIO_SESSION
+    val artworkFrame = playerStyle == PlayerStyle.ARTWORK_FRAME || studioSession
     val shownCoverStyle = when {
         isTurntable -> PlayerCoverStyle.TURNTABLE
         artworkFrame -> PlayerCoverStyle.SQUARED
@@ -999,13 +1000,16 @@ private fun PlayerSheet(
                     modifier = Modifier.fillMaxSize(),
                     coverStyle = shownCoverStyle,
                     backgroundStyle = backgroundStyle,
+                    stillArtworkBackdrop = studioSession,
+                    pauseBackdrop = showExpandMenu || showActionMenu || showProviderSwitch || showStreamInfo,
+                    artworkTopClearance = if (studioSession) StudioSessionTopClearance else 0.dp,
                     editMode = studioEngaged,
                     // the editor's top bar frosts what's under it, so the glass keeps capturing there
                     glassActiveInEdit = { studio.stage >= StudioStage.EDIT && studio.selector.value < 0.01f },
                     // another style draws the open player itself: none of the flagship runs behind it
                     alternateStyle = !playerStyle.flagshipFamily || landscapeFlagship,
                     miniVideo = playerStyle == PlayerStyle.VIDEO,
-                    coverOffsetProvider = layoutTweaks::controlsOffset,
+                    coverOffsetProvider = if (studioSession) ({ 0f }) else layoutTweaks::controlsOffset,
                     onLongPressCover = holdToStudio,
                     studioArtModifier = if (playerStyle.flagshipFamily) {
                         Modifier
@@ -1215,6 +1219,10 @@ private fun PlayerSheet(
                 return@BottomSheet
             }
 
+            if (studioSession && state.isExpanded && transition.page == PlayerPage.NONE && !studioEngaged) {
+                StudioSessionHeader(Modifier.align(Alignment.TopCenter).padding(top = statusBarTopInset + 26.dp))
+            }
+
             // what the studio measures the flagship's parts against: the sheet itself, so the
             // sheet shrinking into a selector card doesn't move them
             Spacer(
@@ -1399,7 +1407,17 @@ private fun PlayerSheet(
             // recomposed the whole player through the bar's hide/show animation at the end of every
             // open and the start of every close, for a value the card layout never uses. (The
             // volume bar reads its size as if it were showing, which stays put through all that.)
-            val belowControls = when {
+            val showSessionVolume = studioSession && showDeck && !studioEngaged && screenHeight >= StudioSessionVolumeMinHeight
+            val sessionVolumeSpace = if (showSessionVolume) 30.dp else 0.dp
+            if (showSessionVolume && state.isExpanded && transition.page == PlayerPage.NONE) {
+                Box(
+                    Modifier.align(Alignment.BottomCenter).widthIn(max = 600.dp).fillMaxWidth()
+                        .padding(start = 26.dp, end = 26.dp, bottom = PlayerDeckHeight + 2.dp),
+                ) {
+                    PlayerVolumeLine(listening = !showActionMenu && !showProviderSwitch)
+                }
+            }
+            val belowControls = sessionVolumeSpace + when {
                 showVolumeBar && newBottomBar -> flagshipBarFootprint()
                 showVolumeBar -> playerVolumeBarFootprint()
                 showPlayerBottomCard -> PlayerDeckHeight
@@ -1855,7 +1873,11 @@ private fun PlayerSheet(
 
         if (showProviderSwitch) {
             val currentProvider = rememberTrackProvider(trackInfo.mediaId)
-            ForceProviderSheet(currentProviderId = currentProvider?.providerId, onDismiss = { showProviderSwitch = false })
+            ForceProviderSheet(
+                currentProviderId = currentProvider?.providerId,
+                currentOption = currentProvider?.selectedOption,
+                onDismiss = { showProviderSwitch = false },
+            )
         }
 
         if (immersiveVisible) ImmersivePlayer(onExit = { immersiveOpen = false })

@@ -10,6 +10,7 @@ import com.mochyy.mochymusic.module.ResolveResult
 import com.mochyy.mochymusic.module.SourceModule
 import com.mochyy.mochymusic.module.SourceStream
 import com.mochyy.mochymusic.module.StreamFormat
+import com.mochyy.mochymusic.module.TrackMatcher
 import com.mochyy.mochymusic.module.TrackQuery
 import com.mochyy.mochymusic.module.applemusic.AppleMusicModule
 import com.mochyy.mochymusic.module.monochrome.MonochromeModule
@@ -109,7 +110,7 @@ class SourceModules @Inject constructor(
 
     /** where a song plays from */
     sealed interface Route {
-        data class Module(val module: SourceModule, val stream: SourceStream) : Route
+        data class Module(val module: SourceModule, val stream: SourceStream, val selectedQuality: String?) : Route
         /** hand it to YouTube, by its video id */
         data object YouTube : Route
         /** every provider in [skip] or without it */
@@ -125,7 +126,7 @@ class SourceModules @Inject constructor(
         track: TrackQuery?,
         skip: Set<String>,
         onUndecodable: (id: String, stream: SourceStream) -> Unit = { _, _ -> },
-    ): Route = walk(_order.value, track, skip, ::isUsable, ::playbackPicks) { id, stream ->
+    ): Route = walk(_order.value, track, skip, ::isUsable, { id, module -> playbackPicks(id, module) }) { id, stream ->
         // a stream this phone has no decoder for would play in silence: the next provider has it
         DeviceDecoders.canPlay(stream).also { playable ->
             if (!playable) {
@@ -181,26 +182,32 @@ class SourceModules @Inject constructor(
         val startedAt = System.currentTimeMillis()
         val answers = if (track == null) emptyMap() else asked.mapNotNull { id ->
             val module = module(id) ?: return@mapNotNull null
-            id to resolveScope.async {
-                runCatching { module.resolve(track, picksFor(id, module)) }
+            val picks = picksFor(id, module)
+            id to (picks to resolveScope.async {
+                runCatching { module.resolve(track, picks) }
                     .onFailure { if (it !is CancellationException) android.util.Log.w(Tag, "$id failed for ${track.title}", it) }
                     .getOrNull()
-            }
+            })
         }.toMap()
         try {
             for (id in asked) {
                 if (id == YouTubeId) return@withContext Route.YouTube
                 val module = module(id) ?: continue
-                val answer = answers[id] ?: continue
+                val (picks, answer) = answers[id] ?: continue
                 // timed on the waiting side, so a module stuck in a call that ignores cancelling can't hold the song either
                 val left = ModuleTimeoutMs - (System.currentTimeMillis() - startedAt)
                 val result = withTimeoutOrNull(left.coerceAtLeast(1L)) { answer.await() }
                 if (result == null && answer.isActive) android.util.Log.i(Tag, "$id took longer than ${ModuleTimeoutMs / 1000} s for ${track?.title}, moving on")
                 when (result) {
                     is ResolveResult.Found -> {
+                        val matched = result.stream.matched
+                        if (track != null && !TrackMatcher.isCompatible(track, matched.title, matched.durationMs)) {
+                            android.util.Log.i(Tag, "$id: ${track.title} did not match ${matched.title}")
+                            continue
+                        }
                         if (!accept(id, result.stream)) continue
                         android.util.Log.i(Tag, "$id: ${track?.title} -> ${result.stream.matched.title} (${result.stream.qualityLabel})")
-                        return@withContext Route.Module(module, result.stream)
+                        return@withContext Route.Module(module, result.stream, streamQuality(module, picks))
                     }
                     is ResolveResult.NotFound -> android.util.Log.i(Tag, "$id: ${track?.title}: ${result.reason}")
                     is ResolveResult.Unavailable -> android.util.Log.i(Tag, "$id unavailable for ${track?.title}: ${result.reason}")
@@ -210,7 +217,7 @@ class SourceModules @Inject constructor(
             Route.Exhausted
         } finally {
             // the ones further down the order aren't needed once one has the song
-            answers.values.forEach { it.cancel() }
+            answers.values.forEach { (_, answer) -> answer.cancel() }
         }
     }
 
@@ -240,14 +247,22 @@ class SourceModules @Inject constructor(
      * the picks a song plays with: with data saver on, a module's stream quality steps down to its
      * "high" option (or one below its best when it has none), and a lighter pick stays as it is
      */
-    fun playbackPicks(id: String, module: SourceModule): Map<String, String> {
-        val picks = picks(id)
+    fun qualityChoice(module: SourceModule) = module.choices.firstOrNull { it.id == QualityChoice }
+        ?: module.choices.firstOrNull { it.id.contains(QualityChoice, ignoreCase = true) }
+
+    fun streamQuality(module: SourceModule, picks: Map<String, String>): String? =
+        qualityChoice(module)?.let { picks[it.id] ?: it.options.firstOrNull()?.id }
+
+    fun playbackPicks(id: String, module: SourceModule, requestedOption: Pair<String, String>? = null): Map<String, String> {
+        val saved = picks(id)
+        val picks = if (requestedOption == null) saved else saved + requestedOption
         if (!DataSaver.isActive(context)) return picks
-        val quality = module.choices.firstOrNull { it.id == QualityChoice }?.options ?: return picks
+        val choice = qualityChoice(module) ?: return picks
+        val quality = choice.options
         val cap = quality.indexOfFirst { it.id == SaverOption }.takeIf { it >= 0 } ?: 1
-        val picked = quality.indexOfFirst { it.id == picks[QualityChoice] }.takeIf { it >= 0 } ?: 0
+        val picked = quality.indexOfFirst { it.id == picks[choice.id] }.takeIf { it >= 0 } ?: 0
         if (picked >= cap || cap >= quality.size) return picks
-        return picks + (QualityChoice to quality[cap].id)
+        return picks + (choice.id to quality[cap].id)
     }
 
     fun setPick(id: String, choiceId: String, optionId: String) = registry.setPick(id, choiceId, optionId)

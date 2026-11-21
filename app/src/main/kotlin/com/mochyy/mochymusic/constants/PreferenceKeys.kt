@@ -711,7 +711,8 @@ enum class PlayerStyle(val displayName: String, val selectorName: String) {
     BEDSIDE_TILES("Bedside", "Bedside"),
     // A look module's own player is available while a player module is enabled.
     MODULE("Module", "Module"),
-    ARTWORK_FRAME("Artwork Frame", "Artwork Frame");
+    ARTWORK_FRAME("Artwork Frame", "Artwork Frame"),
+    STUDIO_SESSION("Studio Session", "Studio Session");
 
     val editable: Boolean get() = this == FLAGSHIP || this == CLASSIC || this == TURNTABLE || this == POSTER || this == IPOD || isBedside
 
@@ -719,7 +720,7 @@ enum class PlayerStyle(val displayName: String, val selectorName: String) {
     val isBedside: Boolean get() = this == BEDSIDE || this == BEDSIDE_TILES
 
     /** drawn by the flagship's own player (cover, controls, card), not a design of its own */
-    val flagshipFamily: Boolean get() = this == FLAGSHIP || this == CLASSIC || this == TURNTABLE || this == ARTWORK_FRAME
+    val flagshipFamily: Boolean get() = this == FLAGSHIP || this == CLASSIC || this == TURNTABLE || this == ARTWORK_FRAME || this == STUDIO_SESSION
 
     // the two flagships the full editor works on: cover, middle part, controls and bottom bar
     val hasFullEditor: Boolean get() = this == FLAGSHIP || this == CLASSIC
@@ -748,7 +749,7 @@ enum class PlayerStyle(val displayName: String, val selectorName: String) {
         // the selector's columns, each look with its variants stacked under it, a swipe down away
         val selectorColumns: List<List<PlayerStyle>> = listOf(
             listOf(FLAGSHIP, CLASSIC),
-            listOf(ARTWORK_FRAME),
+            listOf(ARTWORK_FRAME, STUDIO_SESSION),
             listOf(TURNTABLE),
             listOf(VIDEO),
             listOf(IPOD),

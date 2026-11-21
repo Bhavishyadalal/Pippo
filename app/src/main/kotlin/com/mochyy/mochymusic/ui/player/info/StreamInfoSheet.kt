@@ -107,7 +107,11 @@ fun StreamInfoSheet(onDismiss: () -> Unit) {
         }
 
         if (showForce) {
-            ForceProviderSheet(currentProviderId = from?.providerId, onDismiss = { showForce = false })
+            ForceProviderSheet(
+                currentProviderId = from?.providerId,
+                currentOption = from?.selectedOption,
+                onDismiss = { showForce = false },
+            )
         }
     }
 }
@@ -226,7 +230,8 @@ private fun rememberStatCards(service: MusicService, mediaId: String, durationMs
         details = details.takeIf { it.mediaId == null || it.mediaId == mediaId } ?: StreamDetails(mediaId = mediaId),
         facts = facts,
         // youtube's record only describes youtube's stream
-        youtubeFormat = format?.takeIf { from?.providerId == com.mochyy.mochymusic.modules.SourceModules.YouTubeId },
+        youtubeFormat = from?.manualYouTubeFormat
+            ?: format?.takeIf { from?.providerId == com.mochyy.mochymusic.modules.SourceModules.YouTubeId },
         from = from,
         durationMs = durationMs,
         playerVolume = volume,

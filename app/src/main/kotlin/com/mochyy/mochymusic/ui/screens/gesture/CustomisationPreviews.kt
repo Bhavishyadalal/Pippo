@@ -171,7 +171,7 @@ internal fun PlayerStylePreview(style: PlayerStyle) {
                         Box(Modifier.size(26.dp).background(ArtLight, CircleShape))
                     }
                 }
-            } else if (style == PlayerStyle.ARTWORK_FRAME) {
+            } else if (style == PlayerStyle.ARTWORK_FRAME || style == PlayerStyle.STUDIO_SESSION) {
                 Box(
                     Modifier.align(Alignment.CenterHorizontally).padding(top = 9.dp)
                         .size(84.dp).clip(RoundedCornerShape(10.dp)).background(ArtFill),
