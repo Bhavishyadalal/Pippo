@@ -12,6 +12,7 @@
     <string name="pippo_repair_offline">Turn off Offline mode to retry downloads.</string>
     <string name="pippo_repair_retry_error">Could not queue every download. Try again.</string>
     <string name="pippo_repair_retry">Retry downloads</string>
+    <string name="pippo_provider_opened">Stream opened</string>
     <string name="pippo_provider_opened_quality">Opened %1$s</string>
     <string name="pippo_provider_found_quality">Found %1$s</string>
     <string name="pippo_playback_stalled">The stream took too long to start</string>

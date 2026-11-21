@@ -97,10 +97,9 @@ fun ForceProviderSheet(currentProviderId: String?, currentOption: String? = null
         val close = LocalMenuSheetClose.current
         // once it plays from the new provider there's nothing left to choose
         LaunchedEffect(state) {
-            if (state is ProviderSwitchState.Done) {
-                delay(700)
-                close()
-            }
+            val completed = state as? ProviderSwitchState.Done ?: return@LaunchedEffect
+            delay(700)
+            if (service.providerSwitch.state.value === completed) close()
         }
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -260,14 +259,18 @@ private fun ProviderChoiceRow(
         attempt?.let { result ->
             val quality = result.quality
             val failure = result.failure
-            if (quality != null || failure != null) {
+            if (result.opened || quality != null || failure != null) {
                 Column(Modifier.fillMaxWidth().padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                    if (quality != null) Text(
-                        stringResource(
+                    val streamResult = when {
+                        quality != null -> stringResource(
                             if (result.opened) R.string.pippo_provider_opened_quality else R.string.pippo_provider_found_quality,
                             quality,
-                        ),
-                        color = InfoMuted, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                        )
+                        result.opened -> stringResource(R.string.pippo_provider_opened)
+                        else -> null
+                    }
+                    if (streamResult != null) Text(
+                        streamResult, color = InfoMuted, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis,
                     )
                     if (failure != null) Text(
                         failure.reason ?: stringResource(
