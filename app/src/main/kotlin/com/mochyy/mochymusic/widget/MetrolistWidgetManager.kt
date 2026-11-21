@@ -22,6 +22,7 @@ import coil3.toBitmap
 import com.mochyy.mochymusic.MainActivity
 import com.mochyy.mochymusic.R
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -251,6 +252,8 @@ class MochyWidgetManager @Inject constructor(
                     .build()
                 val result = imageLoader.execute(request)
                 result.image?.toBitmap()
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 null
             }
