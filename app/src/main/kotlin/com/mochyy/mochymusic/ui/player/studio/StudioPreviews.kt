@@ -81,7 +81,7 @@ import com.mochyy.mochymusic.ui.player.PlayerVolumeBarHeight
 import com.mochyy.mochymusic.ui.player.SeamBlur
 import com.mochyy.mochymusic.ui.player.SeekBarLift
 import com.mochyy.mochymusic.ui.player.TransportGapAboveRow
-import com.mochyy.mochymusic.ui.player.info.ProviderMarkRoom
+import com.mochyy.mochymusic.ui.player.info.PlayerProviderMark
 import com.mochyy.mochymusic.ui.player.TurntableControls
 import com.mochyy.mochymusic.ui.player.TurntableControlsLift
 import com.mochyy.mochymusic.ui.player.flagship.FlagshipBarHeight
@@ -280,7 +280,7 @@ internal fun FlagshipPreview(
             val drawShift = if (edgeToEdge) ControlsDrawShift else 0.dp
             val transportGap = (maxHeight * 0.19f - 37.dp - belowControls + TransportGapAboveRow + drawShift) / 2f
             val transportSpacer = (transportGap - SeekBarLift - drawShift).coerceAtLeast(0.dp)
-            val bottomGap = transportGap.coerceAtLeast(if (flagship) ProviderMarkRoom else 0.dp)
+            val bottomGap = transportGap.coerceAtLeast(0.dp)
             val buttonsLift = (transportSpacer + SeekBarLift + drawShift - bottomGap) / 2f
             Column(
                 modifier = Modifier
@@ -292,7 +292,13 @@ internal fun FlagshipPreview(
                     Spacer(Modifier.height(20.dp))
                     SongInfoRow()
                     Spacer(Modifier.height(16.dp))
-                    Column(modifier = Modifier.offset(y = -SeekBarLift)) { PlayerProgressSlider() }
+                    Column(modifier = Modifier.offset(y = -SeekBarLift)) {
+                        PlayerProgressSlider(
+                            centerLabel = if (flagship) {
+                                { PlayerProviderMark(mediaId = track.mediaId, animate = false, onClick = null) }
+                            } else null,
+                        )
+                    }
                 }
                 Spacer(Modifier.height(transportSpacer))
                 Box(modifier = Modifier.offset(y = -buttonsLift)) {
