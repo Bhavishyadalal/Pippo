@@ -2,6 +2,7 @@
 
 package com.mochyy.mochymusic.ui.screens.setup.onboarding
 
+import android.net.Uri
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import com.mochyy.mochymusic.ui.component.rememberDeviceTilt
@@ -58,6 +59,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.mochyy.mochymusic.R
+import com.mochyy.mochymusic.ui.screens.profile.ProfileAvatarPicker
 import com.mochyy.mochymusic.importer.account.AccountImportState
 import com.mochyy.mochymusic.importer.account.AccountService
 import com.mochyy.mochymusic.importer.account.RemotePlaylist
@@ -459,6 +461,8 @@ internal fun ProfilePage(
     onUsernameChange: (String) -> Unit,
     photo: Any?,
     onPhotoClick: () -> Unit,
+    onAvatarPick: (Uri) -> Unit,
+    onUploadPhoto: () -> Unit,
     cardNumber: String,
     joinedText: String,
     onNext: () -> Unit,
@@ -496,6 +500,8 @@ internal fun ProfilePage(
                 cameraDistance = 14f * density
             },
         )
+        Spacer(Modifier.height(16.dp))
+        ProfileAvatarPicker(photo = photo, onPick = onAvatarPick, onUpload = onUploadPhoto)
     }
 }
 

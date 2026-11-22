@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pippo_avatar_picker_title">Profile pictures</string>
+    <string name="pippo_avatar_upload">Upload photo</string>
+    <string name="pippo_avatar_choice">Profile picture %1$d</string>
+    <string name="pippo_profile_save_failed">Couldn’t save your profile. Try again.</string>
+</resources>
