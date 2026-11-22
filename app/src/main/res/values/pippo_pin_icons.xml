@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pippo_pin_group">Pin Collection</string>
+    <string name="pippo_pin_01_midnight_stars_label">Midnight Stars</string>
+    <string name="pippo_pin_02_sky_headphones_label">Sky Headphones</string>
+    <string name="pippo_pin_03_mint_hearts_label">Mint Hearts</string>
+    <string name="pippo_pin_04_mocha_leaves_label">Mocha Leaves</string>
+    <string name="pippo_pin_05_cherry_float_label">Cherry Float</string>
+    <string name="pippo_pin_06_woodland_sketch_label">Woodland Sketch</string>
+    <string name="pippo_pin_07_red_crayon_label">Red Crayon</string>
+    <string name="pippo_pin_08_blue_sketch_note_label">Blue Sketch Note</string>
+    <string name="pippo_pin_09_lilac_note_label">Lilac Note</string>
+    <string name="pippo_pin_10_lilac_stars_label">Lilac Stars</string>
+
+    <style name="Theme.App.Starting.Pin01" parent="Theme.App.Starting">
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/pippo_pin_01_midnight_stars</item>
+    </style>
+    <style name="Theme.App.Starting.Pin02" parent="Theme.App.Starting">
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/pippo_pin_02_sky_headphones</item>
+    </style>
+    <style name="Theme.App.Starting.Pin03" parent="Theme.App.Starting">
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/pippo_pin_03_mint_hearts</item>
+    </style>
+    <style name="Theme.App.Starting.Pin04" parent="Theme.App.Starting">
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/pippo_pin_04_mocha_leaves</item>
+    </style>
+    <style name="Theme.App.Starting.Pin05" parent="Theme.App.Starting">
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/pippo_pin_05_cherry_float</item>
+    </style>
+    <style name="Theme.App.Starting.Pin06" parent="Theme.App.Starting">
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/pippo_pin_06_woodland_sketch</item>
+    </style>
+    <style name="Theme.App.Starting.Pin07" parent="Theme.App.Starting">
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/pippo_pin_07_red_crayon</item>
+    </style>
+    <style name="Theme.App.Starting.Pin08" parent="Theme.App.Starting">
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/pippo_pin_08_blue_sketch_note</item>
+    </style>
+    <style name="Theme.App.Starting.Pin09" parent="Theme.App.Starting">
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/pippo_pin_09_lilac_note</item>
+    </style>
+    <style name="Theme.App.Starting.Pin10" parent="Theme.App.Starting">
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/pippo_pin_10_lilac_stars</item>
+    </style>
+</resources>
