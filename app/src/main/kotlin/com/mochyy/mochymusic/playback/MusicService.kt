@@ -536,14 +536,23 @@ class MusicService :
     private var outputRouteGeneration = 0L
     private var routeRefreshJob: Job? = null
     private var outputMonitorJob: Job? = null
-    private var lastOutputRecovery: Pair<Long, Long>? = null
+    private var outputRebindAttempt: Pair<Long, Long>? = null
+    private var outputReopenAttempt: Pair<Long, Long>? = null
+
+    // Overlapping decks open independent AudioTracks and can compete for a Bluetooth route
+    // or reconfigure the USB mixer while the outgoing track still uses it.
+    private val usesSingleExternalOutput: Boolean
+        get() = lastAudioRoute?.external == true
 
     private fun applyOutputRoute(device: AudioDeviceInfo?, refreshPass: Boolean = false) {
-        val players = (playerCrossmixProcessors.keys.toList().mapNotNull { it as? ExoPlayer } +
-            listOfNotNull(if (::player.isInitialized) player else null, secondaryPlayer, fadingPlayer)).distinct()
+        if (destroying) return
         val preferenceChanged = lastPreferredRouteId != device?.id
         lastPreferredRouteId = device?.id
-        if (preferenceChanged) players.forEach { it.setPreferredAudioDevice(device) }
+        if (preferenceChanged) {
+            val players = (playerCrossmixProcessors.keys.filterIsInstance<ExoPlayer>() +
+                listOfNotNull(if (::player.isInitialized) player else null, secondaryPlayer, fadingPlayer)).distinct()
+            players.forEach { it.setPreferredAudioDevice(device) }
+        }
 
         val active = audioOutputs.activeDevice()
         val route = active?.let {
@@ -582,6 +591,13 @@ class MusicService :
         }
         if (!::player.isInitialized) return
         val target = player
+        if ((previous?.external == true) != route.external) {
+            if (route.external) {
+                crossmixDirector.onItemChanged()
+                crossfadeJob?.cancel()
+            }
+            scheduleCrossfade()
+        }
         if (needsRefresh) {
             val mediaId = target.currentMediaItem?.mediaId ?: return
             val occurrence = providerOccurrence
@@ -614,6 +630,7 @@ class MusicService :
 
     private fun watchPlatformOutput(target: Player) {
         if (target !== player) return
+        val deck = player
         if (!target.isPlaying) {
             outputMonitorJob?.cancel()
             outputMonitorJob = null
@@ -626,13 +643,15 @@ class MusicService :
         val generation = outputRouteGeneration
         val attempt = occurrence to generation
         val pauseGeneration = transport.pauseGeneration
-        if (lastOutputRecovery == attempt || outputMonitorJob?.isActive == true) return
-        val compareRoute = lastPreferredRouteId != null || Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+        if (outputReopenAttempt == attempt || outputMonitorJob?.isActive == true) return
+        val hasPreferredRoute = lastPreferredRouteId != null
+        val compareRoute = hasPreferredRoute || Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
 
         outputMonitorJob = scope.launch {
             var previous: PlatformOutputMonitor.Sample? = null
             var stalled = 0
             var wrongRoute = 0
+            var missingOutput = 0
             while (player === target && providerOccurrence == occurrence && outputRouteGeneration == generation &&
                 target.isPlaying && transport.pauseGeneration == pauseGeneration
             ) {
@@ -640,27 +659,50 @@ class MusicService :
                 if (player !== target || providerOccurrence != occurrence || outputRouteGeneration != generation ||
                     !target.isPlaying || transport.pauseGeneration != pauseGeneration
                 ) return@launch
-                val sample = monitor.sample()
-                if (sample == null || !target.currentTracks.isTypeSelected(C.TRACK_TYPE_AUDIO) ||
+                if (!target.currentTracks.isTypeSelected(C.TRACK_TYPE_AUDIO) ||
                     !canRefreshPlatformOutput(target, mediaId) || routeRefreshJob?.isActive == true
                 ) {
                     previous = null
                     stalled = 0
                     wrongRoute = 0
+                    missingOutput = 0
                     continue
                 }
+                val sample = monitor.sample()
+                missingOutput = if (sample == null || (hasPreferredRoute && sample.deviceId == null)) missingOutput + 1 else 0
                 val prior = previous
-                val sameTrack = prior?.track === sample.track
-                stalled = if (sameTrack && prior?.frames == sample.frames) stalled + 1 else 0
-                wrongRoute = if (compareRoute && sample.deviceId != null && sample.deviceId != route.id) {
+                val sameTrack = sample != null && prior?.track === sample.track
+                val framesAdvanced = prior?.frames != sample?.frames
+                stalled = if (sameTrack && !framesAdvanced) stalled + 1 else 0
+                val actualRouteId = sample?.deviceId
+                wrongRoute = if (compareRoute && actualRouteId != null && actualRouteId != route.id) {
                     if (sameTrack) wrongRoute + 1 else 1
                 } else 0
                 previous = sample
-                if (stalled < 3 && wrongRoute < 3) continue
+                if (stalled < 3 && wrongRoute < 3 && missingOutput < 4) continue
 
-                lastOutputRecovery = attempt
+                val preferred = audioOutputs.preferredDevice()
+                // A device change may be queued on Android's routing callback. Let it take
+                // precedence over a recovery scheduled for the previous output.
+                if (lastPreferredRouteId != preferred?.id || audioOutputs.activeDevice()?.id != route.id) {
+                    applyOutputRoute(preferred)
+                    return@launch
+                }
                 val index = target.currentMediaItemIndex
                 val position = target.contentPosition.coerceAtLeast(0L)
+                deck.setPreferredAudioDevice(preferred)
+                if (outputRebindAttempt != attempt) {
+                    outputRebindAttempt = attempt
+                    Timber.tag(TAG).w("Reapplying the selected audio output after missing or stalled playback")
+                    target.seekTo(index, position)
+                    previous = null
+                    stalled = 0
+                    wrongRoute = 0
+                    missingOutput = 0
+                    continue
+                }
+
+                outputReopenAttempt = attempt
                 Timber.tag(TAG).w("Reopening audio output after a stalled or mismatched route")
                 target.stop()
                 target.seekTo(index, position)
@@ -3516,7 +3558,7 @@ class MusicService :
         }
 
         if (events.containsAny(Player.EVENT_IS_PLAYING_CHANGED, Player.EVENT_MEDIA_ITEM_TRANSITION,
-                Player.EVENT_POSITION_DISCONTINUITY)) {
+                Player.EVENT_POSITION_DISCONTINUITY, Player.EVENT_TRACKS_CHANGED)) {
             watchPlatformOutput(player)
         }
 
@@ -4586,6 +4628,11 @@ class MusicService :
             ) = CrossmixClockSink(PassRouterSink(com.mochyy.mochymusic.playback.audio.PrecisionSink(DefaultAudioSink
                 .Builder(this@MusicService)
                 .setAudioTrackProvider { config, attributes, sessionId ->
+                    // Configure the USB mixer for the track Media3 is actually opening, after
+                    // the previous format has drained and its AudioTrack has been released.
+                    if (androidx.media3.common.util.Util.isEncodingLinearPcm(config.encoding)) {
+                        audioOutputs.prepareMixer(config.sampleRate, Integer.bitCount(config.channelConfig), config.encoding)
+                    }
                     DefaultAudioSink.AudioTrackProvider.DEFAULT.getAudioTrack(config, attributes, sessionId)
                         .also(platformOutput::attach)
                 }
@@ -4999,7 +5046,7 @@ class MusicService :
         if (!isCrossfading) crossmixDirector.schedule()
         crossfadeTriggerJob?.cancel()
         crossfadeTriggerJob = null
-        if (crossmixMode == CrossmixMode.CROSSMIX) return
+        if (usesSingleExternalOutput || crossmixMode == CrossmixMode.CROSSMIX) return
         if (!crossfadeEnabled || player.duration == C.TIME_UNSET || player.duration <= crossfadeDuration) return
         if (crossfadeGapless && isNextItemGapless()) return
         // repeat one goes straight round on the same player; crossfaded into itself, the second time round played silent
@@ -5030,7 +5077,7 @@ class MusicService :
 
     /** the plain fixed-length crossfade (Auto and Manual): two equal-power volume ramps */
     private fun startCrossfade() {
-        if (isCrossfading || crossmixDirector.isTransitioning) return
+        if (usesSingleExternalOutput || isCrossfading || crossmixDirector.isTransitioning) return
         val targetIndex = player.nextMediaItemIndex
         if (targetIndex == C.INDEX_UNSET) return
         crossfadeTo(targetIndex, crossfadeDuration.toLong())
@@ -5038,7 +5085,7 @@ class MusicService :
 
     // "blend skips" can cross over right now: it's on, a song is really playing, and nothing else is mixing or casting; crossmix still gets the song endings
     private fun canBlendSkip(): Boolean =
-        skipBlend && !isCrossfading && !crossmixDirector.isTransitioning &&
+        skipBlend && !usesSingleExternalOutput && !isCrossfading && !crossmixDirector.isTransitioning &&
             castConnectionHandler?.isCasting?.value != true && player.isPlaying
 
     // the blend lasts as long as the fade's Length slider says, not a fixed second and a half
@@ -5286,6 +5333,7 @@ class MusicService :
                     runCatching { cleanupCrossfade() }
                     isCrossfading = false
                     runCatching { scheduleCrossfade() }
+                    watchPlatformOutput(player)
                 }
             }
         }
@@ -5979,6 +6027,7 @@ class MusicService :
             } finally {
                 promotingCrossmix = false
             }
+            watchPlatformOutput(incoming)
         }
 
         override fun release(outgoing: ExoPlayer) {
@@ -6011,6 +6060,7 @@ class MusicService :
         override fun crossmixBlocker(): String? = when {
             !crossfadeEnabled -> "Crossfade is off"
             crossmixMode != CrossmixMode.CROSSMIX -> "Crossfade is set to ${crossmixMode.name.lowercase()}, not Crossmix"
+            usesSingleExternalOutput -> "Bluetooth and USB use single-player transitions"
             isCrossfading -> "A plain crossfade is running"
             player.repeatMode == REPEAT_MODE_ONE -> "Repeat one plays the song straight round"
             castConnectionHandler?.isCasting?.value == true -> "Casting: Crossmix waits until you're back"
