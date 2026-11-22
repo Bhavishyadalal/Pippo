@@ -39,7 +39,7 @@ newpipeextractor = "v0.25.2"
 innertubex = "v0.11.6"
 tinypinyin = "2.0.3"
 protobuf = "4.33.5"
-protobufPlugin = "0.9.6"
+protobufPlugin = "0.10.1"
 smoothCorner = "v1.0.0"
 lottie = "6.6.2"
 work = "2.10.0"
@@ -54,7 +54,7 @@ concurrent-futures = { module = "androidx.concurrent:concurrent-futures-ktx", ve
 
 gradle = { module = "com.android.tools.build:gradle", version.ref = "androidGradlePlugin" }
 activity = { module = "androidx.activity:activity-compose", version.ref = "activity" }
-hilt-navigation = { module = "androidx.hilt:hilt-navigation-compose", version.ref = "hiltNavigation" }
+hilt-viewmodel-compose = { module = "androidx.hilt:hilt-lifecycle-viewmodel-compose", version.ref = "hiltNavigation" }
 datastore = { module = "androidx.datastore:datastore-preferences", version.ref = "datastore" }
 
 compose-runtime = { module = "androidx.compose.runtime:runtime", version.ref = "compose" }

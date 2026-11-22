@@ -146,7 +146,7 @@ object CrossmixPlanner {
                     if (start < windowStart || end > naturalEnd - 150L) continue
                     val exitScore = exitScore(out, bars, exit.grid, exit.swapMs, end, naturalEnd, outLines, style) ?: continue
                     val landing = pickLanding(style, out, inc, exit.swapMs, swap, period, tempo, locked, outVoice, inVoice, latestLanding) ?: continue
-                    val match = if (locked) beatMatch(inc!!, landing.timeMs, tempo!!, period, maxSpeedUp) else null
+                    val match = if (locked) beatMatch(inc!!, landing.timeMs, tempo, period, maxSpeedUp) else null
                     if (style.needsBeatMatch && match == null) continue
                     // Validate the actual local duration and the match that survived fitting, not
                     // the song-wide tempo estimate which may later fail to beat-match.
