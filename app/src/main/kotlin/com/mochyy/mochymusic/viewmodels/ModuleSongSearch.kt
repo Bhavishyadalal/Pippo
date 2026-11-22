@@ -9,7 +9,7 @@ import kotlinx.coroutines.withContext
 internal suspend fun searchModuleTestSongs(query: String): List<SongItem> = withContext(Dispatchers.IO) {
     try {
         YouTube.search(query, YouTube.SearchFilter.FILTER_SONG)
-            .getOrThrow().items.filterIsInstance<SongItem>().take(8)
+            .getOrThrow().items.asSequence().filterIsInstance<SongItem>().distinctBy { it.id }.take(8).toList()
     } catch (cancelled: CancellationException) {
         throw cancelled
     } catch (_: Exception) {
