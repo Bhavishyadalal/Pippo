@@ -773,8 +773,8 @@ class MainActivity : ComponentActivity() {
                     expandedBound = maxHeight,
                 )
 
-                val scrollPlayerActive = scrollPlayerEnabled && shouldShowNavigationBar &&
-                    selectedTabRoute != Screens.Settings.route && currentRoute !in SubSettingsRoutes &&
+                val settingsChrome = selectedTabRoute == Screens.Settings.route || currentRoute in SubSettingsRoutes
+                val scrollPlayerActive = scrollPlayerEnabled && shouldShowNavigationBar && !settingsChrome &&
                     !hideAppChrome.value && !isTelevision() &&
                     com.mochyy.mochymusic.ui.utils.AppMotion.durationScale.scaleFactor > 0f
                 val isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
@@ -796,16 +796,19 @@ class MainActivity : ComponentActivity() {
                 PlayerSystemBarsSync(playerBottomSheetState)
 
                 val sharedBarRow = wideBar != null && shouldShowNavigationBar
+                // Settings keeps the bars in place during vertical scroll, so reserve the actual
+                // tab height there, including the slimmer layout if enabled.
+                val reservedNavHeight = if (settingsChrome) navPadding else navRowHeight
                 val playerAwareWindowInsets = remember(
                     bottomInset,
-                    navRowHeight,
+                    reservedNavHeight,
                     shouldShowNavigationBar,
                     playerBottomSheetState.isDismissed,
                     sharedBarRow,
                 ) {
                     var bottom = bottomInset
                     if (shouldShowNavigationBar) {
-                        bottom += navRowHeight
+                        bottom += reservedNavHeight
                     }
                     // in the wide bar the mini player shares the tabs' row, so it takes no room of its own
                     if (!playerBottomSheetState.isDismissed && !sharedBarRow) bottom += MiniPlayerHeight
