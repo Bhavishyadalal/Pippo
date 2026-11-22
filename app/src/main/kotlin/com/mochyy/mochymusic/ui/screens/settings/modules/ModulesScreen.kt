@@ -5,6 +5,8 @@ package com.mochyy.mochymusic.ui.screens.settings.modules
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -40,6 +42,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
@@ -55,6 +58,9 @@ import com.mochyy.mochymusic.modules.ModuleEntry
 import com.mochyy.mochymusic.ui.component.ActionPromptDialog
 import com.mochyy.mochymusic.ui.component.LocalZoomOutOverlayState
 import com.mochyy.mochymusic.ui.component.PopupSheetHandle
+import com.mochyy.mochymusic.ui.component.RemoteFocus
+import com.mochyy.mochymusic.ui.component.pressBounce
+import com.mochyy.mochymusic.ui.theme.LocalPureBlack
 import com.mochyy.mochymusic.ui.component.SubSettingsScaffold
 import com.mochyy.mochymusic.ui.screens.audiolab.LabColors
 import com.mochyy.mochymusic.ui.screens.settings.devspace.openDevUrl
@@ -77,6 +83,7 @@ private val CardShape = RoundedCornerShape(26.dp)
 fun ModulesScreen(navController: NavController, viewModel: ModulesViewModel = hiltViewModel()) {
     val entries by viewModel.entries.collectAsState()
     val overlay = LocalZoomOutOverlayState.current
+    val testerSurface = if (LocalPureBlack.current) Color.Black else Color(0xFF161616)
     val context = LocalContext.current
     var removing by remember { mutableStateOf<ModuleEntry?>(null) }
     var tester by remember { mutableStateOf<PopupSheetHandle?>(null) }
@@ -123,7 +130,7 @@ fun ModulesScreen(navController: NavController, viewModel: ModulesViewModel = hi
                 tester = overlay.showWithHandle(
                     fullBleed = true,
                     onClosed = { tester = null },
-                    surface = Color(0xFF121C22),
+                    surface = testerSurface,
                 ) {
                     ModulesSetupPage(
                         active = tester?.isClosing == false,
@@ -161,21 +168,32 @@ fun ModulesScreen(navController: NavController, viewModel: ModulesViewModel = hi
 @Composable
 private fun ModuleTesterCard(onClick: () -> Unit) {
     val title = stringResource(R.string.module_tester_title)
+    val press = remember { MutableInteractionSource() }
+    val shape = RoundedCornerShape(22.dp)
+    val silver = Color(0xFFE7E7E7)
     Row(
         modifier = Modifier.fillMaxWidth()
-            .clip(RoundedCornerShape(22.dp))
-            .background(Color(0xFF18262E))
-            .clickable(onClick = onClick)
-            .padding(16.dp),
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
+            .pressBounce(press, pressedScale = 0.98f)
+            .clip(shape)
+            .background(Brush.horizontalGradient(listOf(Color(0xFF202020), Color(0xFF141414))))
+            .border(1.dp, Color.White.copy(alpha = 0.11f), shape)
+            .clickable(interactionSource = press, indication = RemoteFocus, role = Role.Button, onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 15.dp),
+        horizontalArrangement = Arrangement.spacedBy(13.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(painterResource(R.drawable.graphic_eq), null, Modifier.size(25.dp), tint = Color(0xFFA4E8DB))
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            Text(title, modifier = Modifier.silverSweep(title), color = Color(0xFFE0EBF0),
-                fontSize = 17.sp, fontWeight = FontWeight.Bold)
-            Text(stringResource(R.string.module_tester_description), color = Color(0xFFD0D9DF), fontSize = 13.sp)
+        Box(
+            modifier = Modifier.size(42.dp).clip(RoundedCornerShape(13.dp)).background(Color(0xFF303030)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(painterResource(R.drawable.graphic_eq), null, Modifier.size(21.dp), tint = silver)
         }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(title, modifier = Modifier.silverSweep(title), color = silver,
+                fontSize = 17.sp, fontWeight = FontWeight.Bold)
+            Text(stringResource(R.string.module_tester_description), color = Color(0xFFBFBFBF), fontSize = 13.sp, lineHeight = 17.sp)
+        }
+        Icon(painterResource(R.drawable.chevron_right_px), null, Modifier.size(16.dp), tint = silver)
     }
 }
 

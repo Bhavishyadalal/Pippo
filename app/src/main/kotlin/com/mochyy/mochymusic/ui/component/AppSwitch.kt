@@ -7,6 +7,8 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
@@ -15,6 +17,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -26,6 +29,7 @@ private val TrackWidth = 52.dp
 private val TrackHeight = 32.dp
 private val ThumbSize = 24.dp
 private val ThumbInset = (TrackHeight - ThumbSize) / 2
+private val TrackShape = RoundedCornerShape(50)
 private val Grey = Color(0xFF8E8E93)
 
 @Composable
@@ -36,6 +40,8 @@ fun AppSwitch(
     enabled: Boolean = true,
     thumbContent: (@Composable () -> Unit)? = null,
 ) {
+    val interaction = remember { MutableInteractionSource() }
+    val focused by interaction.collectIsFocusedAsState()
     val alpha = if (enabled) 1f else 0.38f
     val animSpec = tween<Color>(150)
 
@@ -45,7 +51,11 @@ fun AppSwitch(
         label = "trackColor"
     )
     val borderColor by animateColorAsState(
-        targetValue = if (checked) Color.Transparent else Grey.copy(alpha = 0.45f * alpha),
+        targetValue = when {
+            focused -> Color.White.copy(alpha = 0.82f)
+            checked -> Color.Transparent
+            else -> Grey.copy(alpha = 0.45f * alpha)
+        },
         animationSpec = animSpec,
         label = "borderColor"
     )
@@ -63,21 +73,26 @@ fun AppSwitch(
     Box(
         modifier = modifier
             .size(TrackWidth, TrackHeight)
-            .toggleable(
-                value = checked,
-                enabled = enabled && onCheckedChange != null,
-                role = Role.Switch,
-                onValueChange = { onCheckedChange?.invoke(it) },
+            .clip(TrackShape)
+            .then(
+                if (onCheckedChange == null) Modifier else Modifier.toggleable(
+                    value = checked,
+                    interactionSource = interaction,
+                    indication = null,
+                    enabled = enabled,
+                    role = Role.Switch,
+                    onValueChange = onCheckedChange,
+                ),
             )
-            .clip(RoundedCornerShape(50))
             .background(trackColor)
-            .border(1.dp, borderColor, RoundedCornerShape(50)),
+            .border(1.dp, borderColor, TrackShape),
     ) {
         Box(
             modifier = Modifier
                 .align(Alignment.CenterStart)
                 .offset(x = thumbOffset)
                 .size(ThumbSize)
+                .pressBounce(interaction, pressedScale = 0.88f)
                 .clip(CircleShape)
                 .background(thumbColor),
             contentAlignment = Alignment.Center,

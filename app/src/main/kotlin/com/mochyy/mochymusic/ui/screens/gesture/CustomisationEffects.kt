@@ -35,6 +35,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -45,6 +46,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -53,6 +56,7 @@ import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.mochyy.mochymusic.R
 import com.mochyy.mochymusic.constants.AnimationSpeedKey
+import com.mochyy.mochymusic.constants.SilverSongTitleSpeedKey
 import androidx.compose.ui.res.stringResource
 import com.mochyy.mochymusic.constants.BlurQuality
 import com.mochyy.mochymusic.constants.BlurQualityKey
@@ -548,26 +552,51 @@ internal fun SilverSongTitleSection() {
         com.mochyy.mochymusic.constants.SilverSongTitleKey,
         defaultValue = false,
     )
-    EffectCard(
-        title = stringResource(R.string.customise_silver_song_title),
-        checked = enabled,
-        onCheckedChange = onEnabled,
-        preview = {
+    val (storedSpeed, onSpeed) = rememberPreference(SilverSongTitleSpeedKey, defaultValue = 1f)
+    val speed = storedSpeed.takeIf { it.isFinite() }?.coerceIn(0.5f, 3f) ?: 1f
+    val haptic = LocalHapticFeedback.current
+    Column {
+        EffectCard(
+            title = stringResource(R.string.customise_silver_song_title),
+            checked = enabled,
+            onCheckedChange = onEnabled,
+            preview = {
+                var onScreen by remember { mutableStateOf(false) }
+                val flowing = if (enabled && onScreen) Modifier.silverSweep("One Kiss", repeat = true, speed = speed) else Modifier
+                Text(
+                    text = "One Kiss",
+                    modifier = Modifier.align(Alignment.Center)
+                        .onGloballyPositioned { onScreen = it.boundsInWindow().height > 0f }
+                        .then(flowing),
+                    color = Color(0xFFBCC6D4),
+                    fontSize = 19.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                )
+            },
+        ) {
             Text(
-                text = "One Kiss",
-                modifier = Modifier.align(Alignment.Center).then(if (enabled) Modifier.silverSweep("One Kiss") else Modifier),
-                color = Color(0xFFBCC6D4),
-                fontSize = 19.sp,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                text = stringResource(R.string.customise_silver_song_title_desc),
+                style = CaptionStyle,
+                color = Color.White.copy(alpha = 0.65f),
             )
-        },
-    ) {
-        Text(
-            text = stringResource(R.string.customise_silver_song_title_desc),
-            style = CaptionStyle,
-            color = Color.White.copy(alpha = 0.65f),
+        }
+        Spacer(Modifier.height(11.dp))
+        CustomiseSliderCard(
+            title = stringResource(R.string.customise_silver_flow_speed),
+            startLabel = "0.5×",
+            endLabel = "3×",
+            fraction = (speed - 0.5f) / 2.5f,
+            onFractionChange = { fraction ->
+                val next = (2 + (fraction * 10).roundToInt()) / 4f
+                if (next != speed) {
+                    haptic.performHapticFeedback(HapticFeedbackType.SegmentTick)
+                    onSpeed(next)
+                }
+            },
+            valueText = animationSpeedLabel(speed),
+            enabled = enabled,
         )
     }
 }

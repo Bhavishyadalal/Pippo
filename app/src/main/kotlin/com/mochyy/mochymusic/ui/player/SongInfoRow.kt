@@ -70,6 +70,7 @@ import com.mochyy.mochymusic.ui.utils.songTitleSilver
 fun SongInfoRow(
     modifier: Modifier = Modifier,
     isExpandMenuOpen: Boolean = false,
+    animateTitle: Boolean = true,
     /** Hides this row's chevron while the lyrics page's chevron (the same control, moved) is up. */
     hideChevron: Boolean = false,
     onToggleExpandMenu: () -> Unit = {},
@@ -174,6 +175,7 @@ fun SongInfoRow(
                     SongLines(
                         mediaId = trackInfo.mediaId,
                         title = trackInfo.title,
+                        animateTitle = animateTitle,
                         artist = trackInfo.artist,
                         showFormatBadge = showFormatBadge,
                         showSampleRate = showSampleRate,
@@ -188,6 +190,7 @@ fun SongInfoRow(
                             SongLines(
                                 mediaId = slot.mediaId,
                                 title = slot.title,
+                                animateTitle = animateTitle && slot.step == carousel.step,
                                 artist = slot.artist,
                                 showFormatBadge = showFormatBadge,
                                 showSampleRate = showSampleRate,
@@ -283,6 +286,7 @@ private fun SongLines(
     mediaId: String,
     title: String,
     artist: String,
+    animateTitle: Boolean,
     showFormatBadge: Boolean,
     showSampleRate: Boolean,
     infoAlpha: () -> Float,
@@ -314,6 +318,7 @@ private fun SongLines(
             // it's cut and scrolls by, as it did against the buttons.
             FadingOverflowText(
                 text = title,
+                animateTitle = animateTitle,
                 style = androidx.compose.material3.MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                 color = Color.White,
                 modifier = Modifier
@@ -384,6 +389,7 @@ internal fun FadingOverflowText(
     style: androidx.compose.ui.text.TextStyle,
     color: Color,
     modifier: Modifier = Modifier,
+    animateTitle: Boolean = true,
 ) {
     // The marquee lays the text out at its full width, wider than it's shown when it's cut. Read
     // while drawing, so a new width redraws the fade without recomposing.
@@ -397,7 +403,7 @@ internal fun FadingOverflowText(
         onTextLayout = { fullWidth = it.size.width },
         modifier = modifier
             .trailingFade { shown -> fullWidth > shown + 0.5f }
-            .songTitleSilver(text)
+            .songTitleSilver(text, animateTitle)
             .basicMarquee(iterations = 1, initialDelayMillis = 3000, velocity = 30.dp),
     )
 }

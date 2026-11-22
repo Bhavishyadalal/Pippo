@@ -7,7 +7,6 @@ import android.os.Handler
 import android.os.Looper
 import androidx.media3.common.C
 import androidx.media3.common.Player
-import com.mochyy.mochymusic.constants.PlayerStyle
 import com.mochyy.mochymusic.constants.PlayerStyleKey
 import com.mochyy.mochymusic.extensions.metadata
 import com.mochyy.mochymusic.extensions.toMediaItem
@@ -144,7 +143,7 @@ internal class LinkControlRoutes(
         val style = runBlocking { context.dataStore.data.first()[PlayerStyleKey] }
         return json
             .put("liked", liked)
-            .put("style", style ?: PlayerStyle.FLAGSHIP.name)
+            .put("style", style ?: styles.first().name)
             .put("styles", JSONArray(styles.map { JSONObject().put("name", it.name).put("label", it.selectorName) }))
     }
 
