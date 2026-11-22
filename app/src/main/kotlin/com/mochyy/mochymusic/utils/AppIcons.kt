@@ -22,8 +22,11 @@ import androidx.annotation.StringRes
 import androidx.core.content.edit
 import com.mochyy.mochymusic.R
 
-enum class AppIconFamily(@StringRes val title: Int) {
+private const val AdaptiveArtworkScale = 1.5f // 108 dp layer / 72 dp visible viewport
+
+enum class AppIconFamily(@StringRes val title: Int, internal val pickerScale: Float = 1f) {
     Brand(R.string.pippo_master_group_brand),
+    PinArtwork(R.string.pippo_pin_group, pickerScale = AdaptiveArtworkScale),
     Lettering(R.string.pippo_master_group_lettering),
     Illustrations(R.string.pippo_master_group_illustrations),
     Glass(R.string.pippo_master_group_glass),
@@ -44,8 +47,26 @@ class AppIcon private constructor(
     internal val foregroundScale: Float = .96f,
 ) {
     companion object {
+        private fun pin(
+            name: String,
+            alias: String,
+            @DrawableRes artwork: Int,
+            @StringRes label: Int,
+            @StyleRes splashTheme: Int,
+        ) = AppIcon(name, alias, AppIconFamily.PinArtwork, artwork, null, label, splashTheme, foregroundScale = AdaptiveArtworkScale)
+
         val entries: List<AppIcon> = listOf(
             AppIcon("Default", "IconDefault", AppIconFamily.Brand, R.drawable.pippo_master_black_ribbon_p, R.color.pippo_master_black_ribbon_p_bg, R.string.pippo_master_black_ribbon_p_label, R.style.Theme_App_Starting, foregroundScale = 1.38f),
+            pin("Pin01", "PippoPin01", R.drawable.pippo_pin_01_midnight_stars_adaptive, R.string.pippo_pin_01_midnight_stars_label, R.style.Theme_App_Starting_Pin01),
+            pin("Pin02", "PippoPin02", R.drawable.pippo_pin_02_sky_headphones_adaptive, R.string.pippo_pin_02_sky_headphones_label, R.style.Theme_App_Starting_Pin02),
+            pin("Pin03", "PippoPin03", R.drawable.pippo_pin_03_mint_hearts_adaptive, R.string.pippo_pin_03_mint_hearts_label, R.style.Theme_App_Starting_Pin03),
+            pin("Pin04", "PippoPin04", R.drawable.pippo_pin_04_mocha_leaves_adaptive, R.string.pippo_pin_04_mocha_leaves_label, R.style.Theme_App_Starting_Pin04),
+            pin("Pin05", "PippoPin05", R.drawable.pippo_pin_05_cherry_float_adaptive, R.string.pippo_pin_05_cherry_float_label, R.style.Theme_App_Starting_Pin05),
+            pin("Pin06", "PippoPin06", R.drawable.pippo_pin_06_woodland_sketch_adaptive, R.string.pippo_pin_06_woodland_sketch_label, R.style.Theme_App_Starting_Pin06),
+            pin("Pin07", "PippoPin07", R.drawable.pippo_pin_07_red_crayon_adaptive, R.string.pippo_pin_07_red_crayon_label, R.style.Theme_App_Starting_Pin07),
+            pin("Pin08", "PippoPin08", R.drawable.pippo_pin_08_blue_sketch_note_adaptive, R.string.pippo_pin_08_blue_sketch_note_label, R.style.Theme_App_Starting_Pin08),
+            pin("Pin09", "PippoPin09", R.drawable.pippo_pin_09_lilac_note_adaptive, R.string.pippo_pin_09_lilac_note_label, R.style.Theme_App_Starting_Pin09),
+            pin("Pin10", "PippoPin10", R.drawable.pippo_pin_10_lilac_stars_adaptive, R.string.pippo_pin_10_lilac_stars_label, R.style.Theme_App_Starting_Pin10),
             AppIcon("Master_01_cobalt_wax", "PippoMaster01CobaltWax", AppIconFamily.Lettering, R.drawable.pippo_master_01_cobalt_wax, R.color.pippo_master_01_cobalt_wax_bg, R.string.pippo_master_01_cobalt_wax_label, R.style.Theme_App_Starting_Master01CobaltWax),
             AppIcon("Master_02_graphite_script", "PippoMaster02GraphiteScript", AppIconFamily.Lettering, R.drawable.pippo_master_02_graphite_script, R.color.pippo_master_02_graphite_script_bg, R.string.pippo_master_02_graphite_script_label, R.style.Theme_App_Starting_Master02GraphiteScript),
             AppIcon("Master_03_pink_pastel", "PippoMaster03PinkPastel", AppIconFamily.Lettering, R.drawable.pippo_master_03_pink_pastel, R.color.pippo_master_03_pink_pastel_bg, R.string.pippo_master_03_pink_pastel_label, R.style.Theme_App_Starting_Master03PinkPastel),
