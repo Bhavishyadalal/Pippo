@@ -162,7 +162,7 @@ internal fun statusColor(entry: ModuleEntry): Color = when {
 @Composable
 internal fun moduleOrigin(entry: ModuleEntry): String = stringResource(
     when (entry.origin) {
-        ModuleOrigin.BuiltIn -> R.string.module_origin_built_in
+        ModuleOrigin.BuiltIn, is ModuleOrigin.BundledWeb -> R.string.module_origin_built_in
         is ModuleOrigin.App -> R.string.module_origin_app
         is ModuleOrigin.Web -> R.string.module_origin_web
         is ModuleOrigin.File, is ModuleOrigin.Code -> R.string.module_origin_file

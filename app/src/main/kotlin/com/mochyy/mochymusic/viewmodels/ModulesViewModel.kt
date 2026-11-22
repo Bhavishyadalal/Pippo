@@ -28,7 +28,6 @@ import com.mochyy.mochymusic.modules.CatalogModule
 import com.mochyy.mochymusic.modules.ModuleCatalog
 import com.mochyy.mochymusic.modules.ModuleRegistry
 import com.mochyy.mochymusic.modules.SourceModules
-import com.music.innertube.YouTube
 import com.music.innertube.models.SongItem
 import org.json.JSONObject
 import com.mochyy.mochymusic.playback.custom.WidevineDrm
@@ -166,9 +165,7 @@ class ModulesViewModel @Inject constructor(
         searchJob = viewModelScope.launch {
             _searching.value = true
             kotlinx.coroutines.delay(350)
-            val items = withContext(Dispatchers.IO) {
-                YouTube.search(query, YouTube.SearchFilter.FILTER_SONG).getOrNull()?.items.orEmpty().filterIsInstance<SongItem>().take(8)
-            }
+            val items = searchModuleTestSongs(query)
             _found.value = items
             _searching.value = false
         }

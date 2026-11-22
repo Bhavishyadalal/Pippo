@@ -124,4 +124,16 @@
     <string name="onb_auto_crossfade_desc">Automatically crossfades, analysing the pitch, tempo and more to pick the perfect moment</string>
     <string name="onb_ai_filter_title">AI Artist filter</string>
     <string name="onb_ai_filter_desc">Turning this off may give you AI slop recommendations</string>
+    <string name="onb_modules_title">Set up music modules</string>
+    <string name="onb_modules_subtitle">Try a song and see which sources find it. A source can still work for other songs, so its switch is always up to you.</string>
+    <string name="onb_modules_fetch">Fetch song</string>
+    <string name="onb_modules_ready">Ready to check</string>
+    <string name="onb_modules_off">Off</string>
+    <string name="onb_modules_fetching">Checking this song…</string>
+    <string name="onb_modules_found">Stream found · %1$s</string>
+    <string name="onb_modules_no_match">No match for this song</string>
+    <string name="onb_modules_timeout">Took too long to respond</string>
+    <string name="onb_modules_unsupported">Stream format unavailable on this device</string>
+    <string name="onb_modules_unavailable">Couldn’t fetch this song</string>
+    <string name="onb_modules_no_results">No results. Try another title or artist.</string>
 </resources>
