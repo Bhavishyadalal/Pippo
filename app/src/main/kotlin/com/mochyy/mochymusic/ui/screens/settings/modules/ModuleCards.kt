@@ -114,7 +114,7 @@ internal fun InfoCard(entry: ModuleEntry, onRaise: () -> Unit) {
     val info = entry.module.info
     val added = entry.addedAt?.let { DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(it)) }
     val source = when (val origin = entry.origin) {
-        ModuleOrigin.BuiltIn -> stringResource(R.string.module_info_built_in)
+        ModuleOrigin.BuiltIn, is ModuleOrigin.BundledWeb -> stringResource(R.string.module_info_built_in)
         is ModuleOrigin.App -> origin.packageName
         is ModuleOrigin.Web -> origin.base.substringAfter("://")
         is ModuleOrigin.File -> origin.fileName
@@ -137,7 +137,7 @@ internal fun InfoCard(entry: ModuleEntry, onRaise: () -> Unit) {
 /** Uses the page's existing card and pill treatment; no browser or network request is needed. */
 @Composable
 private fun ModuleCopyUrl(entry: ModuleEntry) {
-    val url = moduleCopyLink(entry.id, entry.source?.link, (entry.origin as? ModuleOrigin.Web)?.base,
+    val url = moduleCopyLink(entry.id, (entry.origin as? ModuleOrigin.BundledWeb)?.manifestUrl ?: entry.source?.link, (entry.origin as? ModuleOrigin.Web)?.base,
         (entry.module as? ServerListModule)?.servers.orEmpty().map { it.url }, entry.module.info.sourceUrl ?: entry.module.signIn?.startUrl) ?: return
     val context = LocalContext.current
     Spacer(Modifier.height(12.dp))

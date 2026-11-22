@@ -13,6 +13,7 @@ import com.mochyy.mochymusic.module.StreamFormat
 import com.mochyy.mochymusic.module.TrackMatcher
 import com.mochyy.mochymusic.module.TrackQuery
 import com.mochyy.mochymusic.module.applemusic.AppleMusicModule
+import com.mochyy.mochymusic.module.jiosaavn.JioSaavnModule
 import com.mochyy.mochymusic.module.monochrome.MonochromeModule
 import com.mochyy.mochymusic.utils.DataSaver
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -58,11 +59,11 @@ class SourceModules @Inject constructor(
         if (!prefs.getBoolean("order_monochrome_first", false)) {
             saved = listOf(MonochromeModule.Id) + saved.filter { it != MonochromeModule.Id }
             prefs.edit {
-                putString("provider_order", (saved + KnownOrder).distinct().joinToString(","))
+                putString("provider_order", withBundledSources(saved).joinToString(","))
                 putBoolean("order_monochrome_first", true)
             }
         }
-        return (saved + KnownOrder).distinct()
+        return withBundledSources(saved)
     }
 
     fun setOrder(ids: List<String>) {
@@ -81,7 +82,7 @@ class SourceModules @Inject constructor(
 
     private fun readDownloadOrder(): List<String> {
         val saved = prefs.getString("download_order", null)?.split(',')?.filter { it.isNotBlank() }
-        if (saved != null) return (saved + KnownOrder).distinct()
+        if (saved != null) return withBundledSources(saved)
         val copy = _order.value
         prefs.edit { putString("download_order", copy.joinToString(",")) }
         return copy
@@ -263,7 +264,7 @@ class SourceModules @Inject constructor(
     fun setEnabled(id: String, enabled: Boolean) {
         registry.setEnabled(id, enabled)
         if (id == YouTubeId) _youTubeEnabled.value = enabled
-        refresh()
+        refreshOrders()
     }
 
     fun picks(id: String): Map<String, String> = registry.picks(id)
@@ -294,6 +295,10 @@ class SourceModules @Inject constructor(
 
     fun refresh() {
         registry.refresh()
+        refreshOrders()
+    }
+
+    private fun refreshOrders() {
         val installed = registry.all().filter { ModuleFeature.AudioSource in it.adds }.map { it.info.id }
         slotIn(installed, _order.value, ::setOrder)
         slotIn(installed, _downloadOrder.value, ::setDownloadOrder)
@@ -305,6 +310,13 @@ class SourceModules @Inject constructor(
         if (missing.isEmpty()) return
         val at = current.indexOf(YouTubeId).let { if (it < 0) current.size else it }
         save(current.take(at) + missing + current.drop(at))
+    }
+
+    private fun withBundledSources(saved: List<String>): List<String> {
+        val order = (saved + KnownOrder).distinct()
+        val bundled = BundledAudioModules.ids + JioSaavnModule.Id
+        val at = order.indexOf(YouTubeId)
+        return order.take(at) + bundled.filter { it !in order } + order.drop(at)
     }
 
     companion object {

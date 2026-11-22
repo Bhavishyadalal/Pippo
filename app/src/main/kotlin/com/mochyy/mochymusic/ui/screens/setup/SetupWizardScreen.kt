@@ -63,6 +63,7 @@ import com.mochyy.mochymusic.ui.screens.setup.onboarding.HelloCardStep
 import com.mochyy.mochymusic.ui.screens.setup.onboarding.ImportAskPage
 import com.mochyy.mochymusic.ui.screens.setup.onboarding.ImportModePage
 import com.mochyy.mochymusic.ui.screens.setup.onboarding.LastOnePage
+import com.mochyy.mochymusic.ui.screens.setup.onboarding.ModulesSetupPage
 import com.mochyy.mochymusic.ui.screens.setup.onboarding.Onb
 import com.mochyy.mochymusic.ui.screens.setup.onboarding.OnboardingBrowserSheet
 import com.mochyy.mochymusic.ui.screens.setup.onboarding.ProfilePage
@@ -85,7 +86,7 @@ import com.mochyy.mochymusic.ui.component.backdropClick
 
 private enum class Step {
     Welcome, ImportAsk, ImportMode, Restoring, Providers, ProviderSetup, WhatToSync, SyncOptions,
-    Profile, Hello, BlurWarning, LastOne, Done,
+    Modules, Profile, Hello, BlurWarning, LastOne, Done,
 }
 
 /** pages that play once and move on by themselves, back never returns to them */
@@ -138,7 +139,7 @@ fun SetupWizardScreen(
             scope.launch {
                 val error = vm.importBackup(uri)
                 backupError = error
-                if (error == null) go(Step.Profile)
+                if (error == null) go(Step.Modules)
             }
         }
     }
@@ -247,7 +248,7 @@ fun SetupWizardScreen(
         val parsed = readyImport ?: return@LaunchedEffect
         vm.startImport(parsed)
         session?.consumeReady()
-        go(Step.Profile)
+        go(Step.Modules)
     }
 
     // the account's own name and picture start the profile, once
@@ -339,7 +340,7 @@ fun SetupWizardScreen(
 
                         Step.ImportAsk -> ImportAskPage(
                             onYes = { go(Step.ImportMode) },
-                            onSkip = { go(Step.Profile) },
+                            onSkip = { go(Step.Modules) },
                         )
 
                         Step.ImportMode -> ImportModePage(
@@ -404,11 +405,13 @@ fun SetupWizardScreen(
                                 // synced playlists come in through sync itself, linked rather than copied
                                 val selected = (sessionState as? AccountImportState.Choosing)?.selected.orEmpty()
                                 vm.startYouTubeSync(selected, likedId = "LM", choices = syncChoices)
-                                go(Step.Profile)
+                                go(Step.Modules)
                             },
                             onJustImport = { session?.readSelected() },
                             onBack = { if (sessionState is AccountImportState.Reading) session?.cancelReading() else back() },
                         )
+
+                        Step.Modules -> ModulesSetupPage(active = step == Step.Modules, onContinue = { go(Step.Profile) })
 
                         Step.Profile -> ProfilePage(
                             username = username,
