@@ -147,7 +147,7 @@ object TransferRestore {
         }
     }
 
-    private fun isMainProcess(context: Context): Boolean {
+    internal fun isMainProcess(context: Context): Boolean {
         val name = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             Application.getProcessName()
         } else {

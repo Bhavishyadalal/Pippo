@@ -17,7 +17,6 @@ import com.mochyy.mochymusic.playback.StoredKind
 import com.mochyy.mochymusic.utils.dataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.withContext
@@ -46,7 +45,7 @@ class TransferExporter @Inject constructor(
         if (!running.tryLock()) return@withContext Result.failure(TransferException("An export is already running."))
         val work = File(context.cacheDir, "transfer_export").apply { deleteRecursively(); mkdirs() }
         try {
-            runCatching { withDownloadsPaused { pack(target, work, onProgress) } }
+            runCatching { downloadUtil.withDownloadFilesPaused { pack(target, work, onProgress) } }
                 .onSuccess { markExported(context) }
                 .recoverCatching { throw if (it is TransferException) it else TransferException("Couldn't export. Make sure there's free space and try again.", it) }
         } finally {
@@ -103,18 +102,6 @@ class TransferExporter @Inject constructor(
         }
         onProgress(1f)
         return manifest
-    }
-
-    // downloads keep writing into the download folder, so they wait while it's copied and carry on after
-    private suspend fun <T> withDownloadsPaused(block: suspend () -> T): T {
-        val manager = downloadUtil.downloadManager
-        val wasPaused = withContext(Dispatchers.Main) { manager.downloadsPaused.also { manager.pauseDownloads() } }
-        if (!wasPaused) delay(400)
-        try {
-            return block()
-        } finally {
-            if (!wasPaused) withContext(Dispatchers.Main) { manager.resumeDownloads() }
-        }
     }
 
     // the streaming cache stays behind, so its tables in media3's database go too

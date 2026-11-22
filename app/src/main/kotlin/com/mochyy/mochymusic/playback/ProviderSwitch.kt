@@ -69,7 +69,7 @@ sealed interface ProviderSwitchState {
 /** Resolves the latest choice in the background before handing off the current queue entry. */
 class ProviderSwitch(private val scope: () -> CoroutineScope, private val host: Host) {
 
-    data class Target(val mediaId: String, val index: Int, val occurrence: Long)
+    data class Target(val mediaId: String, val occurrence: Long)
 
     sealed interface Resolution {
         data class Found(val route: ForcedRoute) : Resolution
