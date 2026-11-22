@@ -57,7 +57,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.core.content.ContextCompat
 import androidx.navigation.NavController
 import coil3.compose.AsyncImage
 import com.mochyy.mochymusic.LocalPlayerAwareWindowInsets
@@ -172,11 +171,7 @@ fun CommitScreen(
                             CommitItem(
                                 commit = commit,
                                 onClick = {
-                                    ContextCompat.startActivity(
-                                        context,
-                                        Intent(Intent.ACTION_VIEW, Uri.parse(commit.htmlUrl)),
-                                        null
-                                    )
+                                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(commit.htmlUrl)))
                                 }
                             )
                             if (index < commits.lastIndex) {

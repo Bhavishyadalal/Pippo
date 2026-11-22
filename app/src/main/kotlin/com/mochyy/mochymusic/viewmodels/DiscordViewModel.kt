@@ -19,7 +19,6 @@ import com.mochyy.mochymusic.utils.PreferencesCache
 import com.mochyy.mochymusic.utils.dataStore
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -82,6 +81,6 @@ class DiscordViewModel @Inject constructor(
 
     /** finishes even if the user leaves the page straight away, so Discord forgets the token too */
     fun logOut() {
-        viewModelScope.launch(NonCancellable) { auth.logOut() }
+        auth.logOut()
     }
 }

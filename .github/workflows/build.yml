@@ -18,7 +18,7 @@ jobs:
           distribution: 'temurin'
 
       - name: Set Up Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
         with:
           cache-disabled: true
 
@@ -46,10 +46,10 @@ jobs:
           LIBREFM_SECRET: ${{ secrets.LIBREFM_SECRET }}
           DISCORD_CLIENT_ID: ${{ secrets.DISCORD_CLIENT_ID }}
         run: |
-          ./gradlew assembleUniversalGmsDebug --no-configuration-cache --console=plain --warning-mode summary
+          ./gradlew assembleUniversalGmsDebug -PpippoBuildAbi=universal --no-configuration-cache --console=plain --warning-mode summary
 
       - name: Upload Debug APK
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: app-universal-gms-debug
           path: app/build/outputs/apk/universalGms/debug/*.apk

@@ -129,7 +129,7 @@ fun LyricsReadings(
                     isVideo = metadata.isVideoSong,
                     lines = lines,
                     targetLanguage = target,
-                    matchAudio = { videoId -> playerConnection?.service?.matchSongToVideo(metadata.id, videoId) },
+                    matchAudio = { videoId -> playerConnection.service.matchSongToVideo(metadata.id, videoId) },
                 ),
                 lyricsEntity = latestLyricsEntity,
                 mode = translateMode,

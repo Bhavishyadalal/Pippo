@@ -216,16 +216,18 @@ class DiscordAuth @Inject constructor(
             .onSuccess { profile -> context.dataStore.edit { it[DiscordProfileKey] = profile.toJson() } }
     }
 
-    /** Signs out here and tells Discord to forget the token too. */
-    suspend fun logOut() {
-        val token = context.dataStore.data.first()[DiscordAccessTokenKey]
-        signOutHere()
-        if (token != null) {
-            runCatching {
-                DiscordHttp.postForm(
-                    "/oauth2/token/revoke",
-                    mapOf("client_id" to ClientId, "token" to token, "token_type_hint" to "access_token"),
-                )
+    /** Finishes signing out even when the settings screen is closed. */
+    fun logOut() {
+        scope.launch {
+            val token = context.dataStore.data.first()[DiscordAccessTokenKey]
+            signOutHere()
+            if (token != null) {
+                runCatching {
+                    DiscordHttp.postForm(
+                        "/oauth2/token/revoke",
+                        mapOf("client_id" to ClientId, "token" to token, "token_type_hint" to "access_token"),
+                    )
+                }
             }
         }
     }
