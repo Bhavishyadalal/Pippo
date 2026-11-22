@@ -623,8 +623,8 @@ fun MoodTile(
     val tileBrush = remember(tint, tileColor) {
         Brush.linearGradient(
             colors = listOf(
-                blendOver(tint.copy(alpha = 0.55f), tileColor),
-                blendOver(tint.copy(alpha = 0.16f), tileColor),
+                blendOver(tint.copy(alpha = 0.30f), tileColor),
+                blendOver(tint.copy(alpha = 0.10f), tileColor),
             )
         )
     }
@@ -758,7 +758,7 @@ private fun moodTint(stripeColor: Long): Color {
     val r = ((argb shr 16) and 0xFF)
     val g = ((argb shr 8) and 0xFF)
     val b = (argb and 0xFF)
-    if (r == 0 && g == 0 && b == 0) return Color(0xFF3A3A44)
+    if (r == 0 && g == 0 && b == 0) return PippoColors.SurfaceHighest
     val lift = { c: Int -> (c + (170 - c) * 0.45f).toInt().coerceIn(40, 220) }
     return Color(lift(r), lift(g), lift(b))
 }

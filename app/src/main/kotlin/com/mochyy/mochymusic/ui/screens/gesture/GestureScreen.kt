@@ -2,6 +2,8 @@
 
 package com.mochyy.mochymusic.ui.screens.gesture
 
+import com.mochyy.mochymusic.ui.theme.LocalPureBlack
+import com.mochyy.mochymusic.ui.theme.PippoColors
 import android.widget.Toast
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
@@ -164,13 +166,13 @@ fun CustomisationScreen(navController: NavController) {
     // nothing stays pinned over this page, so a highlighted section lands just under the status bar
     val settingsScroll = remember(scroll, statusTop) { SettingsScroll(scroll, statusTop + 16.dp) }
 
-    // a plain black page like the mock: back button, the title, the search, then the cards
+    // Match the settings page surface, including the current AMOLED preference.
     CompositionLocalProvider(LocalSettingsScroll provides settingsScroll) {
         Box(
             contentAlignment = Alignment.TopCenter,
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black)
+                .background(PippoColors.page(LocalPureBlack.current))
                 .verticalScroll(scroll),
         ) {
             Column(
