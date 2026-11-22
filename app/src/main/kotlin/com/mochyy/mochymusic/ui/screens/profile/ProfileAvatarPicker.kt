@@ -12,7 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
@@ -49,8 +49,9 @@ internal fun ProfileAvatarPicker(
 ) {
     val context = LocalContext.current
     val selected = remember(context, photo) { ProfileAvatars.selectedIndex(context, photo) }
-    val pictures = remember { ProfileAvatars.pictures.toList() }
-    val scroll = rememberLazyListState(initialFirstVisibleItemIndex = ((selected ?: 0) - 1).coerceAtLeast(0))
+    val order = ProfileAvatars.displayOrder
+    val firstVisible = selected?.let(order::indexOf)?.let { (it - 1).coerceAtLeast(0) } ?: 0
+    val scroll = rememberLazyListState(initialFirstVisibleItemIndex = firstVisible)
     val accent = Color(0xFFF6CBDC)
     Column(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(Color(0xFF29262C)),
@@ -77,9 +78,11 @@ internal fun ProfileAvatarPicker(
             contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            itemsIndexed(pictures, key = { _, drawable -> drawable }) { index, drawable ->
+            items(order, key = { it }) { index ->
+                val drawable = ProfileAvatars.pictures[index]
                 val active = selected == index
-                val label = stringResource(R.string.pippo_avatar_choice, index + 1)
+                val label = ProfileAvatars.label(index)?.let { stringResource(it) }
+                    ?: stringResource(R.string.pippo_avatar_choice, index + 1)
                 Box(
                     Modifier.size(62.dp)
                         .clip(CircleShape)
