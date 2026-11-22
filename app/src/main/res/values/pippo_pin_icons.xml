@@ -11,6 +11,20 @@
     <string name="pippo_pin_08_blue_sketch_note_label">Blue Sketch Note</string>
     <string name="pippo_pin_09_lilac_note_label">Lilac Note</string>
     <string name="pippo_pin_10_lilac_stars_label">Lilac Stars</string>
+    <string name="pippo_pin_11_strawberry_green_label">Strawberry Green</string>
+    <string name="pippo_pin_12_woodland_note_label">Woodland Note</string>
+    <string name="pippo_pin_13_stardust_cat_label">Stardust Cat</string>
+    <string name="pippo_pin_14_coral_headphones_label">Coral Headphones</string>
+    <string name="pippo_pin_15_neon_shades_label">Neon Shades</string>
+    <string name="pippo_pin_16_green_crayon_label">Green Crayon</string>
+    <string name="pippo_pin_17_midnight_headphones_label">Midnight Headphones</string>
+    <string name="pippo_pin_18_mossy_cat_label">Mossy Cat</string>
+    <string name="pippo_pin_19_cloud_headphones_label">Cloud Headphones</string>
+    <string name="pippo_pin_20_ink_headphones_label">Ink Headphones</string>
+    <string name="pippo_pin_21_candy_web_label">Candy Web</string>
+    <string name="pippo_pin_22_suit_and_shades_label">Suit And Shades</string>
+    <string name="pippo_pin_23_arcade_vampire_label">Arcade Vampire</string>
+    <string name="pippo_pin_24_rooftop_toast_label">Rooftop Toast</string>
 
     <style name="Theme.App.Starting.Pin01" parent="Theme.App.Starting">
         <item name="windowSplashScreenAnimatedIcon">@mipmap/pippo_pin_01_midnight_stars</item>
@@ -41,5 +55,47 @@
     </style>
     <style name="Theme.App.Starting.Pin10" parent="Theme.App.Starting">
         <item name="windowSplashScreenAnimatedIcon">@mipmap/pippo_pin_10_lilac_stars</item>
+    </style>
+    <style name="Theme.App.Starting.Pin11" parent="Theme.App.Starting">
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/pippo_pin_11_strawberry_green</item>
+    </style>
+    <style name="Theme.App.Starting.Pin12" parent="Theme.App.Starting">
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/pippo_pin_12_woodland_note</item>
+    </style>
+    <style name="Theme.App.Starting.Pin13" parent="Theme.App.Starting">
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/pippo_pin_13_stardust_cat</item>
+    </style>
+    <style name="Theme.App.Starting.Pin14" parent="Theme.App.Starting">
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/pippo_pin_14_coral_headphones</item>
+    </style>
+    <style name="Theme.App.Starting.Pin15" parent="Theme.App.Starting">
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/pippo_pin_15_neon_shades</item>
+    </style>
+    <style name="Theme.App.Starting.Pin16" parent="Theme.App.Starting">
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/pippo_pin_16_green_crayon</item>
+    </style>
+    <style name="Theme.App.Starting.Pin17" parent="Theme.App.Starting">
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/pippo_pin_17_midnight_headphones</item>
+    </style>
+    <style name="Theme.App.Starting.Pin18" parent="Theme.App.Starting">
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/pippo_pin_18_mossy_cat</item>
+    </style>
+    <style name="Theme.App.Starting.Pin19" parent="Theme.App.Starting">
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/pippo_pin_19_cloud_headphones</item>
+    </style>
+    <style name="Theme.App.Starting.Pin20" parent="Theme.App.Starting">
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/pippo_pin_20_ink_headphones</item>
+    </style>
+    <style name="Theme.App.Starting.Pin21" parent="Theme.App.Starting">
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/pippo_pin_21_candy_web</item>
+    </style>
+    <style name="Theme.App.Starting.Pin22" parent="Theme.App.Starting">
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/pippo_pin_22_suit_and_shades</item>
+    </style>
+    <style name="Theme.App.Starting.Pin23" parent="Theme.App.Starting">
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/pippo_pin_23_arcade_vampire</item>
+    </style>
+    <style name="Theme.App.Starting.Pin24" parent="Theme.App.Starting">
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/pippo_pin_24_rooftop_toast</item>
     </style>
 </resources>
