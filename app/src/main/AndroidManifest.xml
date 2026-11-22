@@ -311,6 +311,132 @@
             </intent-filter>
             <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
         </activity-alias>
+        <activity-alias android:name=".PippoPin11" android:enabled="false" android:exported="true"
+            android:icon="@mipmap/pippo_pin_11_strawberry_green" android:roundIcon="@mipmap/pippo_pin_11_strawberry_green"
+            android:label="@string/app_name" android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
+        </activity-alias>
+        <activity-alias android:name=".PippoPin12" android:enabled="false" android:exported="true"
+            android:icon="@mipmap/pippo_pin_12_woodland_note" android:roundIcon="@mipmap/pippo_pin_12_woodland_note"
+            android:label="@string/app_name" android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
+        </activity-alias>
+        <activity-alias android:name=".PippoPin13" android:enabled="false" android:exported="true"
+            android:icon="@mipmap/pippo_pin_13_stardust_cat" android:roundIcon="@mipmap/pippo_pin_13_stardust_cat"
+            android:label="@string/app_name" android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
+        </activity-alias>
+        <activity-alias android:name=".PippoPin14" android:enabled="false" android:exported="true"
+            android:icon="@mipmap/pippo_pin_14_coral_headphones" android:roundIcon="@mipmap/pippo_pin_14_coral_headphones"
+            android:label="@string/app_name" android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
+        </activity-alias>
+        <activity-alias android:name=".PippoPin15" android:enabled="false" android:exported="true"
+            android:icon="@mipmap/pippo_pin_15_neon_shades" android:roundIcon="@mipmap/pippo_pin_15_neon_shades"
+            android:label="@string/app_name" android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
+        </activity-alias>
+        <activity-alias android:name=".PippoPin16" android:enabled="false" android:exported="true"
+            android:icon="@mipmap/pippo_pin_16_green_crayon" android:roundIcon="@mipmap/pippo_pin_16_green_crayon"
+            android:label="@string/app_name" android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
+        </activity-alias>
+        <activity-alias android:name=".PippoPin17" android:enabled="false" android:exported="true"
+            android:icon="@mipmap/pippo_pin_17_midnight_headphones" android:roundIcon="@mipmap/pippo_pin_17_midnight_headphones"
+            android:label="@string/app_name" android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
+        </activity-alias>
+        <activity-alias android:name=".PippoPin18" android:enabled="false" android:exported="true"
+            android:icon="@mipmap/pippo_pin_18_mossy_cat" android:roundIcon="@mipmap/pippo_pin_18_mossy_cat"
+            android:label="@string/app_name" android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
+        </activity-alias>
+        <activity-alias android:name=".PippoPin19" android:enabled="false" android:exported="true"
+            android:icon="@mipmap/pippo_pin_19_cloud_headphones" android:roundIcon="@mipmap/pippo_pin_19_cloud_headphones"
+            android:label="@string/app_name" android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
+        </activity-alias>
+        <activity-alias android:name=".PippoPin20" android:enabled="false" android:exported="true"
+            android:icon="@mipmap/pippo_pin_20_ink_headphones" android:roundIcon="@mipmap/pippo_pin_20_ink_headphones"
+            android:label="@string/app_name" android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
+        </activity-alias>
+        <activity-alias android:name=".PippoPin21" android:enabled="false" android:exported="true"
+            android:icon="@mipmap/pippo_pin_21_candy_web" android:roundIcon="@mipmap/pippo_pin_21_candy_web"
+            android:label="@string/app_name" android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
+        </activity-alias>
+        <activity-alias android:name=".PippoPin22" android:enabled="false" android:exported="true"
+            android:icon="@mipmap/pippo_pin_22_suit_and_shades" android:roundIcon="@mipmap/pippo_pin_22_suit_and_shades"
+            android:label="@string/app_name" android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
+        </activity-alias>
+        <activity-alias android:name=".PippoPin23" android:enabled="false" android:exported="true"
+            android:icon="@mipmap/pippo_pin_23_arcade_vampire" android:roundIcon="@mipmap/pippo_pin_23_arcade_vampire"
+            android:label="@string/app_name" android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
+        </activity-alias>
+        <activity-alias android:name=".PippoPin24" android:enabled="false" android:exported="true"
+            android:icon="@mipmap/pippo_pin_24_rooftop_toast" android:roundIcon="@mipmap/pippo_pin_24_rooftop_toast"
+            android:label="@string/app_name" android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
+        </activity-alias>
         <activity-alias android:name=".PippoMaster01CobaltWax" android:enabled="false" android:exported="true"
             android:icon="@mipmap/pippo_master_01_cobalt_wax" android:roundIcon="@mipmap/pippo_master_01_cobalt_wax"
             android:label="@string/app_name" android:targetActivity=".MainActivity">
