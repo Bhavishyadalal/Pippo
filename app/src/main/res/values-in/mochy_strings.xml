@@ -578,8 +578,6 @@
     <string name="crossfade_duration">Durasi crossfade</string>
     <string name="crossfade_gapless">Nonaktifkan untuk album tanpa jeda</string>
     <string name="crossfade_gapless_desc">Jangan crossfade jika album tanpa jeda</string>
-    <string name="crossfade_beta_title">Fitur Beta</string>
-    <string name="crossfade_beta_message">Crossfade adalah fitur baru dan mungkin memiliki bug. Jika Anda mengalami masalah, silakan laporkan.\n\nFitur ini menonaktifkan offload audio karena keterbatasan teknis.</string>
     <string name="audio_offload_disabled_by_crossfade">Dinonaktifkan karena Crossfade aktif</string>
     <string name="hide_youtube_shorts">Sembunyikan YouTube Shorts</string>
     <string name="listen_together_in_top_bar">Listen Together di bilah atas</string>

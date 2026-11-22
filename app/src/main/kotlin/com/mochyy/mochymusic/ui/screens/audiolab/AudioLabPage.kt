@@ -89,7 +89,7 @@ class LabTitle(
     val firstDim: Boolean = false,
     /** the second line greyed, as under dac's stuff */
     val secondDim: Boolean = false,
-    /** a small outlined tag after the second line, like dac's stuff's beta */
+    /** An outlined tag after the second line. */
     val secondBadge: String? = null,
 )
 

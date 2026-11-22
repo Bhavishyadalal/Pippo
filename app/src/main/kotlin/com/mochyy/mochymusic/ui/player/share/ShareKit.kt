@@ -1,6 +1,6 @@
 // ShareKit.kt
 //
-// The small pieces every lyrics share sheet uses: the big title with its BETA tag, the picker
+// The small pieces every lyrics share sheet uses: the big title, the picker
 // row's look (shared with the flying line so it lands on exactly that), and the shake for a tap
 // that can't do anything.
 
@@ -10,13 +10,9 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -29,7 +25,6 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.mochyy.mochymusic.ui.component.BetaBadge
 import com.mochyy.mochymusic.ui.player.menu.MenuRowSurface
 import com.mochyy.mochymusic.ui.theme.InterFontFamily
 import kotlinx.coroutines.CoroutineScope
@@ -41,7 +36,7 @@ internal val ShareMuted = Color(0xFF9A9AA0)
 internal val ShareRowCorner = 16.dp
 internal val ShareRowPadH = 16.dp
 internal val ShareRowFontSize = 15.sp
-internal val ShareRowTextStyle = TextStyle(
+internal val ShareRowTextStyle get() = TextStyle(
     fontFamily = InterFontFamily,
     fontWeight = FontWeight.SemiBold,
     fontSize = ShareRowFontSize,
@@ -94,25 +89,18 @@ internal fun DrawScope.drawShareRowLook(
 internal fun ShareTitle(
     title: String,
     subtitle: String? = null,
-    beta: Boolean = false,
     // a live line under the title instead of the fixed subtitle, for editors whose hint changes
     subtitleSlot: (@Composable () -> Unit)? = null,
 ) {
     Column(Modifier.padding(top = 6.dp, bottom = 14.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                title,
-                fontFamily = InterFontFamily,
-                fontWeight = FontWeight.Bold,
-                fontSize = 34.sp,
-                letterSpacing = (-1.6).sp,
-                color = Color.White,
-            )
-            if (beta) {
-                Spacer(Modifier.width(12.dp))
-                BetaBadge()
-            }
-        }
+        Text(
+            title,
+            fontFamily = InterFontFamily,
+            fontWeight = FontWeight.Bold,
+            fontSize = 34.sp,
+            letterSpacing = (-1.6).sp,
+            color = Color.White,
+        )
         if (subtitleSlot != null) {
             subtitleSlot()
         } else if (subtitle != null) {

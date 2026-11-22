@@ -287,8 +287,6 @@
     <string name="crossfade_duration">Durée du fondu enchaîné</string>
     <string name="crossfade_gapless">Désactiver pour les albums sans interruption</string>
     <string name="crossfade_gapless_desc">Ne pas effectuer de fondu enchaîné si l\'album est sans interruption</string>
-    <string name="crossfade_beta_title">Fonctionnalité Bêta</string>
-    <string name="crossfade_beta_message">Le fondu enchaîné est une nouvelle fonctionnalité qui peut présenter des bugs. Si vous rencontrez des problèmes, veuillez les signaler. \n\nCette fonctionnalité désactive le déchargement audio en raison de limitations techniques.</string>
 
     <!-- Romanization Settings -->
     <string name="lyrics_romanization_cyrillic">Cyrillique</string>

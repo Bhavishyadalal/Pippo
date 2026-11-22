@@ -122,7 +122,7 @@
     <string name="clear_song_cache_dialog">Czy na pewno chcesz wyczyścić wszystkie utwory z pamięci podręcznej?</string>
     <string name="pause_remote_listen_history">Wstrzymaj udostępnianie historii odsłuchiwania w YouTube Music</string>
     <string name="show_cached_playlist">Pokaż listę odtwarzania z pamięci podręcznej</string>
-    <string name="audio_quality_max">Maksymalna jakość (beta)</string>
+    <string name="audio_quality_max">Maksymalna jakość</string>
     <string name="not_logged_in_youtube">Niezalogowany do YouTube</string>
     <string name="default_links">Otwórz obsługiwane linki</string>
     <string name="open_app_settings_error">Nie można otworzyć ustawień aplikacji</string>

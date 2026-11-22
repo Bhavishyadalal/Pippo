@@ -28,7 +28,7 @@
     <string name="configure_app_language">Настроить язык приложения</string>
     <string name="open_supported_links">Открывать поддерживаемые ссылки по умолчанию</string>
     <string name="configure_supported_links">Настроить поддерживаемые ссылки</string>
-    <string name="audio_quality_max">Максимальное (бета)</string>
+    <string name="audio_quality_max">Максимальное</string>
     <string name="enable_similar_content">Включить похожий контент</string>
     <string name="similar_content_desc">Автоматически добавлять больше похожих треков при достижении конца очереди</string>
     <string name="min_playback_duration_title">Минимальная длительность воспроизведения</string>
@@ -588,8 +588,6 @@
     <string name="crossfade_duration">Длительность кроссфейда</string>
     <string name="crossfade_gapless">Отключать для альбомов без пауз</string>
     <string name="crossfade_gapless_desc">Не применять кроссфейд, если альбом воспроизводится без пауз</string>
-    <string name="crossfade_beta_title">Бета-функция</string>
-    <string name="crossfade_beta_message">Кроссфейд - новая функция, которая может работать нестабильно. Пожалуйста, сообщите нам, если столкнётесь с ошибками.\n\nЭта функция отключает аппаратное ускорение аудио из-за технических ограничений.</string>
     <string name="audio_offload_disabled_by_crossfade">Отключено, так как включён кроссфейд</string>
     <string name="hide_youtube_shorts">Скрыть YouTube Shorts</string>
     <string name="listen_together_in_top_bar">Совместное прослушивание в верхней панели</string>

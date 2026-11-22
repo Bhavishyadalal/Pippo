@@ -48,7 +48,6 @@ import androidx.navigation.NavController
 import com.mochyy.mochymusic.R
 import com.mochyy.mochymusic.modules.ModuleEntry
 import com.mochyy.mochymusic.ui.component.ActionPromptDialog
-import com.mochyy.mochymusic.ui.component.BetaBadge
 import com.mochyy.mochymusic.ui.component.LocalZoomOutOverlayState
 import com.mochyy.mochymusic.ui.component.SubSettingsScaffold
 import com.mochyy.mochymusic.ui.screens.audiolab.LabColors
@@ -83,7 +82,6 @@ fun ModulesScreen(navController: NavController, viewModel: ModulesViewModel = hi
     SubSettingsScaffold(
         title = stringResource(R.string.settings_modules_category),
         onBack = { navController.navigateUp() },
-        titleBadge = { BetaBadge() },
     ) {
 
         Spacer(Modifier.height(14.dp))

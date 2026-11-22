@@ -86,7 +86,7 @@ private const val DefaultBlurStrength = 25f
 private val BlurPreviewWidth = 104.dp
 
 private val PillShape = RoundedCornerShape(14.dp)
-private val PillTextStyle = TextStyle(
+private val PillTextStyle get() = TextStyle(
     fontFamily = InterFontFamily,
     fontWeight = FontWeight.SemiBold,
     fontSize = 11.sp,

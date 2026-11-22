@@ -93,7 +93,7 @@ import com.mochyy.mochymusic.core.updater.installApk
 import com.mochyy.mochymusic.core.updater.isDownloaded
 import com.mochyy.mochymusic.core.updater.isNewerThanInstalled
 import com.mochyy.mochymusic.core.updater.parseFullVersion
-import com.mochyy.mochymusic.ui.component.BetaBadge
+import com.mochyy.mochymusic.ui.component.ReleaseChannelBadge
 import com.mochyy.mochymusic.ui.component.PopupSheetState
 import com.mochyy.mochymusic.ui.component.pressBounce
 import com.mochyy.mochymusic.ui.player.menu.MenuRowSurface
@@ -241,7 +241,6 @@ private fun ColumnScope.UpdateSheetContent(
                     fontWeight = FontWeight.Bold,
                     letterSpacing = (-2).sp,
                 )
-                Spacer(Modifier.width(14.dp))
                 ChannelBadge(latestRelease)
             }
 
@@ -316,16 +315,17 @@ private fun ColumnScope.UpdateSheetContent(
     }
 }
 
-/** which channel this build is: nightly says so, newer than any release is beta, the rest is stable */
+/** Show a release channel when the installed build is a nightly or a known stable release. */
 @Composable
 private fun ChannelBadge(latestRelease: GithubRelease?) {
     val aheadOfReleases = latestRelease != null &&
         parseFullVersion(latestRelease.version).copy(buildNumber = 0) < parseFullVersion(BuildConfig.VERSION_NAME).copy(buildNumber = 0)
     val label = when {
         installedIsNightly -> "NIGHTLY"
-        aheadOfReleases -> "BETA"
+        aheadOfReleases -> return
         else -> StableLabel
     }
+    Spacer(Modifier.width(14.dp))
     AnimatedContent(
         targetState = label,
         transitionSpec = {
@@ -334,8 +334,7 @@ private fun ChannelBadge(latestRelease: GithubRelease?) {
         },
         label = "channelBadge",
     ) { text ->
-        // the same outlined tag as every other beta mark in the app, green while this build is stable
-        if (text == StableLabel) BetaBadge(label = text, color = StableGreen) else BetaBadge(label = text)
+        if (text == StableLabel) ReleaseChannelBadge(label = text, color = StableGreen) else ReleaseChannelBadge(label = text)
     }
 }
 

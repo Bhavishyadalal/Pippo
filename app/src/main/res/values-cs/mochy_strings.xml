@@ -110,7 +110,7 @@
     <string name="open_supported_links">Otevírat podporované odkazy</string>
     <string name="configure_supported_links">Nastavit podporované odkazy</string>
     <string name="set_first_lyrics_provider">Preferovaný poskytovatel textů</string>
-    <string name="audio_quality_max">Maximální (beta)</string>
+    <string name="audio_quality_max">Maximální</string>
     <string name="enable_similar_content">Povolit podobný obsah</string>
     <string name="similar_content_desc">Automaticky přidávat další podobné skladby při dosažení konce fronty</string>
     <string name="min_playback_duration_title">Minimální délka přehrávání</string>
@@ -588,8 +588,6 @@
     <string name="crossfade_duration">Trvání prolnutí</string>
     <string name="crossfade_gapless">Zakázat pro alba bez mezer</string>
     <string name="crossfade_gapless_desc">Zakázat, pokud mezi skladbami alba nejsou mezery</string>
-    <string name="crossfade_beta_title">Beta funkce</string>
-    <string name="crossfade_beta_message">Prolnutí je nová funkce, ve které se mohou vyskytnout chyby. Pokud na nějaké narazíte, prosíme nahlaste je.\n\nTato funkce zakáže offload zvuku z důvodu technických omezení.</string>
     <string name="audio_offload_disabled_by_crossfade">Zakázáno z důvodu aktivního prolnutí</string>
     <string name="hide_youtube_shorts">Skrýt YouTube Shorts</string>
     <string name="listen_together_in_top_bar">Společný poslech v horní liště</string>

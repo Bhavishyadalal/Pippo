@@ -149,7 +149,7 @@
     <string name="enable_authentication">Habilitar autentificació</string>
     <string name="discord_use_details">Utilitza els detalls en lloc de l\'estat</string>
     <string name="discord_use_details_description">Mostra el nom de la cançó de manera destacada en lloc dels noms dels artistes</string>
-    <string name="audio_quality_max">Màxima (beta)</string>
+    <string name="audio_quality_max">Màxima</string>
     <string name="enable_similar_content">Habilitar contingut similar</string>
     <string name="similar_content_desc">Afegir automàticament més cançons similars quan s\'aplegue a la fi de la cua</string>
     <string name="min_playback_duration_title">Durada mínima de reproducció</string>
@@ -556,8 +556,6 @@
     <string name="crossfade_duration">Durada de la Transició suau</string>
     <string name="crossfade_gapless">Deshabilita els àlbums sense pauses</string>
     <string name="crossfade_gapless_desc">No aplicar el transaccionat suau si hi ha pauses a l\'album</string>
-    <string name="crossfade_beta_title">Funcionalitat Beta</string>
-    <string name="crossfade_beta_message">El transicionat suau es una nova funcionalitat que pot presentar errors. Si trobes cap problema, per favor, informa\'ns.\n\nAquesta funcionalitat deshabilita la descarrega d\'àudio a causa de limitacions tècniques.</string>
     <string name="audio_offload_disabled_by_crossfade">Deshabilitat per que el transicionat suau està actiu</string>
     <string name="hide_youtube_shorts">Amaga Youtube Shorts</string>
     <string name="listen_together_in_top_bar">Escoltar Junts a la barra superior</string>

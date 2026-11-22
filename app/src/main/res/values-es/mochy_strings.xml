@@ -85,7 +85,7 @@
     <string name="configure_supported_links">Configurar enlaces compatibles</string>
     <string name="intent_supported_links_not_found">No se ha podido encontrar los ajustes de enlaces compatibles, por favor, configúralos manualmente</string>
     <string name="set_first_lyrics_provider">Proveedor de letras preferido</string>
-    <string name="audio_quality_max">Máxima (beta)</string>
+    <string name="audio_quality_max">Máxima</string>
     <string name="enable_similar_content">Habilitar contenido similar</string>
     <string name="similar_content_desc">Añadir automáticamente más canciones similares cuando se alcance el final de la cola</string>
     <string name="min_playback_duration_title">Duración mínima de reproducción</string>
@@ -582,8 +582,6 @@
     <string name="crossfade_duration">Duración de la transición suave</string>
     <string name="crossfade_gapless">Desactivar para álbumes sin pausas</string>
     <string name="crossfade_gapless_desc">No hacer transición suave si el álbum es sin pausas</string>
-    <string name="crossfade_beta_title">Función beta</string>
-    <string name="crossfade_beta_message">La transición suave es una función nueva y puede tener errores. Si experimentas algún problema, por favor repórtalo. \n\nEsta función desactiva la descarga de audio debido a limitaciones técnicas.</string>
     <string name="audio_offload_disabled_by_crossfade">Desactivado porque la transición suave está activa</string>
     <string name="crossfade">Transición suave</string>
     <string name="hide_youtube_shorts">Ocultar YouTube Shorts</string>

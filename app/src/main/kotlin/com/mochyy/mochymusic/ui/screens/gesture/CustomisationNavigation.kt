@@ -148,7 +148,7 @@ internal fun BottomNavigationSection() {
 }
 
 @Composable
-private fun NavigationCard(content: @Composable ColumnScope.() -> Unit) {
+internal fun NavigationCard(content: @Composable ColumnScope.() -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -166,7 +166,7 @@ private fun NavigationCaption(text: String) {
 }
 
 @Composable
-private fun <T : Enum<T>> NavigationChoices(
+internal fun <T : Enum<T>> NavigationChoices(
     options: List<T>,
     selected: T,
     label: (T) -> Int,

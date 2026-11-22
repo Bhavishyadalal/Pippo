@@ -68,7 +68,7 @@ private val MinorTick = 22.dp
 private val HighlightTick = 44.dp
 private val EdgeFade = 40.dp
 
-private val BigLabel = TextStyle(
+private val BigLabel get() = TextStyle(
     fontFamily = InterFontFamily,
     fontWeight = FontWeight.Bold,
     fontSize = 30.sp,

@@ -69,8 +69,6 @@
     <string name="bugs_feedback">Bug dan masukan</string>
     <string name="donate">Donasi</string>
     <string name="support_development">Dukung pengembangan</string>
-    <string name="beta_updates">Pembaruan beta</string>
-    <string name="beta_updates_subtitle">Aktifkan jika Anda ingin menerima pembaruan beta (misalnya b5.0.1)</string>
     <string name="on_latest_version">Anda menggunakan versi terbaru</string>
     <string name="current_version_v">Versi saat ini: %1$s</string>
     <string name="update_to_v">Pembaruan tersedia %1$s</string>
