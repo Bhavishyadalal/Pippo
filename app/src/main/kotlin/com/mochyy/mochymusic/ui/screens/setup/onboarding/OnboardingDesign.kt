@@ -208,6 +208,7 @@ internal fun OnbTextField(
     onValueChange: (String) -> Unit,
     placeholder: String,
     modifier: Modifier = Modifier,
+    placeholderColor: Color = Onb.Faint,
 ) {
     BasicTextField(
         value = value,
@@ -225,7 +226,7 @@ internal fun OnbTextField(
                     .background(Onb.Field)
                     .padding(horizontal = 20.dp, vertical = 14.dp),
             ) {
-                if (value.isEmpty()) Text(placeholder, color = Onb.Faint, fontSize = 16.sp)
+                if (value.isEmpty()) Text(placeholder, color = placeholderColor, fontSize = 16.sp)
                 inner()
             }
         },

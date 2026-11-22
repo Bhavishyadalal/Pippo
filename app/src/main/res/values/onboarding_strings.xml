@@ -127,6 +127,7 @@
     <string name="onb_modules_title">Set up music modules</string>
     <string name="onb_modules_subtitle">Try a song and see which sources find it. A source that misses this song may still work for others.</string>
     <string name="onb_modules_fetch">Fetch song</string>
+    <string name="onb_modules_sources">Music sources</string>
     <string name="onb_modules_ready">Ready to check</string>
     <string name="onb_modules_off">Off</string>
     <string name="onb_modules_enable_on_success">Turns on if this check succeeds</string>
