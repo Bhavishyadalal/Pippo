@@ -154,7 +154,7 @@ internal fun FlagshipLandscape(
     modifier: Modifier = Modifier,
     // the Turntable: its record runs in from the left edge the way the poster's circle does, its arm still the seek bar
     turntable: Boolean = false,
-    fullCoverOverride: Boolean? = null,
+    fullCoverDefault: Boolean = false,
     artworkStrength: Float = 1f,
 ) {
     val connection = LocalPlayerConnection.current ?: return
@@ -166,11 +166,11 @@ internal fun FlagshipLandscape(
     // the tv's "flagship square": the whole cover, square and rounded, instead of one melting down the side
     val tvSquare by com.mochyy.mochymusic.utils.rememberPreference(com.mochyy.mochymusic.constants.TvFlagshipSquareKey, defaultValue = false)
     // set in Settings > Customise > Player: the cover melting in from the left instead of the rounded square
-    val fullCover by com.mochyy.mochymusic.utils.rememberPreference(com.mochyy.mochymusic.constants.LandscapeFullCoverKey, defaultValue = false)
+    val fullCover by com.mochyy.mochymusic.utils.rememberPreference(com.mochyy.mochymusic.constants.LandscapeFullCoverKey, defaultValue = fullCoverDefault)
     val look = when {
         onTv -> if (tvSquare) CoverLook.TV_SQUARE else CoverLook.FULL
         turntable -> CoverLook.RECORD
-        fullCoverOverride ?: fullCover -> CoverLook.FULL
+        fullCover -> CoverLook.FULL
         else -> CoverLook.SQUARE
     }
     // beside the square or the record the seek bar stays over the buttons; with the full cover it moves onto the cover under the lyrics
