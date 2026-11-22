@@ -3,5 +3,13 @@
     <string name="pippo_avatar_picker_title">Profile pictures</string>
     <string name="pippo_avatar_upload">Upload photo</string>
     <string name="pippo_avatar_choice">Profile picture %1$d</string>
+    <string name="pippo_avatar_kitchen_cat">Kitchen Cat</string>
+    <string name="pippo_avatar_sleepy_tabby">Sleepy Tabby</string>
+    <string name="pippo_avatar_lily_pad_tea">Lily Pad Tea</string>
+    <string name="pippo_avatar_book_bunny">Book Bunny</string>
+    <string name="pippo_avatar_meadow_bunny">Meadow Bunny</string>
+    <string name="pippo_avatar_flower_fawn">Flower Fawn</string>
+    <string name="pippo_avatar_snow_penguin">Snow Penguin</string>
+    <string name="pippo_avatar_headphone_portrait">Headphone Portrait</string>
     <string name="pippo_profile_save_failed">Couldn’t save your profile. Try again.</string>
 </resources>

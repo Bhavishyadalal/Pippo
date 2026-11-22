@@ -21,7 +21,24 @@ internal object ProfileAvatars {
         R.drawable.pippo_avatar_41, R.drawable.pippo_avatar_42, R.drawable.pippo_avatar_43, R.drawable.pippo_avatar_44,
         R.drawable.pippo_avatar_45, R.drawable.pippo_avatar_46, R.drawable.pippo_avatar_47, R.drawable.pippo_avatar_48,
         R.drawable.pippo_avatar_49, R.drawable.pippo_avatar_50,
+        R.drawable.pippo_avatar_51, R.drawable.pippo_avatar_52, R.drawable.pippo_avatar_53, R.drawable.pippo_avatar_54,
+        R.drawable.pippo_avatar_55, R.drawable.pippo_avatar_56, R.drawable.pippo_avatar_57, R.drawable.pippo_avatar_58,
     )
+
+    private val cozyStart = pictures.indexOf(R.drawable.pippo_avatar_51)
+    val displayOrder = (cozyStart until pictures.size).toList() + (0 until cozyStart)
+
+    fun label(index: Int): Int? = when (pictures[index]) {
+        R.drawable.pippo_avatar_51 -> R.string.pippo_avatar_kitchen_cat
+        R.drawable.pippo_avatar_52 -> R.string.pippo_avatar_sleepy_tabby
+        R.drawable.pippo_avatar_53 -> R.string.pippo_avatar_lily_pad_tea
+        R.drawable.pippo_avatar_54 -> R.string.pippo_avatar_book_bunny
+        R.drawable.pippo_avatar_55 -> R.string.pippo_avatar_meadow_bunny
+        R.drawable.pippo_avatar_56 -> R.string.pippo_avatar_flower_fawn
+        R.drawable.pippo_avatar_57 -> R.string.pippo_avatar_snow_penguin
+        R.drawable.pippo_avatar_58 -> R.string.pippo_avatar_headphone_portrait
+        else -> null
+    }
 
     fun uri(context: Context, index: Int): Uri =
         Uri.Builder().scheme(ContentResolver.SCHEME_ANDROID_RESOURCE).authority(context.packageName)
