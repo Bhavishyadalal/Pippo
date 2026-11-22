@@ -91,7 +91,7 @@ class PassSink(private val pass: AudioPass) : AudioSink {
         }
         val out = pending!!
         val frameBytes = output.channels * output.bits / 8
-        writtenFrames += output.write(out) / frameBytes
+        writtenFrames += outputCall("USB audio write failed") { output.write(out) } / frameBytes
         if (playing && !transportPlaying) startPlaying(output)
         checkOutputProgress(output, out.hasRemaining())
         if (out.hasRemaining()) return false
@@ -104,7 +104,7 @@ class PassSink(private val pass: AudioPass) : AudioSink {
     }
 
     private fun openTransport(format: Format): PassTransport {
-        val opened = pass.open(format, source, this)
+        val opened = outputCall("Couldn't open the USB audio output") { pass.open(format, source, this) }
         transport = opened
         transportPlaying = false
         exact = true
@@ -113,7 +113,7 @@ class PassSink(private val pass: AudioPass) : AudioSink {
     }
 
     private fun startPlaying(output: PassTransport) {
-        output.play()
+        outputCall("Couldn't start the USB audio output") { output.play() }
         transportPlaying = true
         lastProgressMs = SystemClock.elapsedRealtime()
         nextProgressSampleMs = 0L
@@ -126,19 +126,21 @@ class PassSink(private val pass: AudioPass) : AudioSink {
         val now = SystemClock.elapsedRealtime()
         if (now < nextProgressSampleMs) return
         nextProgressSampleMs = now + 250L
-        val played = try {
-            output.playedFrames()
-        } catch (failure: PassFailure) {
-            throw failure
-        } catch (failure: Exception) {
-            throw PassFailure("Couldn't read USB playback position", failure)
-        }
+        val played = outputCall("Couldn't read USB playback position") { output.playedFrames() }
         if (played != lastPlayedFrames || (!waitingToWrite && played >= writtenFrames)) {
             lastPlayedFrames = played
             lastProgressMs = now
         } else if (now - lastProgressMs >= 3_000L) {
             throw PassFailure("USB audio output did not advance")
         }
+    }
+
+    private inline fun <T> outputCall(message: String, call: () -> T): T = try {
+        call()
+    } catch (failure: PassFailure) {
+        throw failure
+    } catch (failure: Exception) {
+        throw PassFailure(message, failure)
     }
 
     private var scratch: ByteBuffer? = null
@@ -172,7 +174,7 @@ class PassSink(private val pass: AudioPass) : AudioSink {
         val output = transport ?: return
         pending?.let { out ->
             val frameBytes = output.channels * output.bits / 8
-            writtenFrames += output.write(out) / frameBytes
+            writtenFrames += outputCall("USB audio write failed") { output.write(out) } / frameBytes
             if (!out.hasRemaining()) {
                 pendingSource?.let { it.position(it.limit()) }
                 queuedFrames += out.limit() / frameBytes
@@ -191,6 +193,7 @@ class PassSink(private val pass: AudioPass) : AudioSink {
     }
 
     override fun hasPendingData(): Boolean {
+        if (pending != null) return true
         val output = transport ?: return false
         return runCatching { output.playedFrames() < writtenFrames }.getOrDefault(false)
     }

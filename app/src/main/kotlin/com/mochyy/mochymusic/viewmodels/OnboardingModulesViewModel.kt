@@ -55,6 +55,7 @@ class OnboardingModulesViewModel @Inject constructor(
     private val _suggestedSong = MutableStateFlow<SongItem?>(null)
     internal val suggestedSong = _suggestedSong.asStateFlow()
     private var lastSuggestionAttemptMs: Long? = null
+    private var monochromeOptedOut = false
 
     internal suspend fun loadSuggestedSong(): SongItem? = suggestionLock.withLock {
         _suggestedSong.value?.let { return@withLock it }
@@ -76,12 +77,17 @@ class OnboardingModulesViewModel @Inject constructor(
     internal fun showInSetup(entry: ModuleEntry): Boolean =
         entry.adds(ModuleFeature.AudioSource) && (entry.module.signIn == null || entry.account is AccountState.SignedIn)
 
-    internal fun canFetch(entry: ModuleEntry): Boolean = entry.enabled || entry.id == MonochromeModule.Id
+    internal fun canAutoEnable(id: String): Boolean = id == MonochromeModule.Id && !monochromeOptedOut
 
-    fun setEnabled(id: String, enabled: Boolean) = modules.setEnabled(id, enabled)
+    internal fun canFetch(entry: ModuleEntry): Boolean = entry.enabled || canAutoEnable(entry.id)
+
+    fun setEnabled(id: String, enabled: Boolean) {
+        if (id == MonochromeModule.Id) monochromeOptedOut = !enabled
+        modules.setEnabled(id, enabled)
+    }
 
     internal suspend fun fetch(id: String, track: TrackQuery): ModuleFetchResult = lookupSlots.withPermit {
-        val module = modules.module(id)?.takeIf { id == MonochromeModule.Id || modules.isUsable(id) }
+        val module = modules.module(id)?.takeIf { canAutoEnable(id) || modules.isUsable(id) }
             ?: return@withPermit ModuleFetchResult.Unavailable
         val first = fetchOnce(module, track)
         val result = if (first == ModuleFetchResult.Unavailable || first == ModuleFetchResult.Timeout) {
@@ -90,7 +96,7 @@ class OnboardingModulesViewModel @Inject constructor(
         } else first
         currentCoroutineContext().ensureActive()
         if (modules.module(id) !== module) return@withPermit ModuleFetchResult.Unavailable
-        if (id == MonochromeModule.Id && result is ModuleFetchResult.Found && !modules.isEnabled(id)) {
+        if (canAutoEnable(id) && result is ModuleFetchResult.Found && !modules.isEnabled(id)) {
             modules.setEnabled(id, true)
         }
         result

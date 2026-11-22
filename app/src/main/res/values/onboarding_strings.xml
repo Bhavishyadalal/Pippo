@@ -133,6 +133,8 @@
     <string name="onb_modules_enable_on_success">Turns on if this check succeeds</string>
     <string name="onb_modules_fetching">Checking this song…</string>
     <string name="onb_modules_progress">%1$d of %2$d sources checked</string>
+    <string name="onb_modules_enable_source">Turn on a source below to check this song.</string>
+    <string name="onb_modules_searching">Searching for songs…</string>
     <string name="onb_modules_found">Stream found · %1$s</string>
     <string name="onb_modules_no_match">No match for this song</string>
     <string name="onb_modules_timeout">Took too long to respond</string>

@@ -72,7 +72,6 @@ import androidx.lifecycle.compose.currentStateAsState
 import coil3.compose.AsyncImage
 import com.mochyy.mochymusic.R
 import com.mochyy.mochymusic.module.TrackQuery
-import com.mochyy.mochymusic.module.monochrome.MonochromeModule
 import com.mochyy.mochymusic.ui.component.AppSwitch
 import com.mochyy.mochymusic.ui.screens.settings.modules.ModuleLogo
 import com.mochyy.mochymusic.ui.utils.AppMotion
@@ -81,6 +80,8 @@ import com.mochyy.mochymusic.viewmodels.OnboardingModulesViewModel
 import com.mochyy.mochymusic.viewmodels.onboardingSampleTrack
 import com.mochyy.mochymusic.viewmodels.searchModuleTestSongs
 import com.music.innertube.models.SongItem
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
@@ -113,13 +114,15 @@ internal fun ModulesSetupPage(
 ) {
     val allEntries by viewModel.entries.collectAsStateWithLifecycle()
     val modules = remember(allEntries) { allEntries.filter(viewModel::showInSetup) }
+    val moduleIds = remember(modules) { modules.mapTo(mutableSetOf()) { it.id } }
     val fetchResults = remember { mutableStateMapOf<String, ModuleFetchResult>() }
     val jobs = remember { mutableMapOf<String, Job>() }
     val scope = rememberCoroutineScope()
     val focus = LocalFocusManager.current
     var query by rememberSaveable { mutableStateOf("") }
-    var matches by remember { mutableStateOf(emptyList<SongItem>()) }
-    var searching by remember { mutableStateOf(false) }
+    val searchText = query.trim()
+    // As soon as the text changes, earlier results stop being selectable.
+    var matches by remember(active, searchText) { mutableStateOf<List<SongItem>?>(null) }
     val suggested by viewModel.suggestedSong.collectAsStateWithLifecycle()
     var chosenSong by remember { mutableStateOf<SetupSong?>(null) }
     var trackLookup by remember { mutableStateOf<Job?>(null) }
@@ -142,15 +145,18 @@ internal fun ModulesSetupPage(
 
     fun cancelFetches() {
         showFetchProgress = false
-        jobs.values.forEach { it.cancel() }
+        val pending = jobs.values.toList()
         jobs.clear()
+        pending.forEach { it.cancel() }
         trackLookup?.cancel()
         trackLookup = null
         fetchResults.keys.filter { fetchResults[it] == ModuleFetchResult.Fetching }.forEach { fetchResults.remove(it) }
     }
 
     fun fetch(song: SetupSong? = chosenSong) {
-        if (!canFetch) return
+        if (!active) return
+        val sources = viewModel.entries.value.filter { viewModel.showInSetup(it) && viewModel.canFetch(it) }
+        if (sources.isEmpty()) return
         cancelFetches()
         fetchResults.clear()
         fetchRun++
@@ -164,26 +170,40 @@ internal fun ModulesSetupPage(
                 ?: onboardingSampleTrack
         }
         trackLookup = track
-        modules.filter(viewModel::canFetch).forEach { entry ->
+        sources.forEach { entry ->
             fetchResults[entry.id] = ModuleFetchResult.Fetching
-            jobs[entry.id] = scope.launch {
-                fetchResults[entry.id] = viewModel.fetch(entry.id, track.await())
-                jobs.remove(entry.id)
+            val job = scope.launch(start = CoroutineStart.LAZY) {
+                val currentJob = coroutineContext[Job]
+                try {
+                    val result = viewModel.fetch(entry.id, track.await())
+                    if (jobs[entry.id] === currentJob) fetchResults[entry.id] = result
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    if (jobs[entry.id] === currentJob) fetchResults[entry.id] = ModuleFetchResult.Unavailable
+                } finally {
+                    if (jobs[entry.id] === currentJob) jobs.remove(entry.id)
+                }
             }
+            jobs[entry.id] = job
+            job.start()
         }
     }
 
     LaunchedEffect(active) {
         if (active) viewModel.loadSuggestedSong() else cancelFetches()
     }
-    LaunchedEffect(active, query) {
-        val text = query.trim()
-        matches = emptyList()
-        searching = active && text.isNotEmpty()
-        if (!searching) return@LaunchedEffect
-        delay(350)
-        matches = withTimeoutOrNull(10_000L) { searchModuleTestSongs(text) }.orEmpty()
-        searching = false
+    LaunchedEffect(moduleIds) {
+        fetchResults.keys.filterNot { it in moduleIds }.forEach { id ->
+            jobs.remove(id)?.cancel()
+            fetchResults.remove(id)
+        }
+    }
+    LaunchedEffect(active, searchText) {
+        if (active && searchText.isNotEmpty()) {
+            delay(350)
+            matches = withTimeoutOrNull(10_000L) { searchModuleTestSongs(searchText) }.orEmpty()
+        }
     }
 
     OnboardingPage(
@@ -206,22 +226,35 @@ internal fun ModulesSetupPage(
                 placeholderColor = SetupDetail,
                 leadingIcon = painterResource(R.drawable.search_outline),
             )
-            if (query.isNotBlank()) {
+            if (active && searchText.isNotEmpty()) {
+                val results = matches
                 when {
-                    searching -> CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp).align(Alignment.CenterHorizontally),
-                        color = Onb.Subtitle,
-                        strokeWidth = 2.dp,
-                    )
-                    matches.isEmpty() -> Text(stringResource(R.string.onb_modules_no_results), color = SetupDetail, fontSize = 14.sp)
+                    results == null -> Row(
+                        modifier = Modifier.padding(horizontal = 4.dp)
+                            .semantics { liveRegion = LiveRegionMode.Polite },
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        if (motion) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                color = SetupAccent,
+                                strokeWidth = 2.dp,
+                            )
+                        }
+                        Text(stringResource(R.string.onb_modules_searching), color = SetupDetail, fontSize = 14.sp)
+                    }
+                    results.isEmpty() -> Text(stringResource(R.string.onb_modules_no_results), color = SetupDetail, fontSize = 14.sp)
                     else -> Column(
                         Modifier.fillMaxWidth().clip(SetupRow).background(Color(0xFF182127))
                             .border(1.dp, SetupOutline, SetupRow).padding(horizontal = 10.dp, vertical = 4.dp),
                     ) {
-                        matches.forEach { item ->
+                        results.forEach { item ->
                             key(item.id) {
                                 val song = item.toSetupSong()
-                                SetupSongRow(song, canFetch, onClick = { fetch(song) })
+                                SetupSongRow(song, canFetch, onClick = {
+                                    if (query.trim() == searchText) fetch(song)
+                                })
                             }
                         }
                     }
@@ -242,6 +275,13 @@ internal fun ModulesSetupPage(
                     val total = fetchResults.size
                     val completed = fetchResults.values.count { it != ModuleFetchResult.Fetching }
                     ModuleFetchProgress(completed, total)
+                } else if (active && !canFetch && modules.isNotEmpty()) {
+                    Text(
+                        stringResource(R.string.onb_modules_enable_source),
+                        color = SetupDetail,
+                        fontSize = 13.sp,
+                        lineHeight = 18.sp,
+                    )
                 }
             }
             if (modules.isNotEmpty()) {
@@ -258,7 +298,7 @@ internal fun ModulesSetupPage(
                     val result = fetchResults[entry.id]
                     SetupModuleRow(
                         title = entry.module.info.name,
-                        detail = moduleFetchDescription(entry.enabled, entry.id == MonochromeModule.Id, result),
+                        detail = moduleFetchDescription(entry.enabled, viewModel.canAutoEnable(entry.id), result),
                         result = result,
                         checked = entry.enabled,
                         enabled = active,
@@ -302,7 +342,8 @@ private fun SetupModuleRow(
         else -> null
     }
     val reveal = remember { Animatable(1f) }
-    LaunchedEffect(result, motion) {
+    val revealing by remember { derivedStateOf { reveal.value < 1f } }
+    LaunchedEffect(result) {
         reveal.snapTo(1f)
         if (motion && result != null && result != ModuleFetchResult.Fetching) {
             reveal.snapTo(0f)
@@ -314,7 +355,7 @@ private fun SetupModuleRow(
     Row(
         modifier = Modifier.fillMaxWidth().heightIn(min = 78.dp)
             .clip(SetupRow).background(surface)
-            .then(if (found && motion) Modifier.resultRipple(reveal) else Modifier)
+            .then(if (found && motion && revealing) Modifier.resultRipple(reveal) else Modifier)
             .border(1.dp, rim, SetupRow)
             .toggleable(checked, enabled = enabled, role = Role.Switch, onValueChange = onCheckedChange)
             .padding(14.dp),
@@ -335,11 +376,13 @@ private fun SetupModuleRow(
                 fontWeight = FontWeight.Bold,
             )
             Row(
-                modifier = Modifier.graphicsLayer {
-                    val rest = if (motion) reveal.value else 1f
-                    translationY = 5.dp.toPx() * (1f - rest)
-                    alpha = 0.74f + 0.26f * rest
-                },
+                modifier = if (motion && revealing) {
+                    Modifier.graphicsLayer {
+                        val rest = reveal.value
+                        translationY = 5.dp.toPx() * (1f - rest)
+                        alpha = 0.74f + 0.26f * rest
+                    }
+                } else Modifier,
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
