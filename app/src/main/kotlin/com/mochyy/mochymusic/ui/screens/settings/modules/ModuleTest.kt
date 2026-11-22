@@ -151,14 +151,14 @@ private fun SearchPill(query: String, searching: Boolean, onChange: (String) -> 
             if (query.isEmpty()) {
                 Text(
                     stringResource(R.string.module_test_search), fontFamily = InterFontFamily, fontWeight = FontWeight.SemiBold,
-                    fontSize = 13.sp, color = Color.White.copy(alpha = 0.45f),
+                    fontSize = 14.sp, color = Color(0xFFD7D7DF),
                 )
             }
             BasicTextField(
                 value = query,
                 onValueChange = onChange,
                 singleLine = true,
-                textStyle = TextStyle(fontFamily = InterFontFamily, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Color.White),
+                textStyle = TextStyle(fontFamily = InterFontFamily, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = Color.White),
                 cursorBrush = SolidColor(Color.White),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                 keyboardActions = KeyboardActions(onSearch = { focus.clearFocus() }),
@@ -234,9 +234,9 @@ private fun StepRow(step: DiagnosticStep) {
             }
         }
         Spacer(Modifier.width(10.dp))
-        Column {
-            Text(step.name, fontFamily = InterFontFamily, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = Color.White)
-            Text(step.detail, fontFamily = InterFontFamily, fontSize = 12.sp, lineHeight = 16.sp, color = PageSoftText)
+        Column(Modifier.weight(1f)) {
+            Text(step.name, fontFamily = InterFontFamily, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Color.White)
+            Text(step.detail, fontFamily = InterFontFamily, fontWeight = FontWeight.Medium, fontSize = 14.sp, lineHeight = 19.sp, color = Color(0xFFE1E1E8))
         }
     }
 }

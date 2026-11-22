@@ -118,14 +118,20 @@ class MonochromeModule : SourceModule, ServerListModule {
 
     private fun resolveOn(server: Server, track: TrackQuery, report: (DiagnosticStep) -> Unit): ResolveResult {
         val key = server.url to track
+        val cached = matches[key]
         val missedAt = misses[key]
-        if (missedAt != null && System.currentTimeMillis() - missedAt < MissMemoryMs) {
+        if (cached == null && missedAt != null && System.currentTimeMillis() - missedAt < MissMemoryMs) {
             report(DiagnosticStep("Find the song", false, "Not on ${server.name}"))
             return ResolveResult.NotFound("Not on Monochrome")
         }
 
         report(DiagnosticStep("Find the song", null, "Searching ${server.name}…"))
-        val found = matches[key] ?: run {
+        if (cached != null) {
+            openMatch(server, track, cached, report)?.let { return it }
+            matches.remove(key, cached)
+        }
+
+        val candidates = run {
             val query = "${track.artists.firstOrNull().orEmpty()} ${TrackMatcher.core(track.title)}".trim()
             val response = runCatching { host.http(searchRequest(server, query, SearchLimit)) }.getOrElse {
                 val reason = "${server.name} didn't answer"
@@ -137,30 +143,46 @@ class MonochromeModule : SourceModule, ServerListModule {
                 report(DiagnosticStep("Find the song", false, "${server.name} answered ${response.code}"))
                 return ResolveResult.Unavailable("${server.name} answered ${response.code}")
             }
+            if (!answersSearch(server.kind, response.text)) {
+                val reason = "${server.name} returned an unreadable search response"
+                report(DiagnosticStep("Find the song", false, reason))
+                return ResolveResult.Unavailable(reason)
+            }
             clearDown(server.url)
-            val best = TrackMatcher.ranked(track, tracksIn(server.kind, response.text)).firstOrNull()
-            if (best == null) {
+            val ranked = TrackMatcher.ranked(track, tracksIn(server.kind, response.text))
+            if (ranked.isEmpty() && cached == null) {
                 misses[key] = System.currentTimeMillis()
                 report(DiagnosticStep("Find the song", false, "No matching recording of “${track.title}”"))
                 return ResolveResult.NotFound("No matching recording on Monochrome")
             }
-            matches[key] = best.track
-            best.track
+            ranked.asSequence().map { it.track }.filter { it.id != cached?.id }.distinctBy { it.id }
+                .take(if (cached == null) MaxStreamCandidates else MaxStreamCandidates - 1)
         }
+        for (candidate in candidates) {
+            val result = openMatch(server, track, candidate, report) ?: continue
+            matches[key] = candidate
+            misses.remove(key)
+            return result
+        }
+
+        val reason = "${server.name} returned no usable FLAC stream"
+        report(DiagnosticStep("Stream", false, reason))
+        return ResolveResult.Unavailable(reason)
+    }
+
+    private fun openMatch(
+        server: Server,
+        track: TrackQuery,
+        found: CatalogTrack,
+        report: (DiagnosticStep) -> Unit,
+    ): ResolveResult.Found? {
         report(DiagnosticStep("Find the song", true, "${found.title} · ${found.artist}"))
 
         // the head of the file: it should open as flac, and its streaminfo says how fine it is
         report(DiagnosticStep("Stream", null, "Opening the stream…"))
-        val opened = open(server, found.id)
-        if (opened == null) {
-            report(DiagnosticStep("Stream", false, "${server.name} gave no stream"))
-            return ResolveResult.Unavailable("${server.name} gave no stream")
-        }
-        val info = flacInfo(opened.head)
-        if (info == null) {
-            report(DiagnosticStep("Stream", false, "Not a FLAC file"))
-            return ResolveResult.Unavailable("Monochrome's stream isn't FLAC")
-        }
+        val opened = open(server, found.id) ?: return null
+        val info = flacInfo(opened.head) ?: return null
+        if (!TrackMatcher.isCompatible(track, found.title, info.durationMs ?: found.durationMs)) return null
         report(DiagnosticStep("Stream", true, info.label))
 
         return ResolveResult.Found(
@@ -394,6 +416,7 @@ class MonochromeModule : SourceModule, ServerListModule {
         private const val DownKey = "unreachable@"
         private const val DownAtKey = "unreachable_at@"
         private const val SearchLimit = 8
+        private const val MaxStreamCandidates = 3
         private const val MissMemoryMs = 30L * 60 * 1000
         // how long a server that didn't answer is left alone before it's tried again
         private const val UnreachableRetryMs = 10L * 60 * 1000
