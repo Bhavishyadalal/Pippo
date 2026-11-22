@@ -55,6 +55,16 @@ class AppIcon private constructor(
 
         val entries: List<AppIcon> = listOf(
             AppIcon("Default", "IconDefault", AppIconFamily.Brand, R.drawable.pippo_master_black_ribbon_p, R.color.pippo_master_black_ribbon_p_bg, R.string.pippo_master_black_ribbon_p_label, R.style.Theme_App_Starting, foregroundScale = 1.38f),
+            AppIcon(
+                name = "SilverHeadphones",
+                alias = "PippoSilverHeadphones",
+                family = AppIconFamily.Brand,
+                foreground = R.drawable.pippo_silver_headphones_adaptive,
+                background = R.color.pippo_master_black_ribbon_p_bg,
+                label = R.string.pippo_silver_headphones_label,
+                splashTheme = R.style.Theme_App_Starting_SilverHeadphones,
+                foregroundScale = AdaptiveArtworkScale,
+            ),
             pin("Pin01", "PippoPin01", R.drawable.pippo_pin_01_midnight_stars_adaptive, R.string.pippo_pin_01_midnight_stars_label, R.style.Theme_App_Starting_Pin01),
             pin("Pin02", "PippoPin02", R.drawable.pippo_pin_02_sky_headphones_adaptive, R.string.pippo_pin_02_sky_headphones_label, R.style.Theme_App_Starting_Pin02),
             pin("Pin03", "PippoPin03", R.drawable.pippo_pin_03_mint_hearts_adaptive, R.string.pippo_pin_03_mint_hearts_label, R.style.Theme_App_Starting_Pin03),
