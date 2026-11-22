@@ -45,6 +45,7 @@ import coil3.compose.AsyncImage
 import com.mochyy.mochymusic.R
 import com.mochyy.mochymusic.ui.component.PopupSheetHandle
 import com.mochyy.mochymusic.ui.component.PopupSheetState
+import com.mochyy.mochymusic.ui.component.TopToaster
 import com.mochyy.mochymusic.ui.screens.setup.PhotoCropperContainer
 import com.mochyy.mochymusic.ui.screens.setup.onboarding.Onb
 import com.mochyy.mochymusic.ui.screens.setup.onboarding.OnbButton
@@ -67,9 +68,9 @@ private fun EditProfileContent(currentName: String, currentPhoto: Any?, onSaved:
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var name by rememberSaveable { mutableStateOf(currentName) }
-    // a picked picture goes through the cropper first; only the cropped copy is kept
+    // Photos from the gallery need a crop. Presets already have a circular-safe composition.
     var uncropped by remember { mutableStateOf<Uri?>(null) }
-    var cropped by remember { mutableStateOf<Uri?>(null) }
+    var selectedPhoto by rememberSaveable { mutableStateOf<Uri?>(null) }
     var saving by remember { mutableStateOf(false) }
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { picked ->
@@ -80,7 +81,7 @@ private fun EditProfileContent(currentName: String, currentPhoto: Any?, onSaved:
     PhotoCropperContainer(
         uri = uncropped,
         onDone = {
-            cropped = it
+            selectedPhoto = it
             uncropped = null
         },
         onCancel = { uncropped = null },
@@ -105,8 +106,12 @@ private fun EditProfileContent(currentName: String, currentPhoto: Any?, onSaved:
                     onClick = {
                         saving = true
                         scope.launch {
-                            ProfileStore.save(context, name.trim(), cropped)
-                            onSaved()
+                            if (ProfileStore.save(context, name.trim(), selectedPhoto)) {
+                                onSaved()
+                            } else {
+                                saving = false
+                                TopToaster.error(context.getString(R.string.pippo_profile_save_failed))
+                            }
                         }
                     },
                 )
@@ -118,7 +123,14 @@ private fun EditProfileContent(currentName: String, currentPhoto: Any?, onSaved:
             Spacer(Modifier.height(24.dp))
             Text(stringResource(R.string.profile_picture_label), color = Onb.Muted, fontSize = 18.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(12.dp))
-            EditablePhoto(photo = cropped ?: currentPhoto, onClick = ::pickPhoto)
+            EditablePhoto(photo = selectedPhoto ?: currentPhoto, onClick = { if (!saving) pickPhoto() })
+            Spacer(Modifier.height(16.dp))
+            ProfileAvatarPicker(
+                photo = selectedPhoto ?: currentPhoto,
+                onPick = { selectedPhoto = it },
+                onUpload = ::pickPhoto,
+                enabled = !saving,
+            )
         }
     }
 }

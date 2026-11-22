@@ -3,12 +3,12 @@ package com.mochyy.mochymusic.ui.screens.update
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -56,7 +56,7 @@ private data class AboutLink(
 private val aboutLinks = listOf(
     AboutLink(
         R.string.pippo_about_instagram, "@bhavishya_dalal_",
-        "https://www.instagram.com/bhavishya_dalal_/", R.drawable.insert_photo, Color(0xFFF1B2CE),
+        "https://www.instagram.com/bhavishya_dalal_/", R.drawable.pippo_instagram, Color(0xFFFFBBD9),
     ),
     AboutLink(
         R.string.pippo_about_github, "Bhavishyadalal",
@@ -64,7 +64,7 @@ private val aboutLinks = listOf(
     ),
     AboutLink(
         R.string.pippo_about_source, "Bhavishyadalal/Pippo",
-        "https://github.com/Bhavishyadalal/Pippo", R.drawable.library_music_outlined, Color(0xFFBCDCCA),
+        "https://github.com/Bhavishyadalal/Pippo", R.drawable.pippo_source_code, Color(0xFFBCDCCA),
     ),
 )
 
@@ -72,14 +72,22 @@ fun PopupSheetState.showAboutSheet(onOpenDevSpace: (Int) -> Unit = {}) {
     val popup = this
     show(fullBleed = true, surface = Color.Black, buttonBar = { SheetPrimaryButton(stringResource(R.string.done), popup::dismiss) }) {
         Column(
-            Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 4.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             AboutHero()
-            Text(stringResource(R.string.pippo_about_description), color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(Modifier.height(4.dp))
-            aboutLinks.forEach { link -> AboutLinkBadge(link) }
-            TextButton(onClick = { popup.showPippoLicense() }) { Text(stringResource(R.string.pippo_about_license)) }
+            Text(
+                stringResource(R.string.pippo_about_description),
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color(0xFFE1D8DF),
+                modifier = Modifier.padding(horizontal = 2.dp),
+            )
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                aboutLinks.forEach { link -> AboutLinkBadge(link) }
+            }
+            TextButton(onClick = { popup.showPippoLicense() }) {
+                Text(stringResource(R.string.pippo_about_license), color = Color(0xFFE9DEE5))
+            }
         }
     }
 }
@@ -87,7 +95,8 @@ fun PopupSheetState.showAboutSheet(onOpenDevSpace: (Int) -> Unit = {}) {
 @Composable
 private fun AboutHero() {
     Box(
-        Modifier.fillMaxWidth().heightIn(min = 148.dp).clip(RoundedCornerShape(24.dp)),
+        Modifier.fillMaxWidth().heightIn(min = 154.dp).clip(RoundedCornerShape(24.dp))
+            .background(Color(0xFF261B25)),
     ) {
         AsyncImage(
             model = R.drawable.pippo_home_scene_07,
@@ -97,7 +106,7 @@ private fun AboutHero() {
         )
         Box(
             Modifier.matchParentSize().background(
-                Brush.verticalGradient(listOf(Color.Black.copy(alpha = .10f), Color(0xE6141013))),
+                Brush.verticalGradient(0f to Color.Transparent, .45f to Color(0x2218101A), 1f to Color(0xF2181019)),
             ),
         )
         Column(Modifier.align(Alignment.BottomStart).padding(18.dp)) {
@@ -115,11 +124,13 @@ private fun AboutHero() {
 private fun AboutLinkBadge(link: AboutLink) {
     val uriHandler = LocalUriHandler.current
     val openError = stringResource(R.string.pippo_about_link_error)
+    val shape = RoundedCornerShape(18.dp)
     Row(
         Modifier.fillMaxWidth()
-            .heightIn(min = 64.dp)
-            .clip(RoundedCornerShape(20.dp))
-            .background(link.accent.copy(alpha = .095f))
+            .heightIn(min = 66.dp)
+            .clip(shape)
+            .background(Color(0xFF17151A))
+            .border(1.dp, link.accent.copy(alpha = .23f), shape)
             .clickable(role = Role.Button) {
                 runCatching { uriHandler.openUri(link.url) }.onFailure { TopToaster.error(openError) }
             }
@@ -128,16 +139,16 @@ private fun AboutLinkBadge(link: AboutLink) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
-            Modifier.size(40.dp).clip(RoundedCornerShape(13.dp)).background(link.accent.copy(alpha = .16f)),
+            Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(link.accent.copy(alpha = .18f)),
             contentAlignment = Alignment.Center,
         ) {
             Icon(painterResource(link.icon), contentDescription = null, tint = link.accent, modifier = Modifier.size(20.dp))
         }
         Column(Modifier.weight(1f)) {
-            Text(stringResource(link.label), style = MaterialTheme.typography.titleSmall, color = Color.White)
-            Text(link.account, style = MaterialTheme.typography.bodySmall, color = link.accent)
+            Text(stringResource(link.label), style = MaterialTheme.typography.titleSmall, color = Color.White, fontWeight = FontWeight.Bold)
+            Text(link.account, style = MaterialTheme.typography.bodySmall, color = link.accent, modifier = Modifier.padding(top = 2.dp))
         }
-        Icon(painterResource(R.drawable.web_link), contentDescription = null, tint = link.accent, modifier = Modifier.size(17.dp))
+        Icon(painterResource(R.drawable.pippo_open_link), contentDescription = null, tint = link.accent, modifier = Modifier.size(18.dp))
     }
 }
 

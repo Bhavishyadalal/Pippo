@@ -116,7 +116,7 @@ fun SetupWizardScreen(
 
     // ---- profile ----
     var username by rememberSaveable { mutableStateOf("") }
-    var profilePicUri by remember { mutableStateOf<Uri?>(null) }
+    var profilePicUri by rememberSaveable { mutableStateOf<Uri?>(null) }
     var selectedUncroppedUri by remember { mutableStateOf<Uri?>(null) }
     var lastPickedUri by remember { mutableStateOf<Uri?>(null) }
     var prefilled by remember { mutableStateOf(false) }
@@ -421,6 +421,8 @@ fun SetupWizardScreen(
                                 val existing = lastPickedUri
                                 if (existing != null) selectedUncroppedUri = existing else openPhotoPicker()
                             },
+                            onAvatarPick = { profilePicUri = it },
+                            onUploadPhoto = ::openPhotoPicker,
                             cardNumber = vm.cardNumber,
                             joinedText = vm.joinedText,
                             onNext = { if (username.isNotBlank()) go(Step.Hello) },
