@@ -411,7 +411,10 @@ fun SetupWizardScreen(
                             onBack = { if (sessionState is AccountImportState.Reading) session?.cancelReading() else back() },
                         )
 
-                        Step.Modules -> ModulesSetupPage(active = step == Step.Modules, onContinue = { go(Step.Profile) })
+                        Step.Modules -> ModulesSetupPage(
+                            active = step == Step.Modules,
+                            onContinue = { if (history.last() == Step.Modules) go(Step.Profile) },
+                        )
 
                         Step.Profile -> ProfilePage(
                             username = username,

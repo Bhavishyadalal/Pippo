@@ -460,6 +460,8 @@ class MusicService :
     // The settings cache picks up a write a moment after it lands, so right after the toggle the
     // service goes by what was just set until the cache agrees.
     private var pendingInfiniteQueue: Boolean? = null
+    private var infiniteQueueWrite: Job? = null
+    private var autoplayGeneration = 0L
 
     // Lining up Autoplay ahead of time is a nicety, so after an attempt that found nothing (offline,
     // only local songs) it waits a while instead of retrying on every song change.
@@ -2439,7 +2441,7 @@ class MusicService :
         if (com.mochyy.mochymusic.utils.OfflineMode.isOn) return false
         val stored = dataStore.get(InfiniteQueueKey, true)
         val pending = pendingInfiniteQueue ?: return stored
-        if (pending == stored) pendingInfiniteQueue = null
+        if (pending == stored && infiniteQueueWrite?.isActive != true) pendingInfiniteQueue = null
         return pending
     }
 
@@ -2536,8 +2538,6 @@ class MusicService :
 
     /** Drops the Autoplay songs still to come, e.g. when infinite queue is switched off. */
     private fun removeUpcomingAutoplay() {
-        runwayJob?.cancel()
-        runwayRetryJob?.cancel()
         val current = player.currentMediaItemIndex
         var end = player.mediaItemCount - 1
         // Back to front in runs, one timeline change per run rather than per song.
@@ -2602,7 +2602,13 @@ class MusicService :
         val generation = queueGeneration
         runwayJob = scope.launch(SilentHandler) {
             repeat(MAX_RUNWAY_ATTEMPTS) {
+                val autoplayRequest = autoplayGeneration
                 val (candidates, fromInfinite) = loadMoreQueueItems() ?: run {
+                    if (generation == queueGeneration && autoplayRequest != autoplayGeneration) {
+                        runwayJob = null
+                        ensureQueueRunway()
+                        return@launch
+                    }
                     if (previewOnly) {
                         autoplayPreviewRetryAt = android.os.SystemClock.elapsedRealtime() + AUTOPLAY_PREVIEW_RETRY_MS
                     } else if (generation == queueGeneration) {
@@ -2611,7 +2617,13 @@ class MusicService :
                     return@launch
                 }
                 if (generation != queueGeneration || player.mediaItemCount == 0) return@launch
-                if (fromInfinite && (!isInfiniteQueueEnabled() || player.repeatMode != REPEAT_MODE_OFF)) return@launch
+                if (fromInfinite && (autoplayRequest != autoplayGeneration ||
+                        !isInfiniteQueueEnabled() || player.repeatMode != REPEAT_MODE_OFF)
+                ) {
+                    runwayJob = null
+                    ensureQueueRunway()
+                    return@launch
+                }
 
                 val newItems = if (fromInfinite) {
                     // Radio mixes repeat songs that are already queued (including their own seed).
@@ -2687,6 +2699,7 @@ class MusicService :
     }
 
     private suspend fun loadInfiniteQueueItems(): List<MediaItem> {
+        val request = autoplayGeneration
         // Only songs that aren't queued yet count: a radio that repeats the queue (or just its own
         // seed, which is all a signed-out radio sometimes returns) has to fall through to the next source.
         val queued = HashSet<String>()
@@ -2705,6 +2718,7 @@ class MusicService :
                 Timber.tag(TAG).w(e, "Failed to load next infinite queue page")
                 emptyList()
             }.fresh()
+            if (request != autoplayGeneration) return emptyList()
             if (page.isNotEmpty()) return page
         }
 
@@ -2723,6 +2737,8 @@ class MusicService :
             .onFailure { Timber.tag(TAG).w(it, "Failed to start infinite queue radio for $seed") }
             .getOrDefault(emptyList())
             .fresh()
+        currentCoroutineContext().ensureActive()
+        if (request != autoplayGeneration) return emptyList()
         infiniteSource = radio
         if (radioItems.isNotEmpty()) return radioItems
 
@@ -2733,6 +2749,8 @@ class MusicService :
                 YouTube.related(relatedEndpoint).getOrNull()?.songs.orEmpty().map { it.toMediaItem() }
             }
         }.getOrDefault(emptyList()).fresh()
+        currentCoroutineContext().ensureActive()
+        if (request != autoplayGeneration) return emptyList()
         if (relatedItems.isNotEmpty()) return relatedItems
 
         // Last resort, for when YouTube gives a signed-out session neither a radio nor related
@@ -2747,6 +2765,8 @@ class MusicService :
                     .map { it.toMediaItem() }
             }
         }.getOrDefault(emptyList()).fresh().distinctBy { it.mediaId }
+        currentCoroutineContext().ensureActive()
+        if (request != autoplayGeneration) return emptyList()
         if (artistItems.isNotEmpty()) return artistItems
 
         // Nothing came back for this seed: keep it out of this round, but let a retry use it again
@@ -2757,7 +2777,8 @@ class MusicService :
 
     fun setInfiniteQueueEnabled(enabled: Boolean) {
         pendingInfiniteQueue = enabled
-        scope.launch {
+        autoplayGeneration++
+        infiniteQueueWrite = scope.launch {
             dataStore.edit { settings ->
                 settings[InfiniteQueueKey] = enabled
             }
@@ -2766,10 +2787,10 @@ class MusicService :
             // Start over from the queue's tail: switching it off dropped the songs the old radio
             // lined up, and its seeds were already spent, so it would otherwise find nothing new.
             resetInfiniteSource()
-            ensureQueueRunway()
         } else {
             removeUpcomingAutoplay()
         }
+        ensureQueueRunway()
     }
 
     // "start radio", like spotify's song radio or apple music's station: the song keeps playing where it is, and everything after it becomes an endless run of songs like it
@@ -3513,11 +3534,7 @@ class MusicService :
     ) {
         if (player === this.player && !destroying && playerInitialized.value) {
             if (events.contains(Player.EVENT_IS_PLAYING_CHANGED)) queueSavePlaying.value = player.isPlaying
-            if (events.contains(Player.EVENT_TIMELINE_CHANGED) ||
-                (!player.isPlaying && events.contains(Player.EVENT_POSITION_DISCONTINUITY))
-            ) {
-                if (dataStore.get(PersistentQueueKey, true)) saveQueueToDisk(onlyChanges = true)
-            }
+            if (!player.isPlaying && events.contains(Player.EVENT_POSITION_DISCONTINUITY)) scheduleQueueEditSave()
         }
         if (events.containsAny(
                 Player.EVENT_PLAYBACK_STATE_CHANGED,
@@ -4743,8 +4760,22 @@ class MusicService :
     }
 
     private val queueSavePlaying = MutableStateFlow(false)
+    private var queueEditSaveJob: Job? = null
     private var savedQueueKey: Int? = null
     private var savedPosition = -1L
+
+    override fun onTimelineChanged(timeline: Timeline, reason: Int) {
+        if (reason == Player.TIMELINE_CHANGE_REASON_PLAYLIST_CHANGED) scheduleQueueEditSave()
+    }
+
+    private fun scheduleQueueEditSave() {
+        if (destroying || !playerInitialized.value || !dataStore.get(PersistentQueueKey, true)) return
+        queueEditSaveJob?.cancel()
+        queueEditSaveJob = scope.launch {
+            delay(250)
+            if (dataStore.get(PersistentQueueKey, true)) saveQueueToDisk(onlyChanges = true)
+        }
+    }
 
     // a cheap fingerprint of everything in the queue and automix files: the songs, where in them we are, and how they play
     private fun queueKey(): Int {
