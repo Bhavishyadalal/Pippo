@@ -84,6 +84,7 @@ import com.mochyy.mochymusic.playback.PlayerConnection
 import com.mochyy.mochymusic.ui.player.models.TrackInfo
 import com.mochyy.mochymusic.ui.utils.AppMotion
 import com.mochyy.mochymusic.utils.rememberEnumPreference
+import com.mochyy.mochymusic.ui.utils.songTitleSilver
 import kotlinx.coroutines.delay
 
 private enum class ImmersiveStyle(@StringRes val title: Int, @StringRes val description: Int, @DrawableRes val icon: Int) {
@@ -313,7 +314,7 @@ private fun ImmersiveContent(connection: PlayerConnection, onExit: () -> Unit) {
                             horizontalAlignment = Alignment.CenterHorizontally,
                         ) {
                             if (selectedStyle != ImmersiveStyle.ARTWORK_CINEMA) {
-                                Text(track.title, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(track.title, modifier = Modifier.songTitleSilver(track.title, controlsVisible && !pickerOpen), style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 if (track.artist.isNotBlank()) {
                                     Text(track.artist, color = SceneMuted, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 }
@@ -337,7 +338,7 @@ private fun ImmersiveContent(connection: PlayerConnection, onExit: () -> Unit) {
 @Composable
 private fun ImmersiveSongTitle(track: TrackInfo, modifier: Modifier = Modifier) {
     Column(modifier) {
-        Text(track.title, style = MaterialTheme.typography.headlineMedium, color = SceneInk, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Text(track.title, modifier = Modifier.songTitleSilver(track.title), style = MaterialTheme.typography.headlineMedium, color = SceneInk, maxLines = 2, overflow = TextOverflow.Ellipsis)
         Text(track.artist, style = MaterialTheme.typography.titleMedium, color = SceneMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }

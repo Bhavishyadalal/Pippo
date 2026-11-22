@@ -82,6 +82,8 @@ import com.mochyy.mochymusic.constants.PlayerBackgroundStyle
 import com.mochyy.mochymusic.constants.PlayerBackgroundStyleKey
 import com.mochyy.mochymusic.constants.PlayerCoverStyle
 import com.mochyy.mochymusic.constants.DefaultPlayerCoverStyle
+import com.mochyy.mochymusic.constants.ArtworkFrameBackgroundStyleKey
+import com.mochyy.mochymusic.constants.ArtworkFrameCoverStyleKey
 import com.mochyy.mochymusic.constants.PlayerCoverStyleKey
 import com.mochyy.mochymusic.constants.PlayerStyle
 import com.mochyy.mochymusic.constants.ShowPlayerBottomCardKey
@@ -382,15 +384,18 @@ private fun PlayerSheet(
     // the Turntable is the flagship around a record player, whatever cover the flagship is set to
     val isTurntable = playerStyle == com.mochyy.mochymusic.constants.PlayerStyle.TURNTABLE
     val studioSession = playerStyle == PlayerStyle.STUDIO_SESSION
-    val artworkFrame = playerStyle == PlayerStyle.ARTWORK_FRAME || studioSession
+    val artworkFrame = playerStyle == PlayerStyle.ARTWORK_FRAME
+    var frameCoverStyle by rememberEnumPreference(ArtworkFrameCoverStyleKey, PlayerCoverStyle.SQUARED)
+    var frameBackground by rememberEnumPreference(ArtworkFrameBackgroundStyleKey, PlayerBackgroundStyle.COVER_GRADIENT)
     val shownCoverStyle = when {
         isTurntable -> PlayerCoverStyle.TURNTABLE
-        artworkFrame -> PlayerCoverStyle.SQUARED
+        studioSession -> PlayerCoverStyle.SQUARED
+        artworkFrame -> frameCoverStyle
         else -> coverStyle
     }
     val controlsDrawShift = if (shownCoverStyle == PlayerCoverStyle.EDGE_TO_EDGE) ControlsDrawShift else 0.dp
     // the new flagship: its own buttons and bottom bar, the cover frosting into moving colours
-    val isFlagship = playerStyle == PlayerStyle.FLAGSHIP || artworkFrame
+    val isFlagship = playerStyle == PlayerStyle.FLAGSHIP || artworkFrame || studioSession
     // the flagships' landscape layout draws the whole open player itself, the way the other styles do
     val landscapeFlagship = playerStyle.flagshipFamily && landscapeWindow
     // each flagship keeps its own background, the new one starting on the moving colours it was made with
@@ -399,7 +404,8 @@ private fun PlayerSheet(
     var classicBackground by rememberEnumPreference(PlayerBackgroundStyleKey, PlayerBackgroundStyle.COVER_GRADIENT)
     var flagshipBackground by rememberEnumPreference(FlagshipBackgroundStyleKey, PlayerBackgroundStyle.AMBIENT)
     val backgroundStyle = when {
-        artworkFrame -> PlayerBackgroundStyle.COVER_GRADIENT
+        studioSession -> PlayerBackgroundStyle.COVER_GRADIENT
+        artworkFrame -> frameBackground
         isFlagship -> flagshipBackground
         else -> classicBackground
     }
@@ -1154,7 +1160,11 @@ private fun PlayerSheet(
                 FlagshipLandscape(
                     pages = transition,
                     turntable = isTurntable,
-                    preferSquare = artworkFrame,
+                    fullCoverOverride = when {
+                        studioSession -> false
+                        artworkFrame -> shownCoverStyle == PlayerCoverStyle.EDGE_TO_EDGE
+                        else -> null
+                    },
                     artworkStrength = artworkStrength,
                     sheetShowing = sheetShowing,
                     interactive = remember(state) { { landscapeOpen } },
@@ -1980,11 +1990,11 @@ private fun PlayerSheet(
         }
         if (playerStyle.flagshipFamily) {
             val (showBigDiscStyles) = rememberPreference(com.mochyy.mochymusic.constants.ShowBigDiscStylesKey, defaultValue = false)
-            val coverStyles = remember(showBigDiscStyles, coverStyle) {
+            val coverStyles = remember(showBigDiscStyles, shownCoverStyle) {
                 PlayerCoverStyle.entries.filter { style ->
                     style != PlayerCoverStyle.TURNTABLE
                 }.filter { style ->
-                    showBigDiscStyles || !(style == PlayerCoverStyle.DISC_BIG_FULL || style == PlayerCoverStyle.DISC_BIG_LABEL) || style == coverStyle
+                    showBigDiscStyles || !(style == PlayerCoverStyle.DISC_BIG_FULL || style == PlayerCoverStyle.DISC_BIG_LABEL) || style == shownCoverStyle
                 }
             }
             val backgroundStyles = remember { PlayerBackgroundStyle.entries.toList() }
@@ -2006,11 +2016,17 @@ private fun PlayerSheet(
                 glassState = morphingGlassState,
                 capture = studioCapture,
                 coverStyles = coverStyles,
-                coverStyle = coverStyle,
-                onCoverStyle = { coverStyle = it },
+                coverStyle = shownCoverStyle,
+                onCoverStyle = { if (artworkFrame) frameCoverStyle = it else coverStyle = it },
                 backgroundStyles = backgroundStyles,
                 backgroundStyle = backgroundStyle,
-                onBackgroundStyle = { if (isFlagship) flagshipBackground = it else classicBackground = it },
+                onBackgroundStyle = {
+                    when {
+                        artworkFrame -> frameBackground = it
+                        isFlagship -> flagshipBackground = it
+                        else -> classicBackground = it
+                    }
+                },
                 menuLayout = menuLayout,
                 seekBarStyle = seekBarStyle,
                 endTimestamp = endTimestamp,

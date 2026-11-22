@@ -53,6 +53,7 @@ import com.mochyy.mochymusic.ui.player.models.TrackInfo
 import com.mochyy.mochymusic.ui.player.styles.LocalStyleInteractive
 import com.mochyy.mochymusic.ui.player.styles.whileStyleInteractive
 import com.mochyy.mochymusic.utils.makeTimeString
+import com.mochyy.mochymusic.ui.utils.songTitleSilver
 import kotlinx.coroutines.launch
 
 // the music tile's pages, top to bottom
@@ -121,7 +122,7 @@ private fun CoverPage(
                 Box(Modifier.weight(1f)) {
                     SongSlots(carousel, track) { song, slot ->
                         Column(slot) {
-                            BasicText(song.title, style = labelStyle(20.dp, FontWeight.Bold), color = WhiteInk, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            BasicText(song.title, modifier = Modifier.songTitleSilver(song.title), style = labelStyle(20.dp, FontWeight.Bold), color = WhiteInk, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             BasicText(song.artist, style = labelStyle(13.dp), color = SoftWhiteInk, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                     }
@@ -154,7 +155,7 @@ private fun CardPage(track: TrackInfo, carousel: SongCarousel?, progress: Bedsid
             BasicText(stringResource(R.string.bedside_now_playing), style = labelStyle(11.dp, FontWeight.SemiBold), color = SoftWhiteInk)
             Box {
                 SongSlots(carousel, track) { song, slot ->
-                    BasicText(song.title, style = labelStyle(18.dp, FontWeight.Bold), color = WhiteInk, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = slot)
+                    BasicText(song.title, style = labelStyle(18.dp, FontWeight.Bold), color = WhiteInk, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = slot.songTitleSilver(song.title))
                 }
             }
             Spacer(Modifier.height(12.dp))

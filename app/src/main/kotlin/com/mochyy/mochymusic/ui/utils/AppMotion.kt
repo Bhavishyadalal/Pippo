@@ -25,10 +25,10 @@ object AppMotion {
     var enabled by mutableStateOf(true)
 
     /** how much faster than android's own animation speed things move, 1 is just android's */
-    var speed by mutableFloatStateOf(1f)
+    var speed by mutableFloatStateOf(1.5f)
 
     /** false: lyric lines, title morphs, menus and page wipes stay sharp, glass blur isn't touched */
-    var elementBlur by mutableStateOf(true)
+    var elementBlur by mutableStateOf(false)
 
     private var systemScale by mutableFloatStateOf(1f)
 

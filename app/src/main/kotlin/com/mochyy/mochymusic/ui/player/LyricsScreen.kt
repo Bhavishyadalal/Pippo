@@ -505,7 +505,7 @@ fun LyricsScreen(
     // the boring and plain styles are styles 1 and 2 with the shader left out
     val lyricsWaveAnimation = motionStyle.shaded && !immersivePresentation
     // the lines' blur by their distance from the sung one is an element blur, the glass blur switch doesn't touch it
-    val (lineBlurAllowed) = rememberPreference(com.mochyy.mochymusic.constants.ElementBlurKey, defaultValue = true)
+    val (lineBlurAllowed) = rememberPreference(com.mochyy.mochymusic.constants.ElementBlurKey, defaultValue = false)
     val (lyricsHighBloom) = rememberPreference(LyricsHighBloomKey, defaultValue = true)
 
     // Drives the per-line loading dots and lifts the readings out of the way. The button that

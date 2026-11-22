@@ -74,6 +74,7 @@ import com.mochyy.mochymusic.ui.utils.AnimationSpeeds
 import com.mochyy.mochymusic.ui.utils.animationSpeedLabel
 import com.mochyy.mochymusic.utils.rememberEnumPreference
 import com.mochyy.mochymusic.utils.rememberPreference
+import com.mochyy.mochymusic.ui.utils.silverSweep
 import kotlin.math.roundToInt
 
 private const val MinBlurStrength = 10f
@@ -96,7 +97,7 @@ private val PillTextStyle get() = TextStyle(
 // glass blur: on or off, progressive or flat bars, low or high quality, and how strong, with the app's own glass as the preview
 @Composable
 internal fun BlurSection(modifier: Modifier = Modifier) {
-    val (disableBlur, onDisableBlur) = rememberPreference(DisableBlurKey, defaultValue = false)
+    val (disableBlur, onDisableBlur) = rememberPreference(DisableBlurKey, defaultValue = true)
     val (progressive, onProgressive) = rememberPreference(EnableProgressiveBlurKey, defaultValue = true)
     val (quality, onQuality) = rememberEnumPreference(BlurQualityKey, com.mochyy.mochymusic.ui.component.DefaultBlurQuality)
     val (strength, onStrength) = rememberPreference(BlurStrengthPxKey, defaultValue = DefaultBlurStrength)
@@ -104,7 +105,7 @@ internal fun BlurSection(modifier: Modifier = Modifier) {
     var lastTick by remember { mutableIntStateOf((strength / 5f).roundToInt()) }
     val blurOn = !disableBlur
     val defaultQuality = com.mochyy.mochymusic.ui.component.DefaultBlurQuality
-    val changed = disableBlur || !progressive || quality != defaultQuality || kotlin.math.abs(strength - DefaultBlurStrength) >= 0.5f
+    val changed = blurOn || !progressive || quality != defaultQuality || kotlin.math.abs(strength - DefaultBlurStrength) >= 0.5f
 
     Column(modifier.fillMaxWidth()) {
         EffectCard(
@@ -113,7 +114,7 @@ internal fun BlurSection(modifier: Modifier = Modifier) {
             onCheckedChange = { onDisableBlur(!it) },
             canReset = changed,
             onReset = {
-                onDisableBlur(false)
+                onDisableBlur(true)
                 onProgressive(true)
                 onQuality(defaultQuality)
                 onStrength(DefaultBlurStrength)
@@ -173,7 +174,7 @@ internal fun BlurSection(modifier: Modifier = Modifier) {
 
 @Composable
 internal fun TrueBlackSection() {
-    val (enabled, setEnabled) = rememberPreference(com.mochyy.mochymusic.constants.PureBlackKey, defaultValue = false)
+    val (enabled, setEnabled) = rememberPreference(com.mochyy.mochymusic.constants.PureBlackKey, defaultValue = true)
     EffectCard(
         title = stringResource(R.string.true_black_amoled),
         checked = enabled,
@@ -255,7 +256,7 @@ internal fun ArtworkBackgroundSection() {
 // blur on things themselves, apart from the glass: lyric lines, the cover zooming away, title morphs, menus, page wipes
 @Composable
 internal fun ElementBlurSection(modifier: Modifier = Modifier) {
-    val (elementBlur, onElementBlur) = rememberPreference(ElementBlurKey, defaultValue = true)
+    val (elementBlur, onElementBlur) = rememberPreference(ElementBlurKey, defaultValue = false)
     EffectCard(
         title = stringResource(R.string.customise_element_blur),
         checked = elementBlur,
@@ -275,7 +276,7 @@ internal fun ElementBlurSection(modifier: Modifier = Modifier) {
 @Composable
 internal fun AnimationSection(modifier: Modifier = Modifier) {
     val (enabled, onEnabled) = rememberPreference(EnableElementBlurAnimatorKey, defaultValue = true)
-    val (speed, onSpeed) = rememberPreference(AnimationSpeedKey, defaultValue = 1f)
+    val (speed, onSpeed) = rememberPreference(AnimationSpeedKey, defaultValue = 1.5f)
     val haptic = LocalHapticFeedback.current
     val stops = AnimationSpeeds
     val index = stops.indexOfFirst { it >= speed - 0.01f }.takeIf { it >= 0 } ?: stops.lastIndex
@@ -538,5 +539,35 @@ private fun MiniSegmented(options: List<String>, selectedIndex: Int, onSelect: (
                 }
             }
         }
+    }
+}
+
+@Composable
+internal fun SilverSongTitleSection() {
+    val (enabled, onEnabled) = rememberPreference(
+        com.mochyy.mochymusic.constants.SilverSongTitleKey,
+        defaultValue = false,
+    )
+    EffectCard(
+        title = stringResource(R.string.customise_silver_song_title),
+        checked = enabled,
+        onCheckedChange = onEnabled,
+        preview = {
+            Text(
+                text = "One Kiss",
+                modifier = Modifier.align(Alignment.Center).then(if (enabled) Modifier.silverSweep("One Kiss") else Modifier),
+                color = Color(0xFFBCC6D4),
+                fontSize = 19.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+            )
+        },
+    ) {
+        Text(
+            text = stringResource(R.string.customise_silver_song_title_desc),
+            style = CaptionStyle,
+            color = Color.White.copy(alpha = 0.65f),
+        )
     }
 }

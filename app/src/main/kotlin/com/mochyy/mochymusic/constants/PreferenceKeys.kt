@@ -715,7 +715,7 @@ enum class PlayerStyle(val displayName: String, val selectorName: String) {
     ARTWORK_FRAME("Artwork Frame", "Artwork Frame"),
     STUDIO_SESSION("Studio Session", "Studio Session");
 
-    val editable: Boolean get() = this == FLAGSHIP || this == CLASSIC || this == TURNTABLE || this == POSTER || this == IPOD || isBedside
+    val editable: Boolean get() = hasFullEditor || this == TURNTABLE || this == POSTER || this == IPOD || isBedside
 
     // the two nightstand styles share their sheet, their night look and their lock screen rules
     val isBedside: Boolean get() = this == BEDSIDE || this == BEDSIDE_TILES
@@ -723,8 +723,8 @@ enum class PlayerStyle(val displayName: String, val selectorName: String) {
     /** drawn by the flagship's own player (cover, controls, card), not a design of its own */
     val flagshipFamily: Boolean get() = this == FLAGSHIP || this == CLASSIC || this == TURNTABLE || this == ARTWORK_FRAME || this == STUDIO_SESSION
 
-    // the two flagships the full editor works on: cover, middle part, controls and bottom bar
-    val hasFullEditor: Boolean get() = this == FLAGSHIP || this == CLASSIC
+    // styles with Studio editing for the cover, controls and bottom bar
+    val hasFullEditor: Boolean get() = this == FLAGSHIP || this == CLASSIC || this == ARTWORK_FRAME
 
     // the styles whose menu has a rotate button, each with a landscape layout of its own to turn into
     val turnable: Boolean get() = this == TURNTABLE || this == POSTER || this == TIMELINE || this == LYRICS || this == MODULE || isBedside
@@ -874,6 +874,8 @@ val SeekBarStyleKey = stringPreferencesKey("seekBarStyle")
 
 val ButtonStyleKey = stringPreferencesKey("buttonStyle")
 
+val ArtworkFrameCoverStyleKey = stringPreferencesKey("artworkFrameCoverStyle")
+val ArtworkFrameBackgroundStyleKey = stringPreferencesKey("artworkFrameBackgroundStyle")
 val PlayerCoverStyleKey = stringPreferencesKey("playerCoverStyle")
 
 /**
@@ -1364,6 +1366,7 @@ val EnableProgressiveBlurKey = booleanPreferencesKey("enableProgressiveBlur")
 val EnableElementBlurAnimatorKey = booleanPreferencesKey("enableElementBlurAnimator")
 val BlurStrengthPxKey = floatPreferencesKey("blurStrengthPx")
 // blur on things themselves (lyric lines, title morphs, menus, page wipes), apart from the glass blur
+val SilverSongTitleKey = booleanPreferencesKey("silverSongTitle")
 val ElementBlurKey = booleanPreferencesKey("elementBlur")
 // how fast animations run on top of android's own animation speed, 1 means just follow android
 val AnimationSpeedKey = floatPreferencesKey("animationSpeed")

@@ -46,6 +46,7 @@ import com.mochyy.mochymusic.ui.player.styles.LivePosition
 import com.mochyy.mochymusic.ui.player.styles.rememberDurationMs
 import com.mochyy.mochymusic.ui.player.styles.rememberLivePosition
 import com.mochyy.mochymusic.ui.player.styles.rememberPlayedSeconds
+import com.mochyy.mochymusic.ui.utils.songTitleSilver
 
 // what the bottom of now playing shows: the song's time, the volume while the wheel turns it, or the scrubber
 enum class IpodBar { PROGRESS, VOLUME, SCRUB }
@@ -135,11 +136,14 @@ private fun SongText(track: TrackInfo, scale: IpodScale, marquee: Boolean) {
             softWrap = false,
             overflow = if (marquee) TextOverflow.Clip else TextOverflow.Ellipsis,
             // scrolls in a layer of its own, so the marquee doesn't redraw the whole page every frame
-            modifier = if (marquee) {
-                Modifier
-                    .graphicsLayer()
-                    .basicMarquee(iterations = Int.MAX_VALUE, initialDelayMillis = 2000, repeatDelayMillis = 2000, velocity = 24.dp)
-            } else Modifier,
+            modifier = Modifier.songTitleSilver(track.title).then(
+                if (marquee) Modifier.graphicsLayer().basicMarquee(
+                    iterations = Int.MAX_VALUE,
+                    initialDelayMillis = 2000,
+                    repeatDelayMillis = 2000,
+                    velocity = 24.dp,
+                ) else Modifier,
+            ),
         )
         SongLine(track.artist, scale)
         SongLine(track.album, scale)

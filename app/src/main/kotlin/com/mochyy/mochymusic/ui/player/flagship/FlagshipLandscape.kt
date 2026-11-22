@@ -81,6 +81,7 @@ import com.mochyy.mochymusic.ui.player.rememberTextSlots
 import com.mochyy.mochymusic.ui.player.styles.styleSongSwipe
 import com.mochyy.mochymusic.ui.theme.InterFontFamily
 import com.mochyy.mochymusic.ui.utils.resize
+import com.mochyy.mochymusic.ui.utils.songTitleSilver
 
 // the cover takes this much of the width beside the controls, and is at most this much wider than it is tall, like the concept
 private const val CoverWidthShare = 0.55f
@@ -153,7 +154,7 @@ internal fun FlagshipLandscape(
     modifier: Modifier = Modifier,
     // the Turntable: its record runs in from the left edge the way the poster's circle does, its arm still the seek bar
     turntable: Boolean = false,
-    preferSquare: Boolean = false,
+    fullCoverOverride: Boolean? = null,
     artworkStrength: Float = 1f,
 ) {
     val connection = LocalPlayerConnection.current ?: return
@@ -169,7 +170,7 @@ internal fun FlagshipLandscape(
     val look = when {
         onTv -> if (tvSquare) CoverLook.TV_SQUARE else CoverLook.FULL
         turntable -> CoverLook.RECORD
-        fullCover && !preferSquare -> CoverLook.FULL
+        fullCoverOverride ?: fullCover -> CoverLook.FULL
         else -> CoverLook.SQUARE
     }
     // beside the square or the record the seek bar stays over the buttons; with the full cover it moves onto the cover under the lyrics
@@ -587,6 +588,7 @@ private fun SongTitles(title: String, artist: String, onClick: () -> Unit) {
                         title = slot.title.ifEmpty { if (playing) title else "" },
                         artist = slot.artist.ifEmpty { if (playing) artist else "" },
                         modifier = Modifier.carouselText(carousel, slot),
+                        animateTitle = playing,
                     )
                 }
             }
@@ -595,10 +597,11 @@ private fun SongTitles(title: String, artist: String, onClick: () -> Unit) {
 }
 
 @Composable
-private fun TitleLines(title: String, artist: String, modifier: Modifier) {
+private fun TitleLines(title: String, artist: String, modifier: Modifier, animateTitle: Boolean = true) {
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Text(
             text = title,
+            modifier = Modifier.songTitleSilver(title, animateTitle),
             color = Color.White,
             fontFamily = InterFontFamily,
             fontWeight = FontWeight.Bold,

@@ -71,7 +71,7 @@ internal fun BoxScope.VideoPaneBackdrop(
     state: VideoModeState,
     tint: State<Color>,
 ) {
-    val (disableBlur) = rememberPreference(DisableBlurKey, defaultValue = false)
+    val (disableBlur) = rememberPreference(DisableBlurKey, defaultValue = true)
     val blur = !disableBlur && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
     // one pass whose radius grows across the pane on High (android 13+); elsewhere one blur faded in over the ramp
     val progressive = blur && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&

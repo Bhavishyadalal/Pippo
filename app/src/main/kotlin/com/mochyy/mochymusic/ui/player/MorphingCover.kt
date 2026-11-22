@@ -153,6 +153,7 @@ import com.mochyy.mochymusic.ui.component.GlassState
 import com.mochyy.mochymusic.ui.component.glassRoot
 import com.mochyy.mochymusic.utils.rememberPreference
 import androidx.core.content.getSystemService
+import com.mochyy.mochymusic.ui.utils.songTitleSilver
 import com.mochyy.mochymusic.ui.utils.stableStatusBars
 
 @Stable
@@ -1376,7 +1377,7 @@ private fun MiniSongInfo(
         } else {
             for (slot in rememberTextSlots(carousel)) {
                 key(slot.uid) {
-                    MiniSongLines(slot.title, slot.artist, slot.album, Modifier.carouselText(carousel, slot))
+                    MiniSongLines(slot.title, slot.artist, slot.album, Modifier.carouselText(carousel, slot), animateTitle = slot.step == carousel.step)
                 }
             }
         }
@@ -1384,7 +1385,7 @@ private fun MiniSongInfo(
 }
 
 @Composable
-private fun MiniSongLines(title: String, artist: String, album: String, modifier: Modifier) {
+private fun MiniSongLines(title: String, artist: String, album: String, modifier: Modifier, animateTitle: Boolean = true) {
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -1393,6 +1394,7 @@ private fun MiniSongLines(title: String, artist: String, album: String, modifier
     ) {
         Text(
             text = title,
+            modifier = Modifier.songTitleSilver(title, animateTitle),
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurface,
@@ -1580,7 +1582,7 @@ private fun VideoBackdropBlur(
     // the cover's box on the sheet (x, y, width, height), where the upright copy goes
     coverRect: () -> FloatArray = { FloatArray(4) },
 ) {
-    val (disableBlur) = rememberPreference(DisableBlurKey, defaultValue = false)
+    val (disableBlur) = rememberPreference(DisableBlurKey, defaultValue = true)
     val (force1500pxBlur) = rememberPreference(ForceYtBackdropBlur1500Key, defaultValue = false)
     if (disableBlur) return
 
