@@ -91,6 +91,7 @@ internal fun OnboardingPage(
     scrollable: Boolean = true,
     /** space above the badge, a popup sheet has its own handle row so it needs less */
     contentTop: Dp = Onb.TopClearance + 18.dp,
+    titleModifier: Modifier = Modifier,
     footer: @Composable ColumnScope.() -> Unit = {},
     content: @Composable ColumnScope.() -> Unit = {},
 ) {
@@ -114,6 +115,7 @@ internal fun OnboardingPage(
                 Spacer(Modifier.height(22.dp))
                 Text(
                     text = title,
+                    modifier = titleModifier,
                     color = Onb.Title,
                     fontSize = 34.sp,
                     lineHeight = 38.sp,
@@ -209,6 +211,7 @@ internal fun OnbTextField(
     placeholder: String,
     modifier: Modifier = Modifier,
     placeholderColor: Color = Onb.Faint,
+    leadingIcon: Painter? = null,
 ) {
     BasicTextField(
         value = value,
@@ -219,15 +222,22 @@ internal fun OnbTextField(
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
         modifier = modifier,
         decorationBox = { inner ->
-            Box(
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(CircleShape)
                     .background(Onb.Field)
                     .padding(horizontal = 20.dp, vertical = 14.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                if (value.isEmpty()) Text(placeholder, color = placeholderColor, fontSize = 16.sp)
-                inner()
+                if (leadingIcon != null) {
+                    Icon(leadingIcon, contentDescription = null, tint = placeholderColor, modifier = Modifier.size(19.dp))
+                }
+                Box(Modifier.weight(1f)) {
+                    if (value.isEmpty()) Text(placeholder, color = placeholderColor, fontSize = 16.sp)
+                    inner()
+                }
             }
         },
     )
