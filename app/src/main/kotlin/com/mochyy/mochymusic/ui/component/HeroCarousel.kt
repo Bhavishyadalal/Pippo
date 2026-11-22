@@ -794,7 +794,7 @@ private fun HeroPager(
         }
     }
 
-    val (disableBlur) = rememberPreference(DisableBlurKey, defaultValue = false)
+    val (disableBlur) = rememberPreference(DisableBlurKey, defaultValue = true)
     val edgeBlur = !disableBlur && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
 
     var canvasAttached by remember { mutableStateOf(false) }

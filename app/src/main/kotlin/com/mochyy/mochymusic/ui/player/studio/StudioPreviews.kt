@@ -38,6 +38,8 @@ import com.mochyy.mochymusic.constants.PlayerBackgroundStyleKey
 import com.mochyy.mochymusic.constants.PlayerBottomBarStyle
 import com.mochyy.mochymusic.constants.PlayerBottomBarStyleKey
 import com.mochyy.mochymusic.constants.PlayerCoverStyle
+import com.mochyy.mochymusic.constants.ArtworkFrameBackgroundStyleKey
+import com.mochyy.mochymusic.constants.ArtworkFrameCoverStyleKey
 import com.mochyy.mochymusic.constants.PlayerCoverStyleKey
 import com.mochyy.mochymusic.constants.FlagshipBackgroundStyleKey
 import com.mochyy.mochymusic.constants.FlagshipBottomBarStyleKey
@@ -178,9 +180,12 @@ internal fun FlagshipPreview(
     val transport by connection.uiState.transportState.collectAsState()
     val queue by connection.uiState.queueState.collectAsState()
     val flagshipCover by rememberEnumPreference(PlayerCoverStyleKey, DefaultPlayerCoverStyle)
+    val frameCover by rememberEnumPreference(ArtworkFrameCoverStyleKey, PlayerCoverStyle.SQUARED)
+    val frameBackground by rememberEnumPreference(ArtworkFrameBackgroundStyleKey, PlayerBackgroundStyle.COVER_GRADIENT)
     val coverStyle = when {
         turntable -> PlayerCoverStyle.TURNTABLE
-        artworkFrame -> PlayerCoverStyle.SQUARED
+        studioSession -> PlayerCoverStyle.SQUARED
+        artworkFrame -> frameCover
         else -> flagshipCover
     }
     val savedBackground by rememberEnumPreference(
@@ -189,7 +194,11 @@ internal fun FlagshipPreview(
     )
     val artworkStrength = playerArtworkBackgroundStrength()
     val artworkOverlay = playerArtworkOverlayStrength(artworkStrength)
-    val backgroundStyle = if (artworkFrame) PlayerBackgroundStyle.COVER_GRADIENT else savedBackground
+    val backgroundStyle = when {
+        studioSession -> PlayerBackgroundStyle.COVER_GRADIENT
+        artworkFrame -> frameBackground
+        else -> savedBackground
+    }
     // the Turntable is built on the new flagship, so it shares the new bottom bar, as on the live player
     val newBottomBar = flagship || turntable
     val barStyle by rememberEnumPreference(

@@ -83,6 +83,7 @@ import com.mochyy.mochymusic.ui.player.CarouselPictures
 import com.mochyy.mochymusic.ui.player.SongCarousel
 import com.mochyy.mochymusic.ui.player.menu.SkinCustomiseSheet
 import com.mochyy.mochymusic.utils.makeTimeString
+import com.mochyy.mochymusic.ui.utils.songTitleSilver
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -339,7 +340,7 @@ private fun Block(block: SkinBlock, context: SkinContext, modifier: Modifier, in
         is SkinBlock.Time -> SkinTime(block, context, modifier)
         is SkinBlock.Shader -> SkinShaderBlock(block, context, modifier)
         is SkinBlock.Cover -> SkinCover(block, context, modifier)
-        is SkinBlock.Title -> SongText(block.text, context, modifier, inRow) { it.title }
+        is SkinBlock.Title -> SongText(block.text, context, modifier, inRow, isTitle = true) { it.title }
         is SkinBlock.Artist -> SongText(block.text, context, modifier, inRow) { it.artist }
         is SkinBlock.Album -> SongText(block.text, context, modifier, inRow) { it.album }
         is SkinBlock.Label -> SkinLabel(block, context, modifier, inRow)
@@ -410,10 +411,11 @@ private fun SkinCover(block: SkinBlock.Cover, context: SkinContext, modifier: Mo
 
 /** the song's title, artist or album, riding the row of songs the way the other styles' words do */
 @Composable
-private fun SongText(text: SkinText, context: SkinContext, modifier: Modifier, inRow: Boolean, pick: (StyleTrack) -> String) {
+private fun SongText(text: SkinText, context: SkinContext, modifier: Modifier, inRow: Boolean, isTitle: Boolean = false, pick: (StyleTrack) -> String) {
     Box(modifier.then(if (inRow || text.wrap) Modifier else Modifier.fillMaxWidth())) {
         StyleSongs(context.carousel, context.track, NoLyrics) { song, slotModifier ->
-            TextLine(pick(song.track), text, context, slotModifier.textWidth(text))
+            val value = pick(song.track)
+            TextLine(value, text, context, slotModifier.textWidth(text).songTitleSilver(value, isTitle))
         }
     }
 }

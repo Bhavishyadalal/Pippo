@@ -447,7 +447,7 @@ fun GlassPillBackground(
 ) {
     var position by remember { mutableStateOf(Offset.Zero) }
 
-    val (disableBlur) = rememberPreference(DisableBlurKey, defaultValue = false)
+    val (disableBlur) = rememberPreference(DisableBlurKey, defaultValue = true)
     val (blurStrengthPx) = rememberPreference(com.mochyy.mochymusic.constants.BlurStrengthPxKey, defaultValue = 25f)
 
     val currentBlurRadius by rememberUpdatedState(blurRadius)

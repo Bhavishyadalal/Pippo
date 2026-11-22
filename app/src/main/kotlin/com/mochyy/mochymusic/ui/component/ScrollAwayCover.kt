@@ -42,14 +42,14 @@ internal fun smoothstep(from: Float, to: Float, x: Float): Float {
 /** whether glass can blur here: android 12 and up, and the user hasn't turned blur off */
 @Composable
 fun rememberCoverBlurAvailable(): Boolean {
-    val (disableBlur) = rememberPreference(DisableBlurKey, defaultValue = false)
+    val (disableBlur) = rememberPreference(DisableBlurKey, defaultValue = true)
     return !disableBlur && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
 }
 
 // whether a thing can blur itself (the cover zooming away, a ring fading out): android 12 and up, with element blur on
 @Composable
 fun rememberElementBlurAvailable(): Boolean {
-    val (elementBlur) = rememberPreference(ElementBlurKey, defaultValue = true)
+    val (elementBlur) = rememberPreference(ElementBlurKey, defaultValue = false)
     return elementBlur && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
 }
 

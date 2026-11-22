@@ -355,6 +355,7 @@ private fun SearchBrowseContent(
     topPadding: Dp = searchTopBarHeight(withTitle = true),
 ) {
     val sections by viewModel.moodAndGenres.collectAsState()
+    val tileCovers by viewModel.covers.collectAsState()
     val bottomInset = LocalPlayerAwareWindowInsets.current
         .asPaddingValues()
         .calculateBottomPadding()
@@ -406,7 +407,7 @@ private fun SearchBrowseContent(
                             MoodTile(
                                 title = item.title,
                                 stripeColor = item.stripeColor,
-                                covers = viewModel.covers[
+                                covers = tileCovers[
                                     coverKey(item.endpoint.browseId, item.endpoint.params)
                                 ].orEmpty(),
                                 onClick = {

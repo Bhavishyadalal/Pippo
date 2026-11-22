@@ -82,7 +82,7 @@ internal fun BottomNavigationSection() {
     val (openingMotion, setOpeningMotion) = rememberEnumPreference(BottomNavigationMotionKey, BottomNavigationMotion.SLIDE)
     val (scrollEnabled, setScrollEnabled) = rememberPreference(ScrollPlayerEnabledKey, defaultValue = true)
     val (scrollMotion, setScrollMotion) = rememberEnumPreference(ScrollPlayerMotionKey, ScrollPlayerMotion.FLOW)
-    val (pureBlack) = rememberPreference(PureBlackKey, defaultValue = false)
+    val (pureBlack) = rememberPreference(PureBlackKey, defaultValue = true)
     val animationsEnabled = AppMotion.durationScale.scaleFactor > 0f
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {

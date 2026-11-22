@@ -67,6 +67,7 @@ import com.mochyy.mochymusic.lyrics.LyricsEntry
 import com.mochyy.mochymusic.lyrics.LyricsUtils
 import com.mochyy.mochymusic.utils.makeTimeString
 import com.mochyy.mochymusic.ui.player.carouselText
+import com.mochyy.mochymusic.ui.utils.songTitleSilver
 import com.mochyy.mochymusic.ui.utils.stableStatusBars
 
 /** the player's alternate styles, drawn as they look on the player or, [preview], on a selector card */
@@ -745,7 +746,7 @@ private fun TimelinePlayerStyle(actions: StyleActions, modifier: Modifier, previ
                 Box {
                     StyleSongs(carousel, track, StyleLyrics(null, emptyList())) { song, slotModifier ->
                         Column(slotModifier) {
-                            Text(song.track.title, color = tones.ink, fontSize = r.sp(0.04f, 14f, 18f), fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(song.track.title, modifier = Modifier.songTitleSilver(song.track.title), color = tones.ink, fontSize = r.sp(0.04f, 14f, 18f), fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             Text(song.track.artist, color = tones.inkSoft, fontSize = r.sp(0.034f, 12f, 16f), fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                     }

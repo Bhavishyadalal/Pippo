@@ -56,6 +56,7 @@ import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.mochyy.mochymusic.lyrics.LyricsEntry
 import com.mochyy.mochymusic.ui.component.BlurEffectCache
+import com.mochyy.mochymusic.ui.utils.songTitleSilver
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.math.abs
@@ -137,6 +138,7 @@ fun ExpressiveTitle(
         LaunchedEffect(text) { enter.animateTo(1f, spring(dampingRatio = 0.78f, stiffness = 180f)) }
         CompositionLocalProvider(LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr) {
             FlowRow(
+                modifier = Modifier.songTitleSilver(text),
                 horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(fitted.value.dp * TitleSpacing),
                 itemVerticalAlignment = Alignment.Bottom,
             ) {

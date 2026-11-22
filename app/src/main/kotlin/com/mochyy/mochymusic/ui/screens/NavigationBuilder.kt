@@ -268,7 +268,7 @@ fun NavGraphBuilder.navigationBuilder(
     }
 
     coverSourceComposable(Screens.Search.route) {
-        val pureBlackEnabled by rememberPreference(PureBlackKey, defaultValue = false)
+        val pureBlackEnabled by rememberPreference(PureBlackKey, defaultValue = true)
         val useDarkTheme = ForceDarkTheme
         val pureBlack = remember(pureBlackEnabled, useDarkTheme) {
             pureBlackEnabled && useDarkTheme
@@ -285,7 +285,7 @@ fun NavGraphBuilder.navigationBuilder(
         exitTransition = { libraryExitTo(targetState.destination.route) },
         popEnterTransition = { libraryReturnFrom(initialState.destination.route) },
     ) {
-        val pureBlackEnabled by rememberPreference(PureBlackKey, defaultValue = false)
+        val pureBlackEnabled by rememberPreference(PureBlackKey, defaultValue = true)
         val useDarkTheme = ForceDarkTheme
         CompositionLocalProvider(LocalNavAnimatedContentScope provides this) {
             com.mochyy.mochymusic.ui.screens.library.LibraryHomeScreen(
@@ -808,7 +808,7 @@ fun NavGraphBuilder.navigationBuilder(
             },
         ),
     ) {
-        val pureBlackEnabled by rememberPreference(PureBlackKey, defaultValue = false)
+        val pureBlackEnabled by rememberPreference(PureBlackKey, defaultValue = true)
         val useDarkTheme = ForceDarkTheme
         GenreScreen(
             navController = navController,

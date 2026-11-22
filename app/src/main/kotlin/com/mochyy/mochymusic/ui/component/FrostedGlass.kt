@@ -117,7 +117,7 @@ fun FrostedChromeGlass(
 internal fun rememberChromeModuleGlass(): com.mochyy.mochymusic.modules.skin.ActiveGlass? {
     // a look module can swap the frost for a glass shader of its own; android 13+ runs it, older phones and blur switched off keep the frost
     val (style) = rememberEnumPreference(ChromeGlassStyleKey, defaultValue = ChromeGlassStyle.FROSTED)
-    val (blurOff) = rememberPreference(DisableBlurKey, defaultValue = false)
+    val (blurOff) = rememberPreference(DisableBlurKey, defaultValue = true)
     val glass = com.mochyy.mochymusic.modules.skin.ActiveSkin.glass
     return glass.takeIf { style == ChromeGlassStyle.MODULE && !blurOff && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU }
 }
