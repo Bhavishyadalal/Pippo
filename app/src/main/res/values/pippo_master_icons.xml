@@ -3,6 +3,7 @@
     <string name="pippo_master_group_brand">Default</string>
     <string name="pippo_master_group_lettering">Lettering</string>
     <string name="pippo_master_black_ribbon_p_label">Black Ribbon P</string>
+    <string name="pippo_silver_headphones_label">Silver Headphones</string>
     <string name="pippo_master_01_cobalt_wax_label">Cobalt Wax</string>
     <string name="pippo_master_02_graphite_script_label">Graphite Script</string>
     <string name="pippo_master_03_pink_pastel_label">Pink Pastel</string>
@@ -30,6 +31,9 @@
     <color name="pippo_master_11_approved_blue_scrapbook_bg">#000000</color>
     <color name="pippo_master_blue_crayon_original_bg">#000000</color>
 
+    <style name="Theme.App.Starting.SilverHeadphones" parent="Theme.App.Starting">
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/pippo_silver_headphones</item>
+    </style>
     <style name="Theme.App.Starting.Master01CobaltWax" parent="Theme.App.Starting">
         <item name="windowSplashScreenAnimatedIcon">@mipmap/pippo_master_01_cobalt_wax</item>
     </style>

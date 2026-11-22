@@ -540,12 +540,10 @@ fun MochySettingsScreen(navController: NavController, pane: SettingsPane? = null
                 }
             }
 
+            // Insets cover the system bar, tabs and mini player, including the shared wide row.
+            // Keep a small gap above that stack so the last item remains fully tappable.
             val bottomInset = com.mochyy.mochymusic.LocalPlayerAwareWindowInsets.current.asPaddingValues()
-            val bottomPadding = bottomInset.calculateBottomPadding()
-            val bottomSpacerHeight = maxOf(340.dp, bottomPadding + 160.dp)
-
-            // Headroom spacer for smooth scrolling past collapse threshold and bottom bar
-            Spacer(modifier = Modifier.height(bottomSpacerHeight))
+            Spacer(modifier = Modifier.height(bottomInset.calculateBottomPadding() + 12.dp))
         }
         }
 
