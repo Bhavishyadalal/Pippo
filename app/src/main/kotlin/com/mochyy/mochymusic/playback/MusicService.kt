@@ -1205,7 +1205,10 @@ class MusicService :
                     if (player !== target || providerHandoffHost.currentTarget() != entry ||
                         handoffFor(mediaId) != null || target.playbackState != Player.STATE_IDLE
                     ) return@collect
-                    target.seekTo(entry.index, position)
+                    // The same queue entry may have moved while the cache was cleared.
+                    val index = target.currentMediaItemIndex
+                    if (index !in 0 until target.mediaItemCount) return@collect
+                    target.seekTo(index, position)
                     target.prepare()
                 }
         }
