@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -29,6 +30,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -82,8 +84,8 @@ internal fun IconsSection() {
             horizontalArrangement = Arrangement.spacedBy(16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            AsyncImage(
-                model = picked.foreground, contentDescription = null, contentScale = ContentScale.Crop,
+            IconArtwork(
+                icon = picked, contentDescription = null,
                 modifier = Modifier.size(68.dp).clip(RoundedCornerShape(17.dp)),
             )
             Column {
@@ -101,9 +103,8 @@ internal fun IconsSection() {
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         items(AppIcon.entries.filter { it.family == family }, key = { it.name }) { icon ->
                             Column(Modifier.width(92.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                                AsyncImage(
-                                    model = icon.foreground, contentDescription = stringResource(icon.label),
-                                    contentScale = ContentScale.Crop,
+                                IconArtwork(
+                                    icon = icon, contentDescription = stringResource(icon.label),
                                     modifier = Modifier.size(72.dp).clip(RoundedCornerShape(18.dp))
                                         .border(if (icon == picked) 2.dp else 1.dp, Color.White.copy(alpha = if (icon == picked) 1f else .2f), RoundedCornerShape(18.dp))
                                         .semantics { selected = icon == picked }
@@ -124,5 +125,20 @@ internal fun IconsSection() {
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun IconArtwork(icon: AppIcon, contentDescription: String?, modifier: Modifier) {
+    Box(modifier) {
+        AsyncImage(
+            model = icon.foreground,
+            contentDescription = contentDescription,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.matchParentSize().graphicsLayer {
+                scaleX = icon.family.pickerScale
+                scaleY = icon.family.pickerScale
+            },
+        )
     }
 }
