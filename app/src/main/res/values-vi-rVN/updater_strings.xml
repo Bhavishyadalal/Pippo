@@ -70,8 +70,6 @@
     <string name="bugs_feedback">Lỗi &amp; góp ý</string>
     <string name="donate">Ủng hộ</string>
     <string name="support_development">Ủng hộ việc phát triển</string>
-    <string name="beta_updates">Cập nhật beta</string>
-    <string name="beta_updates_subtitle">Bật nếu bạn muốn nhận các bản cập nhật beta (ví dụ: b5.0.1)</string>
     <string name="on_latest_version">Bạn đang dùng phiên bản mới nhất</string>
     <string name="current_version_v">Phiên bản hiện tại: %1$s</string>
     <string name="update_to_v">Có bản cập nhật %1$s</string>

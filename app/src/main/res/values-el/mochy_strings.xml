@@ -83,7 +83,7 @@
     <string name="configure_supported_links">Διαμόρφωση υποστηριζόμενων συνδέσμων</string>
     <string name="intent_supported_links_not_found">Δεν ήταν δυνατή η εύρεση των ρυθμίσεων υποστηριζόμενων συνδέσμων, διαμορφώστε τις χειροκίνητα</string>
     <string name="set_first_lyrics_provider">Προτιμώμενος πάροχος στίχων</string>
-    <string name="audio_quality_max">Μέγιστο (beta)</string>
+    <string name="audio_quality_max">Μέγιστο</string>
     <string name="enable_similar_content">Ενεργοποίηση Παρόμοιου Περιεχομένου</string>
     <string name="similar_content_desc">Αυτόματη προσθήκη περισσότερων παρόμοιων τραγουδιών όταν φτάσει στο τέλος της ουράς</string>
     <string name="min_playback_duration_title">Ελάχιστη διάρκεια αναπαραγωγής</string>

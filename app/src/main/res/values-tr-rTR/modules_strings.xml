@@ -3,7 +3,6 @@
     <string name="module_adds_songs">Şarkılar</string>
     <string name="module_adds_lyrics">Sözler</string>
     <string name="module_adds_look">Görünüm</string>
-    <string name="modules_beta">BETA</string>
     <string name="modules_intro">yeni görünümler, yeni kaynaklar, yeni sözler modül olarak geliyor. 3. parti..</string>
     <string name="module_status_signed_out">Giriş yapılmadı</string>
     <string name="module_status_expired">Tekrar giriş yap · %1$s</string>

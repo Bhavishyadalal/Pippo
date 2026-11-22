@@ -106,7 +106,7 @@ private val CardPadding = 20.dp
 // past this the page stops widening, so a tablet reads like a wide phone
 private val PageMaxWidth = 680.dp
 
-private val PageTitleStyle = TextStyle(
+private val PageTitleStyle get() = TextStyle(
     fontFamily = InterFontFamily,
     fontWeight = FontWeight.Bold,
     fontSize = 34.sp,
@@ -121,6 +121,7 @@ fun GestureScreen(navController: NavController) = CustomisationScreen(navControl
 private enum class CustomiseSection(@StringRes val titleRes: Int, val keys: List<String>, val words: String) {
     ICONS(R.string.customise_icons, listOf("Icons", "App icon"), "icon icons app launcher home screen Pippo outline anime material you white black dark transparent"),
     AMOLED(R.string.true_black_amoled, listOf("True Black"), "theme appearance amoled oled pure black dark"),
+    FONT(R.string.app_font_title, listOf("App font"), "font typeface typography text lilita one caprasimo some time later"),
     NAVIGATION(R.string.nav_appearance_title, listOf("Bottom navigation"), "nav bar tabs capsule docked ribbon fold slide fade opening closing scroll player motion animations"),
     ROUNDING(R.string.customise_cover_rounding, listOf("Cover rounding"), "cover rounding corner radius square rounded art"),
     PLAYLIST(R.string.customise_playlist_styles, listOf("Playlist styles"), "playlist styles flow classic minimal header"),
@@ -208,6 +209,7 @@ private fun CustomiseSectionContent(section: CustomiseSection) {
     when (section) {
         CustomiseSection.ICONS -> IconsSection()
         CustomiseSection.AMOLED -> TrueBlackSection()
+        CustomiseSection.FONT -> AppFontSection()
         CustomiseSection.ARTWORK_BACKGROUND -> ArtworkBackgroundSection()
         CustomiseSection.NAVIGATION -> BottomNavigationSection()
         CustomiseSection.ROUNDING -> {

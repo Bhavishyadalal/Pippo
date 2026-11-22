@@ -42,7 +42,7 @@
     <string name="configure_supported_links">Unterstützte Links konfigurieren</string>
     <string name="intent_supported_links_not_found">Einstellungen für unterstützte Links nicht gefunden, bitte manuell konfigurieren</string>
     <string name="set_first_lyrics_provider">Bevorzugter Songtext-Anbieter</string>
-    <string name="audio_quality_max">Maximal (Beta)</string>
+    <string name="audio_quality_max">Maximal</string>
     <string name="enable_similar_content">Ähnliche Inhalte aktivieren</string>
     <string name="similar_content_desc">Automatisch weitere ähnliche Songs hinzufügen, wenn das Ende der Warteschlange erreicht ist</string>
     <string name="default_links">Unterstützte Links öffnen</string>
@@ -578,8 +578,6 @@
     <string name="crossfade_duration">Überblenddauer</string>
     <string name="crossfade_gapless">Deaktivieren für lückenlose Alben</string>
     <string name="crossfade_gapless_desc">Nicht Überblenden, wenn das Album lückenlos ist</string>
-    <string name="crossfade_beta_title">Beta-Funktion</string>
-    <string name="crossfade_beta_message">Song-Überblendung (Crossfade) ist eine neue Funktion und kann Fehler enthalten. Sollten Sie Probleme feststellen, melden Sie diese bitte.\n\nDiese Funktion deaktiviert die Audioauslagerung aus technischen Gründen.</string>
     <string name="audio_offload_disabled_by_crossfade">Deaktiviert, da Song-Überblendung (Crossfade) aktiv ist.</string>
     <string name="hide_youtube_shorts">YouTube Shorts ausblenden</string>
     <string name="listen_together_in_top_bar">Gemeinsam hören in der oberen Leiste anzeigen</string>

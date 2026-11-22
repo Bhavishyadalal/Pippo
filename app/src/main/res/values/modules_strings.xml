@@ -5,7 +5,6 @@
     <string name="module_adds_lyrics">Lyrics</string>
     <string name="module_adds_look">Look</string>
     <string name="module_adds_metadata">Song info</string>
-    <string name="modules_beta">BETA</string>
     <string name="module_status_signed_out">Not signed in</string>
     <string name="module_status_expired">Sign in again · %1$s</string>
     <string name="module_status_on">On · %1$s</string>

@@ -101,5 +101,4 @@
     <string name="audiopass_value_db">%1$s dB</string>
     <string name="audiopass_blocker_lossy_direct">Lossy songs go to the DAC untouched too. They were only compressed before they got here.</string>
     <string name="audiopass_blockers_restore">Turn these back on</string>
-    <string name="audiopass_beta">BETA</string>
 </resources>

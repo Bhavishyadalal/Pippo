@@ -70,8 +70,6 @@
     <string name="bugs_feedback">Hatalar &amp; geri bildirim</string>
     <string name="donate">Bağış yap</string>
     <string name="support_development">Geliştirmeye destek ol</string>
-    <string name="beta_updates">Beta güncellemeleri</string>
-    <string name="beta_updates_subtitle">Beta güncellemeleri almak istiyorsan bunu aç (ör. b5.0.1)</string>
     <string name="on_latest_version">En son sürümdesin</string>
     <string name="current_version_v">Mevcut sürüm: %1$s</string>
     <string name="update_to_v">Güncelleme var %1$s</string>

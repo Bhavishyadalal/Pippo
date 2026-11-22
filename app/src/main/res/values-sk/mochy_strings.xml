@@ -120,7 +120,7 @@
     <string name="configure_supported_links">Konfigurácia podporovaných odkazov</string>
     <string name="intent_supported_links_not_found">Nepodarilo sa nájsť podporované nastavenia odkazov, nakonfigurujte ich manuálne</string>
     <string name="set_first_lyrics_provider">Preferovaný poskytovateľ textov piesní</string>
-    <string name="audio_quality_max">Max (beta)</string>
+    <string name="audio_quality_max">Max</string>
     <string name="enable_similar_content">Povoliť podobný obsah</string>
     <string name="similar_content_desc">Automaticky pridávať ďalšie podobné skladby po dosiahnutí konca frontu</string>
     <string name="min_playback_duration_title">Minimálna dĺžka prehrávania</string>

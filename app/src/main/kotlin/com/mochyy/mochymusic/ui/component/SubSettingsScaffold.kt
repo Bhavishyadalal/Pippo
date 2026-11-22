@@ -105,7 +105,7 @@ fun SubSettingsScaffold(
     searchBar: (@Composable () -> Unit)? = null,
     /** the page this one sits under, written beside the back button ("‹ Audio Lab") */
     backLabel: String? = null,
-    /** a small mark beside the title, like a beta tag; it fades as the title shrinks into the bar */
+    /** A small mark that fades as the title shrinks into the bar. */
     titleBadge: (@Composable () -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {

@@ -105,7 +105,7 @@
     <string name="configure_supported_links">Konfiguracija podprtih povezav</string>
     <string name="intent_supported_links_not_found">Podprtih nastavitev povezav ni bilo mogoče najti, zato jih konfigurirajte ročno</string>
     <string name="set_first_lyrics_provider">Prednostni ponudnik besedil</string>
-    <string name="audio_quality_max">Maksimalno (beta)</string>
+    <string name="audio_quality_max">Maksimalno</string>
     <string name="enable_similar_content">Omogoči podobno vsebino</string>
     <string name="similar_content_desc">Samodejno dodajanje podobnih skladb, ko je dosežen konec čakalne vrste</string>
     <string name="min_playback_duration_title">Minimalno trajanje predvajanja</string>

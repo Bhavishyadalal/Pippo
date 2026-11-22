@@ -208,7 +208,7 @@
     <string name="enable_authentication">启用身份验证</string>
     <string name="discord_use_details">使用详细信息代替状态</string>
     <string name="discord_use_details_description">突出显示歌曲标题，而非音乐人名称</string>
-    <string name="audio_quality_max">最大 (beta)</string>
+    <string name="audio_quality_max">最大</string>
     <string name="enable_similar_content">启用相似内容</string>
     <string name="similar_content_desc">当播放队列末尾到达时，自动添加更多相似歌曲</string>
     <string name="persistent_shuffle_title">持续随机播放</string>
@@ -274,8 +274,6 @@
     <string name="crossfade_duration">淡入淡出时长</string>
     <string name="crossfade_gapless">对无缝专辑禁用</string>
     <string name="crossfade_gapless_desc">如果专辑为无缝格式则不淡入淡出</string>
-    <string name="crossfade_beta_title">测试功能</string>
-    <string name="crossfade_beta_message">淡入淡出是一项新功能，可能存在错误。如果您遇到任何问题，请及时反馈。\n\n由于技术限制，此功能会禁用省电播放。</string>
     <!-- Romanization Settings -->
     <string name="lyrics_romanization_cyrillic">罗马音设置</string>
     <string name="lyrics_romanize_title">罗马化</string>

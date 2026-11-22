@@ -222,8 +222,6 @@
     <string name="crossfade_duration">ระยะเวลาครอสเฟด</string>
     <string name="crossfade_gapless">ปิดสำหรับอัลบั้มแบบไม่มีช่วงว่าง</string>
     <string name="crossfade_gapless_desc">ไม่ใช้ครอสเฟดหากอัลบั้มไม่มีช่วงว่างระหว่างเพลง</string>
-    <string name="crossfade_beta_title">ฟีเจอร์เบต้า</string>
-    <string name="crossfade_beta_message">ครอสเฟดเป็นฟีเจอร์ใหม่และอาจมีข้อผิดพลาด หากพบปัญหา โปรดรายงานให้เราทราบ\n\nฟีเจอร์นี้จะปิดการใช้งาน audio offload เนื่องจากข้อจำกัดทางเทคนิค</string>
     <string name="lyrics_romanization_cyrillic">ซีริลลิก</string>
     <string name="lyrics_romanize_title">การถอดเสียง</string>
     <string name="lyrics_romanization">การถอดเสียงเนื้อเพลง</string>

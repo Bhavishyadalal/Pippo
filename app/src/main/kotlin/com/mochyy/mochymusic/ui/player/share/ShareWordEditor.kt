@@ -160,7 +160,6 @@ private fun ColumnScope.WordEditorContent(session: LyricsShareSession) {
 
     ShareTitle(
         "CoolfontEditor",
-        beta = true,
         subtitleSlot = {
             val line = mode?.let { stringResource(it.prompt) } ?: if (hinting) stringResource(R.string.ps_word_pick_first) else null
             AnimatedContent(

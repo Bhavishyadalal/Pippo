@@ -58,7 +58,7 @@ val HomeCardSpacing = 15.dp
 
 private val HomeTracking = (-0.06).em
 
-val HomeLabelStyle = TextStyle(
+val HomeLabelStyle get() = TextStyle(
     fontFamily = InterFontFamily,
     fontWeight = FontWeight.Bold,
     fontSize = 16.sp,
@@ -66,7 +66,7 @@ val HomeLabelStyle = TextStyle(
     letterSpacing = HomeTracking,
 )
 
-val HomeTitleStyle = TextStyle(
+val HomeTitleStyle get() = TextStyle(
     fontFamily = InterFontFamily,
     fontWeight = FontWeight.Bold,
     fontSize = 24.sp,
@@ -74,7 +74,7 @@ val HomeTitleStyle = TextStyle(
     letterSpacing = HomeTracking,
 )
 
-private val HomeCardTitleStyle = TextStyle(
+private val HomeCardTitleStyle get() = TextStyle(
     fontFamily = InterFontFamily,
     fontWeight = FontWeight.SemiBold,
     fontSize = 14.sp,
@@ -82,7 +82,7 @@ private val HomeCardTitleStyle = TextStyle(
     letterSpacing = (-0.03).em,
 )
 
-private val HomeCardSubtitleStyle = TextStyle(
+private val HomeCardSubtitleStyle get() = TextStyle(
     fontFamily = InterFontFamily,
     fontWeight = FontWeight.Medium,
     fontSize = 12.sp,
@@ -90,7 +90,7 @@ private val HomeCardSubtitleStyle = TextStyle(
     letterSpacing = (-0.02).em,
 )
 
-private val HomeRankStyle = TextStyle(
+private val HomeRankStyle get() = TextStyle(
     fontFamily = InterFontFamily,
     fontWeight = FontWeight.Bold,
     fontSize = 22.sp,
@@ -283,7 +283,7 @@ fun HomeCoverCard(
 // the Figma "Concert" card (20:195) is 314 x 247 on a 402 wide frame
 const val HomeVideoCardAspect = 314f / 247f
 
-private val HomeVideoTitleStyle = TextStyle(
+private val HomeVideoTitleStyle get() = TextStyle(
     fontFamily = InterFontFamily,
     fontWeight = FontWeight.SemiBold,
     fontSize = 15.sp,
@@ -291,7 +291,7 @@ private val HomeVideoTitleStyle = TextStyle(
     letterSpacing = (-0.03).em,
 )
 
-private val HomeVideoSubtitleStyle = TextStyle(
+private val HomeVideoSubtitleStyle get() = TextStyle(
     fontFamily = InterFontFamily,
     fontWeight = FontWeight.Medium,
     fontSize = 13.sp,

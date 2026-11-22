@@ -122,7 +122,7 @@
         <item quantity="other">%d segundos</item>
     </plurals>
     <string name="trending">Tendencia</string>
-    <string name="audio_quality_max">Max (BETA)</string>
+    <string name="audio_quality_max">Max</string>
     <string name="intent_app_language_not_found">No se encontró la configuración de idioma, por favor configúrela manualmente</string>
     <string name="elements_selected">%1$d elementos seleccionados</string>
     <string name="link_copied">Link copiado al portapapeles</string>
@@ -474,8 +474,6 @@
     <string name="crossfade_duration">Duración del desvanecido</string>
     <string name="crossfade_gapless">Desactivar para álbumes sin pausas</string>
     <string name="crossfade_gapless_desc">No desvanecer si el álbum no tiene pausas</string>
-    <string name="crossfade_beta_title">Funciones Beta</string>
-    <string name="crossfade_beta_message">Desvanecimiento es una nueva función y puede tener errores. Si experimentas algún problema, por favor, infórmanos.\n\nEsta función desactiva la descarga de audio debido a limitaciones técnicas.</string>
     <string name="lyrics_romanize_hindi">Romanizar letras Hindi</string>
     <string name="lyrics_romanize_punjabi">Romanizar letras Punjabi</string>
     <string name="audio_offload_disabled_by_crossfade">Deshabilitado porque el desvanecido esta activo</string>

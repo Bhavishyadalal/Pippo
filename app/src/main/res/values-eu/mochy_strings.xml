@@ -123,7 +123,7 @@
     <string name="proxy_username">Proxy erabiltzaile izena</string>
     <string name="proxy_password">Proxy pasahitza</string>
     <string name="enable_authentication">Autentikazioa gaitu</string>
-    <string name="audio_quality_max">Gehiena (beta)</string>
+    <string name="audio_quality_max">Gehiena</string>
     <string name="enable_similar_content">Antzeko edukia gaitu</string>
     <string name="similar_content_desc">Ilara amaitzerakoan, antzeko abestiak gehitu</string>
     <string name="min_playback_duration_title">Gutxieneko erreprodukzio iraupena</string>
