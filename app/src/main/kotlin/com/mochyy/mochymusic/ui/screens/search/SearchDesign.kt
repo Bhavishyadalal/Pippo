@@ -731,7 +731,7 @@ private fun BoxScope.LayeredCover(
         if (url != null) {
             AsyncImage(
 
-                model = url.resize(128, 128),
+                model = com.mochyy.mochymusic.viewmodels.searchTileCoverUrl(url),
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),

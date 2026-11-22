@@ -548,7 +548,7 @@ class MainActivity : ComponentActivity() {
             setSystemBarAppearance(useDarkTheme)
         }
 
-        val pureBlackEnabled by rememberPreference(PureBlackKey, defaultValue = false)
+        val pureBlackEnabled by rememberPreference(PureBlackKey, defaultValue = true)
         // Pure black only makes sense on top of the dark scheme; forcing it in light mode
         // paints a black background under light-mode colours and the app looks dark on a
         // phone set to light.
@@ -1530,8 +1530,8 @@ class MainActivity : ComponentActivity() {
                 .map { prefs ->
                     LookSettings(
                         animations = prefs[com.mochyy.mochymusic.constants.EnableElementBlurAnimatorKey] ?: true,
-                        speed = prefs[com.mochyy.mochymusic.constants.AnimationSpeedKey] ?: 1f,
-                        elementBlur = prefs[com.mochyy.mochymusic.constants.ElementBlurKey] ?: true,
+                        speed = prefs[com.mochyy.mochymusic.constants.AnimationSpeedKey] ?: 1.5f,
+                        elementBlur = prefs[com.mochyy.mochymusic.constants.ElementBlurKey] ?: false,
                         coverRadius = prefs[com.mochyy.mochymusic.constants.ThumbnailCornerRadiusKey] ?: 25f,
                     )
                 }

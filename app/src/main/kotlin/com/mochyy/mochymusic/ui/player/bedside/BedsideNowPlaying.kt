@@ -58,6 +58,7 @@ import com.mochyy.mochymusic.ui.player.styles.StyleTones
 import com.mochyy.mochymusic.ui.player.styles.TransportCircles
 import com.mochyy.mochymusic.ui.player.styles.rememberStyleShowing
 import com.mochyy.mochymusic.ui.player.styles.styleSongSwipe
+import com.mochyy.mochymusic.ui.utils.songTitleSilver
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
@@ -135,7 +136,7 @@ private fun SongDetails(
         Box {
             SongSlots(carousel, track) { song, slot ->
                 Column(slot) {
-                    BasicText(song.title, style = labelStyle(titleSize, FontWeight.Bold), color = ink.main, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    BasicText(song.title, modifier = Modifier.songTitleSilver(song.title), style = labelStyle(titleSize, FontWeight.Bold), color = ink.main, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     Spacer(Modifier.height(titleSize * 0.2f))
                     BasicText(song.artist, style = labelStyle(titleSize * 0.66f), color = ink.soft, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }

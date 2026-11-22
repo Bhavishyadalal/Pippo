@@ -42,6 +42,7 @@ import com.mochyy.mochymusic.ui.player.LyricsHeaderArtX
 import com.mochyy.mochymusic.ui.player.LyricsScreen
 import com.mochyy.mochymusic.ui.player.QueueScreen
 import com.mochyy.mochymusic.ui.theme.InterFontFamily
+import com.mochyy.mochymusic.ui.utils.songTitleSilver
 import com.mochyy.mochymusic.ui.utils.stableStatusBarsPadding
 
 /**
@@ -167,6 +168,7 @@ private fun StyleOverlayPage(
                     Column(Modifier.weight(1f)) {
                         Text(
                             track.title,
+                            modifier = Modifier.songTitleSilver(track.title),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             style = TextStyle(fontFamily = InterFontFamily, fontWeight = FontWeight.Bold, fontSize = 19.sp, letterSpacing = (-0.03).em, color = Color.White),

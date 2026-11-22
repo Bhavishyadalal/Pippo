@@ -7,7 +7,7 @@ import androidx.compose.ui.graphics.Color
 import com.mochyy.mochymusic.constants.PlayerArtworkBackgroundStrengthKey
 import com.mochyy.mochymusic.utils.rememberPreference
 
-internal const val DefaultPlayerArtworkBackgroundStrength = 0.35f
+internal const val DefaultPlayerArtworkBackgroundStrength = 0f
 
 @Composable
 internal fun playerArtworkBackgroundStrength(): Float =

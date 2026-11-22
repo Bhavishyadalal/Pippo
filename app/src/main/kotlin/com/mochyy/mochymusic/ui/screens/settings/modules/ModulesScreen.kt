@@ -6,15 +6,19 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -53,6 +57,8 @@ import com.mochyy.mochymusic.ui.component.SubSettingsScaffold
 import com.mochyy.mochymusic.ui.screens.audiolab.LabColors
 import com.mochyy.mochymusic.ui.screens.settings.devspace.openDevUrl
 import com.mochyy.mochymusic.ui.theme.InterFontFamily
+import com.mochyy.mochymusic.ui.screens.setup.onboarding.ModulesSetupPage
+import com.mochyy.mochymusic.ui.utils.silverSweep
 import com.mochyy.mochymusic.viewmodels.ModulesViewModel
 import kotlinx.coroutines.launch
 
@@ -105,6 +111,14 @@ fun ModulesScreen(navController: NavController, viewModel: ModulesViewModel = hi
 
         Spacer(Modifier.height(34.dp))
         ModuleSectionTitle(stringResource(R.string.modules_sources), stringResource(R.string.modules_swipe_to_delete))
+        Spacer(Modifier.height(12.dp))
+        ModuleTesterCard {
+            var sheet: com.mochyy.mochymusic.ui.component.PopupSheetHandle? = null
+            sheet = overlay.showWithHandle(fullBleed = true, surface = Color(0xFF121C22)) {
+                ModulesSetupPage(active = true, onContinue = { sheet?.dismiss() }, inSettings = true)
+            }
+        }
+        Spacer(Modifier.height(12.dp))
         ModuleList(
             sources, onOpen = open, onRemove = { removing = it }, onReorder = { viewModel.reorder(it, looks = false) },
             updating = updating, onUpdate = update,
@@ -125,6 +139,27 @@ fun ModulesScreen(navController: NavController, viewModel: ModulesViewModel = hi
             },
         ) {
             Text(stringResource(R.string.module_remove_body), fontFamily = InterFontFamily, fontSize = 14.sp, lineHeight = 20.sp)
+        }
+    }
+}
+
+@Composable
+private fun ModuleTesterCard(onClick: () -> Unit) {
+    val title = stringResource(R.string.module_tester_title)
+    Row(
+        modifier = Modifier.fillMaxWidth()
+            .clip(RoundedCornerShape(22.dp))
+            .background(Color(0xFF18262E))
+            .clickable(onClick = onClick)
+            .padding(16.dp),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(painterResource(R.drawable.graphic_eq), null, Modifier.size(25.dp), tint = Color(0xFFA4E8DB))
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text(title, modifier = Modifier.silverSweep(title), color = Color(0xFFE0EBF0),
+                fontSize = 17.sp, fontWeight = FontWeight.Bold)
+            Text(stringResource(R.string.module_tester_description), color = Color(0xFFD0D9DF), fontSize = 13.sp)
         }
     }
 }

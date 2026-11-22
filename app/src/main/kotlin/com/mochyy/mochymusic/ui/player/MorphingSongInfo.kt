@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mochyy.mochymusic.ui.player.models.TrackInfo
+import com.mochyy.mochymusic.ui.utils.songTitleSilver
 
 private val TargetX = 36.dp + 60.dp + 18.dp
 
@@ -140,6 +141,7 @@ fun MorphingSongInfo(
                         scaleY = scale
                         transformOrigin = TransformOrigin(0f, 0f)
                     }
+                    .songTitleSilver(trackInfo.title)
                     .basicMarquee(
                         iterations = Int.MAX_VALUE,
                         initialDelayMillis = 2500,

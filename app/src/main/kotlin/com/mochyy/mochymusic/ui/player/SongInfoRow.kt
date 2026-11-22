@@ -64,6 +64,7 @@ import com.mochyy.mochymusic.constants.ShowFormatBadgeKey
 import com.mochyy.mochymusic.constants.ShowFormatSampleRateKey
 import com.mochyy.mochymusic.utils.rememberPreference
 import com.mochyy.mochymusic.ui.component.RemoteFocus
+import com.mochyy.mochymusic.ui.utils.songTitleSilver
 
 @Composable
 fun SongInfoRow(
@@ -396,6 +397,7 @@ internal fun FadingOverflowText(
         onTextLayout = { fullWidth = it.size.width },
         modifier = modifier
             .trailingFade { shown -> fullWidth > shown + 0.5f }
+            .songTitleSilver(text)
             .basicMarquee(iterations = 1, initialDelayMillis = 3000, velocity = 30.dp),
     )
 }

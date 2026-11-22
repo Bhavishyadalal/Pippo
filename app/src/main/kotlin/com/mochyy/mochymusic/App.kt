@@ -62,6 +62,9 @@ class App : Application(), SingletonImageLoader.Factory {
     lateinit var applicationScope: CoroutineScope
 
     @Inject
+    lateinit var searchBrowseArtwork: com.mochyy.mochymusic.viewmodels.SearchBrowseArtwork
+
+    @Inject
     lateinit var musicDatabase: com.mochyy.mochymusic.db.MusicDatabase
 
     // only built once a tv is paired, it pulls in the downloads
@@ -85,6 +88,17 @@ class App : Application(), SingletonImageLoader.Factory {
         }
 
         PreferencesCache.start(this, applicationScope)
+        applicationScope.launch(Dispatchers.IO) {
+            com.mochyy.mochymusic.ui.launch.LaunchGate.awaitIntro()
+            kotlinx.coroutines.delay(1_250)
+            try {
+                searchBrowseArtwork.warmDiskCache()
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                reportException(error)
+            }
+        }
         // tokens saved before the vault existed are sealed on the first start after the update
         applicationScope.launch(kotlinx.coroutines.Dispatchers.IO) { (dataStore as? com.mochyy.mochymusic.utils.SecretPreferences)?.sealLeftovers() }
         com.mochyy.mochymusic.utils.NotRecommended.init(this)

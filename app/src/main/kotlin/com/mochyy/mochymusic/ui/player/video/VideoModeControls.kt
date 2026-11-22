@@ -75,6 +75,7 @@ import com.mochyy.mochymusic.ui.player.rememberMusicVolume
 import com.mochyy.mochymusic.ui.player.styles.rememberDurationMs
 import com.mochyy.mochymusic.ui.theme.InterFontFamily
 import com.mochyy.mochymusic.ui.utils.resize
+import com.mochyy.mochymusic.ui.utils.songTitleSilver
 import com.mochyy.mochymusic.ui.utils.stableStatusBars
 import com.mochyy.mochymusic.utils.makeTimeString
 import kotlinx.coroutines.delay
@@ -173,6 +174,7 @@ internal fun BoxScope.VideoTopBar(
     ) {
         Text(
             text = track.title,
+            modifier = Modifier.songTitleSilver(track.title, visible),
             color = Color.White,
             fontFamily = InterFontFamily,
             fontSize = 18.sp,

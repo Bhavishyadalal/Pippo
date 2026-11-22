@@ -71,6 +71,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.currentStateAsState
 import coil3.compose.AsyncImage
 import com.mochyy.mochymusic.R
+import com.mochyy.mochymusic.modules.ModuleEntry
 import com.mochyy.mochymusic.module.TrackQuery
 import com.mochyy.mochymusic.ui.component.AppSwitch
 import com.mochyy.mochymusic.ui.screens.settings.modules.ModuleLogo
@@ -111,6 +112,7 @@ internal fun ModulesSetupPage(
     active: Boolean,
     onContinue: () -> Unit,
     viewModel: OnboardingModulesViewModel = hiltViewModel(),
+    inSettings: Boolean = false,
 ) {
     val allEntries by viewModel.entries.collectAsStateWithLifecycle()
     val modules = remember(allEntries) { allEntries.filter(viewModel::showInSetup) }
@@ -130,7 +132,10 @@ internal fun ModulesSetupPage(
     var showFetchProgress by remember { mutableStateOf(false) }
     val selected = chosenSong ?: suggested?.toSetupSong() ?: OneKiss
     val fetching = fetchResults.values.any { it == ModuleFetchResult.Fetching }
-    val canFetch = active && modules.any(viewModel::canFetch)
+    fun canFetchEntry(entry: ModuleEntry) =
+        entry.enabled || (!inSettings && viewModel.canAutoEnable(entry.id))
+
+    val canFetch = active && modules.any(::canFetchEntry)
     val lifecycle by LocalLifecycleOwner.current.lifecycle.currentStateAsState()
     val motion = active && lifecycle.isAtLeast(Lifecycle.State.RESUMED) && AppMotion.durationScale.scaleFactor > 0f
     val titleSweep = remember { Animatable(1f) }
@@ -155,7 +160,7 @@ internal fun ModulesSetupPage(
 
     fun fetch(song: SetupSong? = chosenSong) {
         if (!active) return
-        val sources = viewModel.entries.value.filter { viewModel.showInSetup(it) && viewModel.canFetch(it) }
+        val sources = viewModel.entries.value.filter { viewModel.showInSetup(it) && canFetchEntry(it) }
         if (sources.isEmpty()) return
         cancelFetches()
         fetchResults.clear()
@@ -175,7 +180,7 @@ internal fun ModulesSetupPage(
             val job = scope.launch(start = CoroutineStart.LAZY) {
                 val currentJob = coroutineContext[Job]
                 try {
-                    val result = viewModel.fetch(entry.id, track.await())
+                    val result = viewModel.fetch(entry.id, track.await(), autoEnable = !inSettings)
                     if (jobs[entry.id] === currentJob) fetchResults[entry.id] = result
                 } catch (cancelled: CancellationException) {
                     throw cancelled
@@ -208,12 +213,13 @@ internal fun ModulesSetupPage(
 
     OnboardingPage(
         badge = { ModulesEmblem() },
-        title = stringResource(R.string.onb_modules_title),
-        subtitle = stringResource(R.string.onb_modules_subtitle),
+        title = stringResource(if (inSettings) R.string.module_tester_title else R.string.onb_modules_title),
+        subtitle = stringResource(if (inSettings) R.string.module_tester_description else R.string.onb_modules_subtitle),
         modifier = Modifier.imePadding(),
+        contentTop = if (inSettings) 12.dp else Onb.TopClearance + 18.dp,
         titleModifier = Modifier.semantics { heading() }.silverText(titleSweep, motion),
         footer = {
-            OnbButton(stringResource(R.string.onb_continue), onClick = {
+            OnbButton(stringResource(if (inSettings) R.string.done else R.string.onb_continue), onClick = {
                 cancelFetches()
                 focus.clearFocus()
                 onContinue()
@@ -298,7 +304,7 @@ internal fun ModulesSetupPage(
                     val result = fetchResults[entry.id]
                     SetupModuleRow(
                         title = entry.module.info.name,
-                        detail = moduleFetchDescription(entry.enabled, viewModel.canAutoEnable(entry.id), result),
+                        detail = moduleFetchDescription(entry.enabled, !inSettings && viewModel.canAutoEnable(entry.id), result),
                         result = result,
                         checked = entry.enabled,
                         enabled = active,

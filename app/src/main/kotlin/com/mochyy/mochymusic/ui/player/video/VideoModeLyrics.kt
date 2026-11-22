@@ -183,7 +183,7 @@ internal fun rememberVideoLyrics(): VideoLyrics {
 internal fun rememberVideoLyricLook(): VideoLyricLook {
     val (motion) = rememberEnumPreference(LyricsMotionStyleKey, defaultValue = LyricsMotionStyle.MOTION)
     val (highBloom) = rememberPreference(LyricsHighBloomKey, defaultValue = true)
-    val (blurAllowed) = rememberPreference(com.mochyy.mochymusic.constants.ElementBlurKey, defaultValue = true)
+    val (blurAllowed) = rememberPreference(com.mochyy.mochymusic.constants.ElementBlurKey, defaultValue = false)
     val status by LyricsTranslationHelper.status.collectAsState()
     val translating = status is LyricsTranslationHelper.TranslationStatus.Translating
     return remember(motion, highBloom, blurAllowed, translating) {
