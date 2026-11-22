@@ -58,6 +58,9 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.Runnable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
@@ -126,6 +129,10 @@ constructor(
 
     private class NoLosslessDownload : java.io.IOException("No downloadable FLAC or ALAC stream")
     private val repairLock = Mutex()
+    private val fileOperationLock = Mutex()
+    private var locationChangePending = false
+    private var downloadPauseHolds = 0
+    private var resumeAfterHolds = false
     // DownloadManager commands and their callbacks are serialized on the application thread.
     private val pendingDownloadRequests = mutableSetOf<String>()
     private val unavailableLossless = MutableStateFlow<Set<String>>(emptySet())
@@ -340,24 +347,60 @@ constructor(
         scope.launch { followBatches() }
         scope.launch { followAutoDownloads(context) }
 
-        // Offline mode holds downloads where they are rather than failing them: they carry on
-        // when it's turned off. Only then - resuming whenever offline mode reads off, at every
-        // start included, would undo downloads paused for any other reason.
+        // Offline mode and file operations hold the same pause. Turning Offline Mode off
+        // cannot restart the writer during a copy, and an existing pause stays in place.
         scope.launch {
-            var wasOffline = false
+            var offlineHold = false
             context.dataStore.data
                 .map { it[OfflineModeKey] ?: false }
                 .distinctUntilChanged()
                 .collect { offline ->
-                    kotlinx.coroutines.withContext(Dispatchers.Main) {
-                        if (offline) {
-                            downloadManager.pauseDownloads()
-                        } else if (wasOffline) {
-                            downloadManager.resumeDownloads()
-                        }
+                    withContext(Dispatchers.Main) {
+                        if (offline && !offlineHold) holdDownloads()
+                        if (!offline && offlineHold) releaseDownloads()
+                        offlineHold = offline
                     }
-                    wasOffline = offline
                 }
+        }
+    }
+
+    private fun holdDownloads() {
+        if (downloadPauseHolds == 0) {
+            resumeAfterHolds = !downloadManager.downloadsPaused
+            if (resumeAfterHolds) downloadManager.pauseDownloads()
+        }
+        downloadPauseHolds++
+    }
+
+    private fun releaseDownloads() {
+        downloadPauseHolds--
+        if (downloadPauseHolds == 0 && resumeAfterHolds) downloadManager.resumeDownloads()
+    }
+
+    internal suspend fun <T> withDownloadFilesPaused(
+        keepPausedUntilRestart: Boolean = false,
+        action: suspend () -> T,
+    ): T = fileOperationLock.withLock {
+        check(!locationChangePending) { "Downloads are waiting for the app to restart" }
+        var held = false
+        var complete = false
+        try {
+            withContext(Dispatchers.Main) {
+                holdDownloads()
+                held = true
+            }
+            check(withTimeoutOrNull(10_000L) {
+                while (!withContext(Dispatchers.Main) { downloadManager.isIdle }) delay(100L)
+                true
+            } == true) { "Downloads did not stop writing" }
+            action().also {
+                complete = true
+                if (keepPausedUntilRestart) locationChangePending = true
+            }
+        } finally {
+            if (held && (!complete || !keepPausedUntilRestart)) {
+                withContext(Dispatchers.Main + NonCancellable) { releaseDownloads() }
+            }
         }
     }
 
@@ -455,7 +498,18 @@ constructor(
      * stream was recorded at.
      */
     private suspend fun recordDownloadedLength(download: Download) {
-        val length = download.contentLength.takeIf { it > 0 } ?: return
+        val key = download.request.customCacheKey ?: download.request.uri.toString()
+        val metadataLength = ContentMetadata.getContentLength(downloadCache.getContentMetadata(key))
+        val length = download.contentLength.takeIf { it > 0 }
+            ?: metadataLength.takeIf { it > 0 }
+            ?: download.bytesDownloaded.takeIf { it > 0 }
+            ?: return
+        if (metadataLength <= 0 && downloadCache.isCached(key, 0, length)) {
+            runCatching {
+                val metadata = ContentMetadataMutations.setContentLength(ContentMetadataMutations(), length)
+                downloadCache.applyContentMetadataMutations(key, metadata)
+            }.onFailure { android.util.Log.w(LOG_TAG, "Couldn't record downloaded length", it) }
+        }
         val format = database.format(download.request.id).first() ?: return
         if (format.contentLength != length) database.query { upsert(format.copy(contentLength = length)) }
     }
@@ -577,9 +631,9 @@ constructor(
         Download.STATE_COMPLETED -> {
             val cacheKey = download.request.customCacheKey ?: download.request.uri.toString()
             val length = download.contentLength.takeIf { it > 0 }
-                ?: ContentMetadata.getContentLength(downloadCache.getContentMetadata(cacheKey))
-            if (length > 0) !downloadCache.isCached(cacheKey, 0, length)
-            else downloadCache.getCachedSpans(cacheKey).firstOrNull()?.position != 0L
+                ?: ContentMetadata.getContentLength(downloadCache.getContentMetadata(cacheKey)).takeIf { it > 0 }
+                ?: download.bytesDownloaded
+            length <= 0 || !downloadCache.isCached(cacheKey, 0, length)
         }
         else -> false
     }

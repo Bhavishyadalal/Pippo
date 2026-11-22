@@ -18,6 +18,8 @@ import com.mochyy.mochymusic.R
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.io.FileOutputStream
+import java.io.IOException
 
 // the two big folders mochy can keep on another drive, named after the folder they use on any drive
 enum class StoredKind(val folder: String) {
@@ -161,16 +163,36 @@ object StoragePlaces {
 
     // remembers where [kind] lives from the next start on, and that the old folder can go once that start is here
     fun choose(context: Context, kind: StoredKind, place: StoragePlace, oldDir: File) {
-        val marker = markerOf(context, kind)
-        if (place.isPhone) marker.delete() else marker.writeText(place.root.path)
-        if (oldDir != File(place.root, kind.folder)) addLeftover(context, kind, oldDir)
+        val destination = File(place.root, kind.folder).canonicalFile
+        val previous = oldDir.canonicalFile
+        writeSelection(context, kind, if (place.isPhone) "" else place.root.canonicalPath)
+        if (previous != destination) scheduleLeftover(context, kind, previous)
     }
 
-    // an import brings its downloads back onto the phone, so whatever lived on a card is left behind
+    // An import brings its downloads back onto the phone, so the previous copy can be retired.
     fun resetToPhone(context: Context, kind: StoredKind) {
         val root = chosenRoot(context, kind) ?: return
-        markerOf(context, kind).delete()
-        addLeftover(context, kind, File(root, kind.folder))
+        writeSelection(context, kind, "")
+        scheduleLeftover(context, kind, File(root, kind.folder))
+    }
+
+    private fun writeSelection(context: Context, kind: StoredKind, value: String) {
+        val marker = markerOf(context, kind)
+        val temporary = File.createTempFile("storage-place-", ".tmp", context.noBackupFilesDir)
+        try {
+            FileOutputStream(temporary).use { output ->
+                output.write(value.toByteArray(Charsets.UTF_8))
+                output.fd.sync()
+            }
+            if (!temporary.renameTo(marker)) throw IOException("Couldn't save the storage location")
+        } finally {
+            temporary.delete()
+        }
+    }
+
+    private fun scheduleLeftover(context: Context, kind: StoredKind, directory: File) {
+        runCatching { addLeftover(context, kind, directory) }
+            .onFailure { Log.w(Tag, "Couldn't schedule cleanup for the previous ${kind.folder} folder", it) }
     }
 
     private fun addLeftover(context: Context, kind: StoredKind, dir: File) {
@@ -187,14 +209,28 @@ object StoragePlaces {
         val list = runCatching { JSONArray(file.readText()) }.getOrNull()
         file.delete()
         list ?: return
-        // read now, before anything can change them, so a folder in use is never the one deleted
-        val inUse = StoredKind.entries.map { dir(app, it) }.toSet()
-        Thread {
+        // Move retired folders out of the way before the app opens caches or lets the user
+        // pick the same location again. Only the renamed paths are deleted on the worker.
+        val inUse = StoredKind.entries.flatMap { kind ->
+            listOfNotNull(dir(app, kind), chosenRoot(app, kind)?.let { File(it, kind.folder) })
+        }.mapNotNull { runCatching { it.canonicalPath + File.separator }.getOrNull() }
+        val retired = buildList {
             for (i in 0 until list.length()) {
                 val entry = list.optJSONObject(i) ?: continue
                 val kind = runCatching { StoredKind.valueOf(entry.getString("kind")) }.getOrNull() ?: continue
-                val dir = File(entry.optString("path"))
-                if (dir in inUse || !dir.exists()) continue
+                val path = entry.optString("path").takeIf { it.isNotBlank() } ?: continue
+                val directory = runCatching { File(path).canonicalFile }.getOrNull() ?: continue
+                if (directory.name != kind.folder || !directory.isDirectory) continue
+                val canonicalPath = directory.path + File.separator
+                if (inUse.any { canonicalPath.startsWith(it) || it.startsWith(canonicalPath) }) continue
+                val parent = directory.parentFile ?: continue
+                val moved = File(parent, "${kind.folder}-retired-${java.util.UUID.randomUUID()}")
+                if (directory.renameTo(moved)) add(kind to moved)
+            }
+        }
+        if (retired.isEmpty()) return
+        Thread {
+            for ((kind, dir) in retired) {
                 runCatching {
                     // the cache's index lives in media3's database, so it goes through simplecache to take its tables too
                     if (kind == StoredKind.SongCache) {

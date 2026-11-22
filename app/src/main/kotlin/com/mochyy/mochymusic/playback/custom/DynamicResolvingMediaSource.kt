@@ -69,104 +69,106 @@ class DynamicResolvingMediaSource(
 
         fetchScope.launch {
             val mediaId = originalMediaItem.mediaId
-            val result = try {
-                fetcherAction(mediaId)
+            try {
+                val result = fetcherAction(mediaId)
+                ensureActive()
+                openResolvedStream(gen, mediaId, result)
             } catch (e: Exception) {
                 // A provider may cancel its own request. A live MediaSource still has to
                 // report that failure so ExoPlayer can recover from buffering.
                 ensureActive()
-                Timber.e(e, "Failed to fetch stream for mediaId: $mediaId")
+                Timber.e(e, "Failed to open stream for mediaId: $mediaId")
                 playbackHandler?.post {
                     if (gen == generation) fetchError = if (e is IOException) e else IOException(e)
                 }
-                return@launch
             }
+        }
+    }
 
-            ensureActive()
-            playbackHandler?.post {
-                if (gen == generation) onSourceResolved(mediaId, result?.source ?: "YouTube Music")
-            }
+    private fun openResolvedStream(gen: Int, mediaId: String, result: CustomStreamResult?) {
+        playbackHandler?.post {
+            if (gen == generation) onSourceResolved(mediaId, result?.source ?: "YouTube Music")
+        }
 
-            if (result == null) {
-                prepareChild(gen, mediaSourceFactoryProvider(null), originalMediaItem)
-                return@launch
-            }
+        if (result == null) {
+            prepareChild(gen, mediaSourceFactoryProvider(null), originalMediaItem)
+            return
+        }
 
-            val uri = Uri.parse(result.streamUrl)
-            val path = uri.path.orEmpty()
-            val adaptiveMime = when {
-                result.isDash -> MimeTypes.APPLICATION_MPD
-                result.isHls -> MimeTypes.APPLICATION_M3U8
-                path.endsWith(".mpd", ignoreCase = true) -> MimeTypes.APPLICATION_MPD
-                path.endsWith(".m3u8", ignoreCase = true) -> MimeTypes.APPLICATION_M3U8
-                else -> null
-            }
-            val builder = originalMediaItem.buildUpon().setUri(uri)
-            if (adaptiveMime != null) {
-                // Adaptive segment requests identify themselves by URL. A progressive cache
-                // key cannot describe all of the manifest's independent resources.
-                builder.setMimeType(adaptiveMime).setCustomCacheKey(null)
-            } else {
-                result.cacheKey?.let(builder::setCustomCacheKey)
-            }
+        val uri = Uri.parse(result.streamUrl)
+        val path = uri.path.orEmpty()
+        val adaptiveMime = when {
+            result.isDash -> MimeTypes.APPLICATION_MPD
+            result.isHls -> MimeTypes.APPLICATION_M3U8
+            path.endsWith(".mpd", ignoreCase = true) -> MimeTypes.APPLICATION_MPD
+            path.endsWith(".m3u8", ignoreCase = true) -> MimeTypes.APPLICATION_M3U8
+            else -> null
+        }
+        val builder = originalMediaItem.buildUpon().setUri(uri)
+        if (adaptiveMime != null) {
+            // Adaptive segment requests identify themselves by URL. A progressive cache
+            // key cannot describe all of the manifest's independent resources.
+            builder.setMimeType(adaptiveMime).setCustomCacheKey(null)
+        } else {
+            result.cacheKey?.let(builder::setCustomCacheKey)
+        }
 
-            val widevine = result.widevineLicense
-            if (widevine != null) {
-                // a source module's Widevine stream: the device's CDM decrypts, the module licenses
-                val drmManager = WidevineDrm.sessionManager(widevine)
-                builder.setDrmConfiguration(
-                    MediaItem.DrmConfiguration.Builder(C.WIDEVINE_UUID).setMultiSession(true).build()
-                )
-                prepareChild(gen, mediaSourceFactoryProvider(drmManager), builder.build())
-            } else if (!result.decryptionKey.isNullOrBlank()) {
+        val widevine = result.widevineLicense
+        if (widevine != null) {
+            // a source module's Widevine stream: the device's CDM decrypts, the module licenses
+            val drmManager = WidevineDrm.sessionManager(widevine)
+            builder.setDrmConfiguration(
+                MediaItem.DrmConfiguration.Builder(C.WIDEVINE_UUID).setMultiSession(true).build()
+            )
+            prepareChild(gen, mediaSourceFactoryProvider(drmManager), builder.build())
+        } else if (!result.decryptionKey.isNullOrBlank()) {
 
-                val drmCallback = object : MediaDrmCallback {
-                    override fun executeProvisionRequest(uuid: UUID, request: ExoMediaDrm.ProvisionRequest): ByteArray {
-                        return ByteArray(0)
-                    }
-
-                    override fun executeKeyRequest(uuid: UUID, request: ExoMediaDrm.KeyRequest): ByteArray {
-                        try {
-                            val requestStr = String(request.data, Charsets.UTF_8)
-                            val requestJson = JSONObject(requestStr)
-                            val kids = requestJson.getJSONArray("kids")
-                            val kid = kids.getString(0)
-
-                            val keyBytes = hexStringToByteArray(result.decryptionKey)
-                            val kBase64Url = Base64.encodeToString(keyBytes, Base64.URL_SAFE or Base64.NO_PADDING or Base64.NO_WRAP)
-
-                            val responseJson = JSONObject().apply {
-                                put("keys", JSONArray().apply {
-                                    put(JSONObject().apply {
-                                        put("kty", "oct")
-                                        put("k", kBase64Url)
-                                        put("kid", kid)
-                                    })
-                                })
-                                put("type", "temporary")
-                            }
-                            return responseJson.toString().toByteArray(Charsets.UTF_8)
-                        } catch (e: Exception) {
-                            Timber.e(e, "Failed to generate ClearKey response")
-                            throw RuntimeException(e)
-                        }
-                    }
+            val drmCallback = object : MediaDrmCallback {
+                override fun executeProvisionRequest(uuid: UUID, request: ExoMediaDrm.ProvisionRequest): ByteArray {
+                    return ByteArray(0)
                 }
 
-                val drmManager = DefaultDrmSessionManager.Builder()
-                    .setUuidAndExoMediaDrmProvider(C.CLEARKEY_UUID, FrameworkMediaDrm.DEFAULT_PROVIDER)
-                    .build(drmCallback)
+                override fun executeKeyRequest(uuid: UUID, request: ExoMediaDrm.KeyRequest): ByteArray {
+                    try {
+                        val requestStr = String(request.data, Charsets.UTF_8)
+                        val requestJson = JSONObject(requestStr)
+                        val kids = requestJson.getJSONArray("kids")
+                        val kid = kids.getString(0)
 
-                val localFactory = mediaSourceFactoryProvider(drmManager)
+                        val keyBytes = hexStringToByteArray(result.decryptionKey)
+                        val kBase64Url = Base64.encodeToString(keyBytes, Base64.URL_SAFE or Base64.NO_PADDING or Base64.NO_WRAP)
 
-                builder.setDrmConfiguration(
-                    MediaItem.DrmConfiguration.Builder(C.CLEARKEY_UUID).build()
-                )
-
-                prepareChild(gen, localFactory, builder.build())
-            } else {
-                prepareChild(gen, mediaSourceFactoryProvider(null), builder.build())
+                        val responseJson = JSONObject().apply {
+                            put("keys", JSONArray().apply {
+                                put(JSONObject().apply {
+                                    put("kty", "oct")
+                                    put("k", kBase64Url)
+                                    put("kid", kid)
+                                })
+                            })
+                            put("type", "temporary")
+                        }
+                        return responseJson.toString().toByteArray(Charsets.UTF_8)
+                    } catch (e: Exception) {
+                        Timber.e(e, "Failed to generate ClearKey response")
+                        throw RuntimeException(e)
+                    }
+                }
             }
+
+            val drmManager = DefaultDrmSessionManager.Builder()
+                .setUuidAndExoMediaDrmProvider(C.CLEARKEY_UUID, FrameworkMediaDrm.DEFAULT_PROVIDER)
+                .build(drmCallback)
+
+            val localFactory = mediaSourceFactoryProvider(drmManager)
+
+            builder.setDrmConfiguration(
+                MediaItem.DrmConfiguration.Builder(C.CLEARKEY_UUID).build()
+            )
+
+            prepareChild(gen, localFactory, builder.build())
+        } else {
+            prepareChild(gen, mediaSourceFactoryProvider(null), builder.build())
         }
     }
 

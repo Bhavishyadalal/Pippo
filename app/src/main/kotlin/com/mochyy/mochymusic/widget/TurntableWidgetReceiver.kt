@@ -17,9 +17,7 @@ class TurntableWidgetReceiver : AppWidgetProvider() {
         appWidgetIds: IntArray
     ) {
 
-        if (MusicService.isRunning) {
-            requestWidgetRefresh(context)
-        } else {
+        if (!MusicService.isRunning || !requestWidgetRefresh(context)) {
             MochyWidgetManager(context).updateEmpty(appWidgetManager, appWidgetIds, turntable = true)
         }
     }
