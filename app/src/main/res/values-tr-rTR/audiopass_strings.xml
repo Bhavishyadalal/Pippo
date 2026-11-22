@@ -100,5 +100,4 @@
     <string name="audiopass_value_db">%1$s dB</string>
     <string name="audiopass_blocker_lossy_direct">Kayıplı şarkılar da DAC\'e dokunulmadan gider. Buraya gelmeden önce sadece sıkıştırılmışlardı.</string>
     <string name="audiopass_blockers_restore">Bunları tekrar aç</string>
-    <string name="audiopass_beta">BETA</string>
 </resources>

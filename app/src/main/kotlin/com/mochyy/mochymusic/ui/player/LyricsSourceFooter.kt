@@ -57,14 +57,14 @@ private val LabelColor = Color.White.copy(alpha = 0.55f)
 private val ValueColor = Color.White.copy(alpha = 0.38f)
 private val StarColor = Color(0xFFFFD60A)
 
-private val FooterTextStyle = TextStyle(
+private val FooterTextStyle get() = TextStyle(
     fontFamily = InterFontFamily,
     fontSize = 17.sp,
     letterSpacing = (-0.01).em,
     color = ValueColor,
 )
 
-private val ButtonTextStyle = TextStyle(
+private val ButtonTextStyle get() = TextStyle(
     fontFamily = InterFontFamily,
     fontWeight = FontWeight.SemiBold,
     fontSize = 13.sp,

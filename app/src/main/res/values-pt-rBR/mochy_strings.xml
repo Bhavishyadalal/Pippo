@@ -210,7 +210,7 @@
     <string name="enable_authentication">Ativar autenticação</string>
     <string name="discord_use_details">Usar detalhes ao invés do estado</string>
     <string name="discord_use_details_description">Mostrar o título da música destacadamente em vez do nome do artista</string>
-    <string name="audio_quality_max">Máxima (beta)</string>
+    <string name="audio_quality_max">Máxima</string>
     <string name="enable_similar_content">Habilitar conteúdo similar</string>
     <string name="similar_content_desc">Adicionar automaticamente mais músicas similares quando o final da fila for alcançado</string>
     <string name="persistent_shuffle_title">Modo aleatório persistente</string>
@@ -277,8 +277,6 @@
     <string name="crossfade_duration">Duração da transição suave</string>
     <string name="crossfade_gapless">Desativar para álbuns sem intervalos</string>
     <string name="crossfade_gapless_desc">Não suavizar transição se o álbum for ininterrupto</string>
-    <string name="crossfade_beta_title">Recurso Beta</string>
-    <string name="crossfade_beta_message">Transição suave é uma nova função e podem haver erros. Se você experiênciar qualquer problema, por favor reporte-os.\n\nEsse recurso desativa a descarga de áudio devido a limitações técnicas.</string>
     <!-- Romanization Settings -->
     <string name="lyrics_romanization_cyrillic">Alfabeto cirílico</string>
     <string name="lyrics_romanize_title">Romanização</string>

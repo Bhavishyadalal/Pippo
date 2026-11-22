@@ -59,7 +59,7 @@
     <string name="configure_supported_links">Налаштувати підтримувані посилання</string>
     <string name="intent_supported_links_not_found">Не вдалося знайти налаштування підтримуваних посилань, будь ласка, налаштуйте їх вручну</string>
     <string name="set_first_lyrics_provider">Вибрати основне джерело текстів пісень</string>
-    <string name="audio_quality_max">Максимум (бета)</string>
+    <string name="audio_quality_max">Максимум</string>
     <string name="enable_similar_content">Увімкнути подібний контент</string>
     <string name="similar_content_desc">Автоматично додавати більше схожих пісень, коли буде досягнуто кінця черги</string>
     <string name="default_links">Відкрити підтримувані посилання</string>

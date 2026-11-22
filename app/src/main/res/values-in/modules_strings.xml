@@ -4,7 +4,6 @@
     <string name="module_adds_songs">Lagu</string>
     <string name="module_adds_lyrics">Lirik</string>
     <string name="module_adds_look">Tampilan</string>
-    <string name="modules_beta">BETA</string>
     <string name="modules_intro">Modul menambahkan sesuatu ke Pippo: sumber lagu baru, lirik baru, dan tampilan baru. Matikan satu dan semua yang ia tambahkan ikut hilang, dari Kualitas Audio juga.</string>
     <string name="module_status_signed_out">Belum masuk</string>
     <string name="module_status_expired">Masuk lagi · %1$s</string>

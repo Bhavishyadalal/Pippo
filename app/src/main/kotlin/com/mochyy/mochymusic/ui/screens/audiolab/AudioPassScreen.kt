@@ -124,7 +124,6 @@ fun AudioPassScreen(navController: NavController) {
             firstSize = 64.sp,
             secondSize = 30.sp,
             secondDim = true,
-            secondBadge = stringResource(R.string.audiopass_beta),
         ),
         onBack = { navController.navigateUp() },
         subtitle = subtitleFor(shown),

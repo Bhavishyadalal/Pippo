@@ -208,7 +208,7 @@
     <string name="enable_authentication">開啟身份驗證</string>
     <string name="discord_use_details">使用詳細內容而非狀態</string>
     <string name="discord_use_details_description">強化顯示曲名而非作曲家</string>
-    <string name="audio_quality_max">最高 (beta)</string>
+    <string name="audio_quality_max">最高</string>
     <string name="enable_similar_content">啟用相似內容</string>
     <string name="similar_content_desc">當播放佇列快結束時，自動加入更多相似歌曲</string>
     <string name="persistent_shuffle_title">固定隨機播放</string>
@@ -274,8 +274,6 @@
     <string name="crossfade_duration">Crossfade duration</string>
     <string name="crossfade_gapless">Disable for gapless albums</string>
     <string name="crossfade_gapless_desc">Don\'t crossfade if the album is gapless</string>
-    <string name="crossfade_beta_title">Beta Feature</string>
-    <string name="crossfade_beta_message">Crossfade is a new feature and may have bugs. If you experience any issues, please report them.\n\nThis feature disables audio offload due to technical limitations.</string>
     <!-- Romanization Settings -->
     <string name="lyrics_romanization_cyrillic">西里爾</string>
     <string name="lyrics_romanize_title">羅馬化</string>

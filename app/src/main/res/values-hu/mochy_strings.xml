@@ -102,7 +102,7 @@
     <string name="configure_supported_links">Támogatott hivatkozások beállítása</string>
     <string name="intent_supported_links_not_found">Nincs támogatott hivatkozások beállítás, kérem állítsa be azt kézzel</string>
     <string name="set_first_lyrics_provider">Preferált dalszöveg szolgáltató</string>
-    <string name="audio_quality_max">Max (béta)</string>
+    <string name="audio_quality_max">Max</string>
     <string name="enable_similar_content">Hasonló tartalom engedélyezése</string>
     <string name="similar_content_desc">Automatikusan hozzáad hasonló zenéket ha a lista a végéhez ért</string>
     <string name="min_playback_duration_title">Minimum lejátszási hossz</string>

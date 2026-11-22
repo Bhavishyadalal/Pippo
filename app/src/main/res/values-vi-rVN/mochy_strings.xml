@@ -54,7 +54,7 @@
     <string name="configure_supported_links">Tùy chỉnh các liên kết được hỗ trợ</string>
     <string name="intent_supported_links_not_found">Không thể tìm thấy cài đặt mở liên kết hỗ trợ, hãy tùy chỉnh chúng bằng cách thủ công</string>
     <string name="set_first_lyrics_provider">Lựa chọn nhà cung cấp lời bài hát</string>
-    <string name="audio_quality_max">Cao nhất (Beta)</string>
+    <string name="audio_quality_max">Cao nhất</string>
     <string name="enable_similar_content">Bật hiển thị nội dung tương tự</string>
     <string name="similar_content_desc">Tự động thêm bài hát có nội dung tương tự khi hàng chờ của bạn đã hết</string>
     <string name="min_playback_duration_title">Thời lượng nghe tối thiểu</string>
@@ -468,8 +468,6 @@
     <string name="crossfade_duration">Thời lượng chuyển bài mượt</string>
     <string name="crossfade_gapless">Tắt cho album phát liền mạch</string>
     <string name="crossfade_gapless_desc">Không chuyển bài mượt nếu album phát liền mạch</string>
-    <string name="crossfade_beta_title">Tính năng thử nghiệm</string>
-    <string name="crossfade_beta_message">Chuyển bài mượt là tính năng mới và có thể còn lỗi. Nếu gặp sự cố, vui lòng báo cho chúng tôi.\n\nTính năng này sẽ tắt chế độ audio offload do hạn chế kỹ thuật.</string>
     <string name="lyrics_romanize_hindi">La-tinh hóa lời bài hát tiếng Hindi</string>
     <string name="lyrics_romanize_punjabi">La-tinh hóa lời bài hát tiếng Punjabi</string>
     <string name="audio_offload_disabled_by_crossfade">Đã tắt vì đang bật chuyển bài mượt</string>

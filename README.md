@@ -8,7 +8,7 @@ Pippo's characters are selected randomly once per app process. They stay consist
 
 All GitHub Actions workflows are manual. Open **Actions → CI & Debug Build → Run workflow** for a debug APK without release signing secrets. Download the APK artifact when your run completes.
 
-On `design/pippo-design-system`, **Android Release APK** and the new **Optimized Release APK** use a shared optimized release builder. Select ARM64 for a smaller build or Universal for broader device support. Auto signing needs no secrets for a temporary preview; a complete private signing configuration enables stable release signing. See [optimized APK and signing instructions](docs/OPTIMIZED-APK.md).
+**Android Release APK** and **Optimized Release APK** use a shared optimized release builder. Select ARM64 for a smaller build or Universal for broader device support. Auto signing needs no secrets for a temporary preview; a complete private signing configuration enables stable release signing. See [optimized APK and signing instructions](docs/OPTIMIZED-APK.md).
 
 The separate **Fast Signed APK (ARM64)** workflow still requires release signing secrets. All workflows remain manual; none was launched while adding these build options.
 

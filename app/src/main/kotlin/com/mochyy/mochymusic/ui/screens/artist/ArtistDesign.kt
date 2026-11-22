@@ -120,7 +120,7 @@ import com.mochyy.mochymusic.ui.component.RemoteFocus
 internal const val ArtistAvatarAt = 0.45f
 internal val ArtistAvatarSize = 96.dp
 
-internal val ArtistNameStyle = TextStyle(
+internal val ArtistNameStyle get() = TextStyle(
     fontFamily = InterFontFamily,
     fontWeight = FontWeight.Bold,
     fontSize = 36.sp,
@@ -128,7 +128,7 @@ internal val ArtistNameStyle = TextStyle(
     letterSpacing = PlaylistTracking,
 )
 
-private val ArtistBarTitleStyle = TextStyle(
+private val ArtistBarTitleStyle get() = TextStyle(
     fontFamily = InterFontFamily,
     fontWeight = FontWeight.Bold,
     fontSize = 19.sp,
@@ -136,7 +136,7 @@ private val ArtistBarTitleStyle = TextStyle(
     letterSpacing = (-0.04).em,
 )
 
-private val CardLabelStyle = TextStyle(
+private val CardLabelStyle get() = TextStyle(
     fontFamily = InterFontFamily,
     fontWeight = FontWeight.SemiBold,
     fontSize = 13.sp,
@@ -144,7 +144,7 @@ private val CardLabelStyle = TextStyle(
     letterSpacing = (-0.02).em,
 )
 
-internal val AboutTitleStyle = TextStyle(
+internal val AboutTitleStyle get() = TextStyle(
     fontFamily = InterFontFamily,
     fontWeight = FontWeight.Bold,
     fontSize = 21.sp,
@@ -152,7 +152,7 @@ internal val AboutTitleStyle = TextStyle(
     letterSpacing = (-0.04).em,
 )
 
-internal val AboutBodyStyle = TextStyle(
+internal val AboutBodyStyle get() = TextStyle(
     fontFamily = InterFontFamily,
     fontWeight = FontWeight.Medium,
     fontSize = 13.sp,

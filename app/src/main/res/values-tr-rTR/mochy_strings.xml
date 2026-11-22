@@ -206,7 +206,7 @@
     <string name="enable_authentication">Kimlik doğrulamayı aç</string>
     <string name="discord_use_details">State yerine details kullan</string>
     <string name="discord_use_details_description">Sanatçı adları yerine şarkı adını öne çıkarır</string>
-    <string name="audio_quality_max">Maks (beta)</string>
+    <string name="audio_quality_max">Maks</string>
     <string name="enable_similar_content">Benzer içeriği aç</string>
     <string name="similar_content_desc">Sıranın sonuna gelince otomatik olarak daha fazla benzer şarkı ekler</string>
     <string name="persistent_shuffle_title">Kalıcı karıştırma</string>
@@ -272,8 +272,6 @@
     <string name="crossfade_duration">Çapraz geçiş süresi</string>
     <string name="crossfade_gapless">Boşluksuz albümlerde kapat</string>
     <string name="crossfade_gapless_desc">Albüm boşluksuzsa çapraz geçiş yapmaz</string>
-    <string name="crossfade_beta_title">Beta özellik</string>
-    <string name="crossfade_beta_message">Çapraz geçiş yeni bir özellik ve hataları olabilir. Bir sorun yaşarsan lütfen bildir.\n\nTeknik sınırlamalar yüzünden bu özellik ses offload\'unu kapatır.</string>
     <string name="lyrics_romanization_cyrillic">Kiril</string>
     <string name="lyrics_romanize_title">Romanizasyon</string>
     <string name="lyrics_romanization">Söz romanizasyonu</string>

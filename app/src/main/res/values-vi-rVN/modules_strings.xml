@@ -4,7 +4,6 @@
     <string name="module_adds_lyrics">Lời bài hát</string>
     <string name="module_adds_look">Giao diện</string>
     <string name="module_adds_metadata">Thông tin bài hát</string>
-    <string name="modules_beta">BETA</string>
     <string name="module_status_signed_out">Chưa đăng nhập</string>
     <string name="module_status_expired">Đăng nhập lại · %1$s</string>
     <string name="module_status_on">Bật · %1$s</string>

@@ -101,5 +101,4 @@
     <string name="audiopass_value_db">%1$s dB</string>
     <string name="audiopass_blocker_lossy_direct">非可逆圧縮音源もそのままDACへ送られます（元のデータ段階で圧縮済み）</string>
     <string name="audiopass_blockers_restore">元の設定に戻す</string>
-    <string name="audiopass_beta">BETA</string>
 </resources>

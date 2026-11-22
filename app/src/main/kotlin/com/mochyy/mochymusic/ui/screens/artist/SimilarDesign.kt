@@ -126,7 +126,7 @@ import com.music.innertube.models.SongItem
 import com.music.innertube.models.WatchEndpoint
 import com.music.innertube.models.YTItem
 
-private val SmallLineStyle = TextStyle(
+private val SmallLineStyle get() = TextStyle(
     fontFamily = InterFontFamily,
     fontWeight = FontWeight.Bold,
     fontSize = 26.sp,
@@ -134,7 +134,7 @@ private val SmallLineStyle = TextStyle(
     letterSpacing = PlaylistTracking,
 )
 
-private val BigLineStyle = TextStyle(
+private val BigLineStyle get() = TextStyle(
     fontFamily = InterFontFamily,
     fontWeight = FontWeight.Bold,
     fontSize = 44.sp,

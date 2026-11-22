@@ -129,7 +129,7 @@
     <string name="enable_authentication">Slå på autentisering</string>
     <string name="discord_use_details">Nøyt detaljar i staden for ein tilstand</string>
     <string name="discord_use_details_description">Syn songtittel fremst i staden for artistnamn</string>
-    <string name="audio_quality_max">Max (beta)</string>
+    <string name="audio_quality_max">Max</string>
     <string name="enable_similar_content">Slå på liknande innhald</string>
     <string name="similar_content_desc">Legg automatisk til fleire liknande songar når køen tek slutt</string>
     <string name="min_playback_duration_title">Minst avspelingstid</string>
