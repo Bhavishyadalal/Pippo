@@ -428,6 +428,7 @@ class MainActivity : ComponentActivity() {
         setTheme(com.mochyy.mochymusic.utils.AppIcons.current(this).splashTheme)
         installSplashScreen().handOffToLaunchIntro { introPlays }
         super.onCreate(savedInstanceState)
+        com.mochyy.mochymusic.utils.AppIcons.migrateRetiredSelection(this, intent)
         lifecycleScope.launch(Dispatchers.IO) {
             applicationContext.removeCustomizationExpansionPreferences()
         }
