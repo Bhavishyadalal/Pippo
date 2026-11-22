@@ -34,6 +34,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -388,7 +389,10 @@ private fun SearchBrowseContent(
                         stringResource(if (offline) R.string.search_browse_offline else R.string.search_browse_unavailable),
                         color = SearchColors.Secondary,
                     )
-                    if (!offline) TextButton(onClick = viewModel::retrySections) {
+                    if (!offline) TextButton(
+                        onClick = viewModel::retrySections,
+                        colors = ButtonDefaults.textButtonColors(contentColor = com.mochyy.mochymusic.ui.theme.PippoColors.Accent),
+                    ) {
                         Text(stringResource(R.string.retry))
                     }
                 }

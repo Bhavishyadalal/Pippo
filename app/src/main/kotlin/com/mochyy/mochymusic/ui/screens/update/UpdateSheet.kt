@@ -736,7 +736,7 @@ internal fun AppIconImage(modifier: Modifier = Modifier) {
             modifier = modifier.background(MenuSurface),
         ) {
             Icon(
-                painter = painterResource(R.drawable.ic_mochy_mark),
+                painter = painterResource(R.drawable.ic_launcher_mark),
                 contentDescription = null,
                 modifier = Modifier.fillMaxSize(0.6f),
             )

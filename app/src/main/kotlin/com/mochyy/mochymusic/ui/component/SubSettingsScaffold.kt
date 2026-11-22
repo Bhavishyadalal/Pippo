@@ -2,7 +2,10 @@
 
 package com.mochyy.mochymusic.ui.component
 
+import com.mochyy.mochymusic.ui.screens.search.SearchColors
+import com.mochyy.mochymusic.ui.theme.LocalPureBlack
 import com.mochyy.mochymusic.ui.theme.PippoColors
+import com.mochyy.mochymusic.ui.theme.PippoCorners
 import com.mochyy.mochymusic.ui.theme.PippoSize
 import com.mochyy.mochymusic.ui.theme.PippoSpacing
 
@@ -14,6 +17,9 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.border
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -60,6 +66,7 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -112,7 +119,8 @@ fun SubSettingsScaffold(
     val scrollState = rememberScrollState()
     val glassState = remember { GlassState() }
 
-    val headerFoundationColor = Color.Black
+    val headerFoundationColor = PippoColors.page(LocalPureBlack.current)
+    val headerControlColor = SearchColors.FieldFocused
 
     // Latch-and-settle collapse, same as Library/Search: once the threshold is crossed the morph
     // always finishes smoothly, even after the user's finger lifts mid-scroll.
@@ -149,7 +157,7 @@ fun SubSettingsScaffold(
         snapshotFlow { collapse.value < 0.5f }.collect { opened -> if (opened) searchOverlayVisible = false }
     }
 
-    Box(modifier = modifier.fillMaxSize()) {
+    Box(modifier = modifier.fillMaxSize().background(headerFoundationColor)) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -195,13 +203,13 @@ fun SubSettingsScaffold(
                     .drawWithCache {
                         val gradient = if (progressive) {
                             Brush.verticalGradient(
-                                0f to Color.Black.copy(alpha = 0.90f),
-                                0.20f to Color.Black.copy(alpha = 0.50f),
-                                0.45f to Color.Black.copy(alpha = 0.18f),
+                                0f to headerFoundationColor.copy(alpha = 0.90f),
+                                0.20f to headerFoundationColor.copy(alpha = 0.50f),
+                                0.45f to headerFoundationColor.copy(alpha = 0.18f),
                                 0.75f to Color.Transparent,
                             )
                         } else {
-                            SolidColor(Color.Black.copy(alpha = FlatBarScrimAlpha))
+                            SolidColor(headerFoundationColor.copy(alpha = FlatBarScrimAlpha))
                         }
                         onDrawBehind { drawRect(brush = gradient) }
                     }
@@ -220,7 +228,7 @@ fun SubSettingsScaffold(
                     .padding(top = HeaderTopPadding)
                     .size(BackButtonSize)
                     .clip(CircleShape)
-                    .background(PippoColors.SurfaceRaised)
+                    .background(headerControlColor)
                     .clickable(onClick = onBack),
                 contentAlignment = Alignment.Center
             ) {
@@ -319,7 +327,7 @@ fun SubSettingsScaffold(
                         shape = RoundedCornerShape(lerpDp(26.dp, BackButtonSize / 2, collapse.value))
                         clip = true
                     }
-                    .background(PippoColors.SurfaceRaised)
+                    .background(headerControlColor)
             ) {
                 Box(
                     modifier = Modifier
@@ -379,13 +387,20 @@ fun SubSettingsSearchBar(
     onQueryChange: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val interaction = remember { MutableInteractionSource() }
+    val focused by interaction.collectIsFocusedAsState()
     Box(
         modifier = modifier
             .fillMaxWidth()
             .height(PippoSize.Field)
-            .clip(androidx.compose.foundation.shape.RoundedCornerShape(PippoSize.Field / 2))
-            .background(PippoColors.Surface)
-            .padding(horizontal = 20.dp),
+            .clip(PippoCorners.Pill)
+            .background(if (focused) SearchColors.FieldFocused else SearchColors.Field)
+            .border(
+                1.dp,
+                if (focused) PippoColors.Accent else Color.White.copy(alpha = 0.08f),
+                PippoCorners.Pill,
+            )
+            .padding(start = 20.dp, end = if (query.isEmpty()) 20.dp else 6.dp),
         contentAlignment = Alignment.CenterStart
     ) {
         androidx.compose.foundation.layout.Row(
@@ -396,13 +411,14 @@ fun SubSettingsSearchBar(
                 value = query,
                 onValueChange = onQueryChange,
                 singleLine = true,
+                interactionSource = interaction,
                 textStyle = androidx.compose.ui.text.TextStyle(
                     fontFamily = com.mochyy.mochymusic.ui.theme.InterFontFamily,
                     fontSize = 16.sp,
                     color = Color.White,
                     fontWeight = FontWeight.Normal
                 ),
-                cursorBrush = androidx.compose.ui.graphics.SolidColor(Color.White),
+                cursorBrush = SolidColor(PippoColors.Accent),
                 modifier = Modifier.weight(1f),
                 decorationBox = { innerTextField ->
                     if (query.isEmpty()) {
@@ -410,7 +426,7 @@ fun SubSettingsSearchBar(
                             text = stringResource(R.string.settings_search_placeholder),
                             fontFamily = com.mochyy.mochymusic.ui.theme.InterFontFamily,
                             fontSize = 16.sp,
-                            color = Color.White.copy(alpha = 0.5f)
+                            color = SearchColors.Placeholder
                         )
                     }
                     innerTextField()
@@ -418,16 +434,21 @@ fun SubSettingsSearchBar(
             )
 
             if (query.isNotEmpty()) {
-                androidx.compose.foundation.layout.Spacer(modifier = Modifier.size(8.dp))
-                Icon(
-                    painter = painterResource(R.drawable.close),
-                    contentDescription = stringResource(R.string.settings_clear_search),
-                    tint = Color.White.copy(alpha = 0.7f),
-                    modifier = Modifier
-                        .size(20.dp)
+                val press = remember { MutableInteractionSource() }
+                Box(
+                    modifier = Modifier.size(44.dp)
+                        .pressBounce(press, pressedScale = 0.92f)
                         .clip(CircleShape)
-                        .clickable { onQueryChange("") }
-                )
+                        .clickable(interactionSource = press, indication = RemoteFocus, role = Role.Button) { onQueryChange("") },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.close),
+                        contentDescription = stringResource(R.string.settings_clear_search),
+                        tint = SearchColors.Secondary,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
             }
         }
     }

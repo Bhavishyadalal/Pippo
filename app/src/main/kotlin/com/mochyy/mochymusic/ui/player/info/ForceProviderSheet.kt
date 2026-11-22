@@ -12,9 +12,10 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -24,9 +25,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -43,6 +47,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -63,6 +68,10 @@ import com.mochyy.mochymusic.ui.player.menu.MenuSheetSurface
 import com.mochyy.mochymusic.utils.rememberPreference
 import com.mochyy.mochymusic.ui.component.AppSwitch
 import com.mochyy.mochymusic.ui.component.RemoteFocus
+import com.mochyy.mochymusic.ui.component.pressBounce
+import com.mochyy.mochymusic.ui.theme.PippoColors
+import com.mochyy.mochymusic.ui.theme.PippoCorners
+import com.mochyy.mochymusic.ui.theme.PippoMotion
 
 private val YouTubeQualities = listOf(AudioQuality.AUTO, AudioQuality.HIGH, AudioQuality.MEDIUM, AudioQuality.LOW)
 
@@ -141,17 +150,24 @@ fun ForceProviderSheet(currentProviderId: String?, currentOption: String? = null
 
 @Composable
 private fun SwitchStatus(state: ProviderSwitchState, nameOf: (String) -> String, onCancel: () -> Unit) {
+    val shape = RoundedCornerShape(PippoCorners.Card)
+    val accent = when (state) {
+        is ProviderSwitchState.Failed -> PippoColors.Error
+        is ProviderSwitchState.Done -> PippoColors.Sage
+        else -> PippoColors.Accent
+    }
     AnimatedVisibility(
         visible = state !is ProviderSwitchState.Idle,
-        enter = fadeIn(tween(200)) + expandVertically(tween(260)),
-        exit = fadeOut(tween(160)) + shrinkVertically(tween(220)),
+        enter = fadeIn(tween(PippoMotion.StateChange)) + expandVertically(tween(PippoMotion.StateChange)),
+        exit = fadeOut(tween(PippoMotion.Feedback)) + shrinkVertically(tween(PippoMotion.StateChange)),
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(bottom = 14.dp)
-                .clip(RoundedCornerShape(18.dp))
+                .clip(shape)
                 .background(MenuRowSurface)
+                .border(1.dp, accent.copy(alpha = 0.26f), shape)
                 .padding(horizontal = 16.dp, vertical = 14.dp),
         ) {
             when (state) {
@@ -161,7 +177,7 @@ private fun SwitchStatus(state: ProviderSwitchState, nameOf: (String) -> String,
                     Spacer(Modifier.height(10.dp))
                     val progress by animateFloatAsState(state.attempt / state.of.toFloat(), label = "switchTries")
                     Box(Modifier.fillMaxWidth().height(4.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.12f))) {
-                        Box(Modifier.fillMaxWidth(progress).fillMaxHeight().clip(CircleShape).background(Color.White))
+                        Box(Modifier.fillMaxWidth(progress.coerceIn(0f, 1f)).fillMaxHeight().clip(CircleShape).background(accent))
                     }
                     TextButton(onClick = onCancel, modifier = Modifier.align(Alignment.End)) {
                         Text(stringResource(R.string.cancel), color = Color.White)
@@ -174,7 +190,7 @@ private fun SwitchStatus(state: ProviderSwitchState, nameOf: (String) -> String,
                     }
                 }
                 is ProviderSwitchState.Failed -> {
-                    Text(stringResource(R.string.pc_force_unavailable), color = Color(0xFFFF7A7A), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.pc_force_unavailable), color = accent, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                     Text(
                         state.reason ?: if (state.opening) {
                             stringResource(R.string.pc_force_open_failed, nameOf(state.providerId))
@@ -186,7 +202,7 @@ private fun SwitchStatus(state: ProviderSwitchState, nameOf: (String) -> String,
                     )
                 }
                 is ProviderSwitchState.Done -> {
-                    Text(stringResource(R.string.pc_force_switched, nameOf(state.providerId)), color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.pc_force_switched, nameOf(state.providerId)), color = accent, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                 }
                 ProviderSwitchState.Idle -> Unit
             }
@@ -194,6 +210,7 @@ private fun SwitchStatus(state: ProviderSwitchState, nameOf: (String) -> String,
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ProviderChoiceRow(
     providerId: String,
@@ -208,22 +225,30 @@ private fun ProviderChoiceRow(
     /** null when the row itself was tapped, keeping the quality as it is */
     onPick: (String?) -> Unit,
 ) {
+    val shape = RoundedCornerShape(PippoCorners.Card)
+    val rowPress = remember { MutableInteractionSource() }
+    val statusColor = if (enabled && isCurrent) PippoColors.Sage else PippoColors.SecondaryText
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
+            .clip(shape)
             .background(MenuRowSurface)
+            .border(1.dp, if (enabled && isCurrent) PippoColors.Sage.copy(alpha = 0.26f) else Color.White.copy(alpha = 0.07f), shape)
             .padding(horizontal = 14.dp, vertical = 12.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.weight(1f).clickable(
-                    enabled = available,
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = RemoteFocus,
-                    onClick = { onPick(null) },
-                ),
+                modifier = Modifier.weight(1f)
+                    .pressBounce(rowPress, pressedScale = 0.98f)
+                    .clip(RoundedCornerShape(PippoCorners.Small))
+                    .clickable(
+                        enabled = available,
+                        interactionSource = rowPress,
+                        indication = RemoteFocus,
+                        role = Role.Button,
+                        onClick = { onPick(null) },
+                    ),
             ) {
                 ProviderLogo(providerId, name, 44.dp)
                 Spacer(Modifier.width(12.dp))
@@ -236,7 +261,7 @@ private fun ProviderChoiceRow(
                         isCurrent -> R.string.pc_force_playing_here
                         else -> R.string.pc_force_tap_here
                     }
-                    Text(stringResource(status), color = InfoMuted, fontSize = 12.sp)
+                    Text(stringResource(status), color = statusColor, fontSize = 12.sp, lineHeight = 16.sp)
                 }
             }
             Spacer(Modifier.width(12.dp))
@@ -275,9 +300,10 @@ private fun ProviderChoiceRow(
         }
         if (available && options.size > 1) {
             Spacer(Modifier.height(10.dp))
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                modifier = Modifier.horizontalScroll(rememberScrollState()),
+            FlowRow(
+                modifier = Modifier.fillMaxWidth().selectableGroup(),
+                horizontalArrangement = Arrangement.spacedBy(7.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 options.forEach { option ->
                     QualityChip(
@@ -293,16 +319,25 @@ private fun ProviderChoiceRow(
 
 @Composable
 private fun QualityChip(label: String, selected: Boolean, onClick: () -> Unit) {
-    val shape = RoundedCornerShape(50)
+    val press = remember { MutableInteractionSource() }
+    val shape = PippoCorners.Pill
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier
-            .height(28.dp)
+            .sizeIn(minWidth = 48.dp, minHeight = 44.dp)
+            .pressBounce(press, pressedScale = 0.95f)
             .clip(shape)
-            .then(if (selected) Modifier.background(Color.White) else Modifier.border(1.dp, Color.White.copy(alpha = 0.25f), shape))
-            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = RemoteFocus, onClick = onClick)
-            .padding(horizontal = 12.dp),
+            .background(if (selected) PippoColors.Accent else Color.White.copy(alpha = 0.045f))
+            .border(1.dp, if (selected) Color.Transparent else Color.White.copy(alpha = 0.17f), shape)
+            .selectable(selected, interactionSource = press, indication = RemoteFocus, role = Role.RadioButton, onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 7.dp),
     ) {
-        Text(text = label, color = if (selected) Color.Black else Color.White.copy(alpha = 0.8f), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+        Text(
+            text = label,
+            color = if (selected) PippoColors.OnAccent else PippoColors.Text,
+            fontSize = 12.sp,
+            lineHeight = 16.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
     }
 }

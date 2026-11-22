@@ -63,10 +63,13 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import com.mochyy.mochymusic.ui.theme.LocalPureBlack
+import com.mochyy.mochymusic.ui.theme.PippoColors
 import com.mochyy.mochymusic.ui.utils.stableStatusBars
 import com.mochyy.mochymusic.ui.component.RemoteFocus
 
-val MenuSurface = Color(0xFF0B0B0C)
+val MenuSurface: Color
+    @Composable get() = PippoColors.page(LocalPureBlack.current)
 val MenuRowSurface = Color(0xFF161619)
 
 internal val MenuEasing = CubicBezierEasing(0.57f, 0.53f, 0f, 1f)
@@ -194,6 +197,7 @@ fun MenuSheetSurface(
     dragFromContent: Boolean = true,
     content: @Composable ColumnScope.(dragHandle: Modifier) -> Unit,
 ) {
+    val surface = MenuSurface
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
     val stack = LocalMenuSheetStack.current
@@ -509,7 +513,7 @@ fun MenuSheetSurface(
                         val index = entries.indexOf(entry)
                         if (index >= 0) recede = entries.depthAbove(index).coerceAtMost(1f)
                     }
-                    drawRect(lerp(MenuSurface, MenuRowSurface, recede))
+                    drawRect(lerp(surface, MenuRowSurface, recede))
                 }
         ) {
             val dragHandle = Modifier.draggable(
