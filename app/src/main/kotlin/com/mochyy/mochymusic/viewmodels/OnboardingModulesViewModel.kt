@@ -62,6 +62,7 @@ class OnboardingModulesViewModel @Inject constructor(
         val now = SystemClock.elapsedRealtime()
         if (lastSuggestionAttemptMs?.let { now - it < 30_000L } == true) return@withLock null
         val songs = withTimeoutOrNull(6_000L) { searchModuleTestSongs("One Kiss Calvin Harris Dua Lipa") }.orEmpty()
+        currentCoroutineContext().ensureActive()
         lastSuggestionAttemptMs = SystemClock.elapsedRealtime()
         val sampleTitle = TrackMatcher.core(onboardingSampleTrack.title)
         val candidates = songs.filter { song ->
@@ -69,7 +70,7 @@ class OnboardingModulesViewModel @Inject constructor(
                 TrackMatcher.core(song.title) == sampleTitle
         }.associateBy { it.id }
         val match = TrackMatcher.best(onboardingSampleTrack, candidates.values.map { song ->
-            CatalogTrack(song.id, song.title, song.artists.joinToString(", ") { it.name }, song.album?.name, song.duration?.times(1_000L))
+            CatalogTrack(song.id, song.title, song.artists.joinToString(", ") { it.name }, song.album?.name, song.duration?.takeIf { it > 0 }?.times(1_000L))
         })
         match?.let { candidates[it.track.id] }?.also { _suggestedSong.value = it }
     }
@@ -93,8 +94,11 @@ class OnboardingModulesViewModel @Inject constructor(
             fetchOnce(module, track)
         } else first
         currentCoroutineContext().ensureActive()
-        if (modules.module(id) !== module) return@withPermit ModuleFetchResult.Unavailable
-        if (autoEnable && canAutoEnable(id) && result is ModuleFetchResult.Found && !modules.isEnabled(id)) {
+        val canEnable = autoEnable && canAutoEnable(id)
+        if (modules.module(id) !== module || (!canEnable && !modules.isUsable(id))) {
+            return@withPermit ModuleFetchResult.Unavailable
+        }
+        if (canEnable && result is ModuleFetchResult.Found && !modules.isEnabled(id)) {
             modules.setEnabled(id, true)
         }
         result

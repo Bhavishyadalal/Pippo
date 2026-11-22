@@ -1,6 +1,7 @@
 package com.mochyy.mochymusic.viewmodels
 
 import android.content.Context
+import android.os.SystemClock
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import coil3.SingletonImageLoader
@@ -19,12 +20,16 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -35,7 +40,9 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
-fun coverKey(browseId: String, params: String?): String = "$browseId|${params.orEmpty()}"
+private fun coverKey(browseId: String, params: String?): String = "$browseId|${params.orEmpty()}"
+
+private const val SectionCacheAgeMs = 7L * 24 * 60 * 60 * 1_000
 
 internal fun searchTileCoverUrl(url: String): String = url.resize(128, 128)
 
@@ -44,34 +51,52 @@ class SearchBrowseArtwork @Inject constructor(@ApplicationContext private val co
     private val disk by lazy { context.getSharedPreferences("search_browse_artwork", Context.MODE_PRIVATE) }
     private val sectionsLock = Mutex()
     private var loadedLocale: String? = null
+    private var lastSectionFailureAt: Long? = null
     private val coverSlots = Semaphore(3)
-    private val activeKeys = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+    private val coverLocks = Array(32) { Mutex() }
     private val sections = MutableStateFlow<List<MoodAndGenres>?>(null)
     private val covers = MutableStateFlow<Map<String, List<String>>>(emptyMap())
 
+    val offlineMode = context.dataStore.data.map { it[OfflineModeKey] == true }.distinctUntilChanged()
     val moodAndGenres = sections.asStateFlow()
     val tileCovers = covers.asStateFlow()
 
-    suspend fun loadSections() = sectionsLock.withLock {
+    suspend fun loadSections(force: Boolean = false) = sectionsLock.withLock {
         val locale = YouTube.locale.let { "${it.gl}|${it.hl}" }
-        if (loadedLocale == locale && sections.value != null) return@withLock
         val prefs = context.dataStore.data.first()
-        val saved = if (prefs[MaxImageCacheSizeKey] != 0 && disk.getString("locale", null) == locale) {
-            disk.getString("sections", null)?.let {
+        val offline = prefs[OfflineModeKey] == true
+        val cacheEnabled = prefs[MaxImageCacheSizeKey] != 0
+        val sameLocale = loadedLocale == locale
+        if (!sameLocale) lastSectionFailureAt = null
+        val settled = sections.value?.takeIf { sameLocale && it.isNotEmpty() }
+        val saved = if (cacheEnabled && disk.getString("locale", null) == locale) {
+            settled ?: disk.getString("sections", null)?.let {
                 runCatching { Json.decodeFromString<List<MoodAndGenres>>(it) }.getOrNull()
             }
         } else null
-        sections.value = saved
+        if (!sameLocale || sections.value.isNullOrEmpty()) sections.value = saved
         loadedLocale = locale
+        if (offline) {
+            if (sections.value == null) sections.value = emptyList()
+            return@withLock
+        }
         val age = System.currentTimeMillis() - disk.getLong("savedAt", 0L)
-        if ((saved != null && age in 0L until 7L * 24 * 60 * 60 * 1_000) || prefs[OfflineModeKey] == true) {
+        val recentlyFailed = lastSectionFailureAt?.let { SystemClock.elapsedRealtime() - it < 10_000L } == true
+        if (!force && ((settled != null && !cacheEnabled) ||
+                (saved != null && age in 0L until SectionCacheAgeMs) || recentlyFailed)
+        ) {
+            if (sections.value == null) sections.value = emptyList()
             return@withLock
         }
         val fetched = withTimeoutOrNull(12_000) { YouTube.moodAndGenres().getOrNull() }
         currentCoroutineContext().ensureActive()
-        if (!fetched.isNullOrEmpty()) {
+        if (fetched.isNullOrEmpty()) {
+            lastSectionFailureAt = SystemClock.elapsedRealtime()
+            if (sections.value == null) sections.value = emptyList()
+        } else {
+            lastSectionFailureAt = null
             sections.value = fetched
-            if (prefs[MaxImageCacheSizeKey] != 0) {
+            if (cacheEnabled) {
                 disk.edit()
                     .putString("sections", Json.encodeToString(fetched))
                     .putString("locale", locale)
@@ -83,9 +108,9 @@ class SearchBrowseArtwork @Inject constructor(@ApplicationContext private val co
 
     suspend fun loadCovers(browseId: String, params: String?): List<String> {
         val key = coverKey(browseId, params)
-        covers.value[key]?.let { return it }
-        if (!activeKeys.add(key)) return emptyList()
-        try {
+        val lock = coverLocks[(key.hashCode() and Int.MAX_VALUE) % coverLocks.size]
+        return lock.withLock {
+            covers.value[key]?.let { return@withLock it }
             val prefs = context.dataStore.data.first()
             val cacheEnabled = prefs[MaxImageCacheSizeKey] != 0
             val saved = if (cacheEnabled) disk.getString("cover:$key", null)?.let {
@@ -95,6 +120,7 @@ class SearchBrowseArtwork @Inject constructor(@ApplicationContext private val co
                 saved != null -> saved
                 prefs[OfflineModeKey] == true -> emptyList()
                 else -> coverSlots.withPermit {
+                    if (context.dataStore.data.first()[OfflineModeKey] == true) return@withPermit emptyList()
                     val result = withTimeoutOrNull(10_000) { YouTube.browse(browseId, params).getOrNull() }
                     currentCoroutineContext().ensureActive()
                     result?.items.orEmpty()
@@ -108,9 +134,7 @@ class SearchBrowseArtwork @Inject constructor(@ApplicationContext private val co
                     disk.edit().putString("cover:$key", Json.encodeToString(urls)).apply()
                 }
             }
-            return urls
-        } finally {
-            activeKeys.remove(key)
+            urls
         }
     }
 
@@ -124,12 +148,15 @@ class SearchBrowseArtwork @Inject constructor(@ApplicationContext private val co
             .distinctBy { coverKey(it.endpoint.browseId, it.endpoint.params) }
         if (items.isEmpty()) return
         val loader = SingletonImageLoader.get(context)
+        if (loader.diskCache == null) return
         val warmed = mutableSetOf<String>()
         for (item in items) {
             val current = context.dataStore.data.first()
             if (current[OfflineModeKey] == true || current[MaxImageCacheSizeKey] == 0) return
             for (cover in loadCovers(item.endpoint.browseId, item.endpoint.params)) {
                 val url = searchTileCoverUrl(cover)
+                val latest = context.dataStore.data.first()
+                if (latest[OfflineModeKey] == true || latest[MaxImageCacheSizeKey] == 0) return
                 if (!warmed.add(url)) continue
                 val cached = loader.diskCache?.openSnapshot(url)
                 if (cached != null) {
@@ -154,14 +181,24 @@ class MoodAndGenresViewModel @Inject constructor(
     private val artwork: SearchBrowseArtwork,
 ) : ViewModel() {
     val moodAndGenres = artwork.moodAndGenres
-    val covers = artwork.tileCovers
+    private var sectionRetry: Job? = null
+
+    fun observeCovers(browseId: String, params: String?) =
+        artwork.tileCovers.map { it[coverKey(browseId, params)].orEmpty() }.distinctUntilChanged()
 
     init {
-        viewModelScope.launch(Dispatchers.IO) { artwork.loadSections() }
+        viewModelScope.launch(Dispatchers.IO) {
+            artwork.offlineMode.collectLatest { artwork.loadSections() }
+        }
+    }
+
+    fun retrySections() {
+        if (sectionRetry?.isActive == true) return
+        sectionRetry = viewModelScope.launch(Dispatchers.IO) { artwork.loadSections(force = true) }
     }
 
     fun requestCovers(browseId: String, params: String?) {
-        if (coverKey(browseId, params) in covers.value) return
+        if (coverKey(browseId, params) in artwork.tileCovers.value) return
         viewModelScope.launch(Dispatchers.IO) { artwork.loadCovers(browseId, params) }
     }
 }

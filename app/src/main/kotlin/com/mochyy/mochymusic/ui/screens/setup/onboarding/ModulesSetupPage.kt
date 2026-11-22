@@ -103,7 +103,7 @@ private val SongBackdrop = Brush.linearGradient(listOf(Color(0xFF273742), Color(
 private val SongRim = Brush.linearGradient(listOf(Color(0xFF81939D), Color(0xFF38454D), Color(0xFF556967)))
 
 private fun SongItem.toSetupSong() = SetupSong(
-    TrackQuery(title, artists.map { it.name }, album?.name, duration?.times(1000L)),
+    TrackQuery(title, artists.map { it.name }, album?.name, duration?.takeIf { it > 0 }?.times(1000L)),
     thumbnail,
 )
 
@@ -171,7 +171,7 @@ internal fun ModulesSetupPage(
         focus.clearFocus()
         val track = scope.async {
             song?.track ?: suggested?.toSetupSong()?.track
-                ?: withTimeoutOrNull(2_500L) { viewModel.loadSuggestedSong() }?.toSetupSong()?.track
+                ?: viewModel.loadSuggestedSong()?.toSetupSong()?.track
                 ?: onboardingSampleTrack
         }
         trackLookup = track
