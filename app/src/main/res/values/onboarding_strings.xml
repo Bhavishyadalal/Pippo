@@ -125,10 +125,11 @@
     <string name="onb_ai_filter_title">AI Artist filter</string>
     <string name="onb_ai_filter_desc">Turning this off may give you AI slop recommendations</string>
     <string name="onb_modules_title">Set up music modules</string>
-    <string name="onb_modules_subtitle">Try a song and see which sources find it. A source can still work for other songs, so its switch is always up to you.</string>
+    <string name="onb_modules_subtitle">Try a song and see which sources find it. A source that misses this song may still work for others.</string>
     <string name="onb_modules_fetch">Fetch song</string>
     <string name="onb_modules_ready">Ready to check</string>
     <string name="onb_modules_off">Off</string>
+    <string name="onb_modules_enable_on_success">Turns on if this check succeeds</string>
     <string name="onb_modules_fetching">Checking this song…</string>
     <string name="onb_modules_found">Stream found · %1$s</string>
     <string name="onb_modules_no_match">No match for this song</string>

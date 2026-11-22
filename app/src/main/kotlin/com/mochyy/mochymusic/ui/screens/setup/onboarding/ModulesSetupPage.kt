@@ -42,6 +42,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import com.mochyy.mochymusic.R
 import com.mochyy.mochymusic.module.TrackQuery
+import com.mochyy.mochymusic.module.monochrome.MonochromeModule
 import com.mochyy.mochymusic.ui.screens.settings.modules.ModuleLogo
 import com.mochyy.mochymusic.viewmodels.ModuleFetchResult
 import com.mochyy.mochymusic.viewmodels.OnboardingModulesViewModel
@@ -78,7 +79,7 @@ internal fun ModulesSetupPage(
     var searching by remember { mutableStateOf(false) }
     var selected by remember { mutableStateOf(OneKiss) }
     val fetching = fetchResults.values.any { it == ModuleFetchResult.Fetching }
-    val canFetch = active && modules.any { it.enabled }
+    val canFetch = active && modules.any(viewModel::canFetch)
 
     fun cancelFetches() {
         jobs.values.forEach { it.cancel() }
@@ -93,7 +94,7 @@ internal fun ModulesSetupPage(
         selected = song
         query = ""
         focus.clearFocus()
-        modules.filter { it.enabled }.forEach { entry ->
+        modules.filter(viewModel::canFetch).forEach { entry ->
             fetchResults[entry.id] = ModuleFetchResult.Fetching
             jobs[entry.id] = scope.launch {
                 fetchResults[entry.id] = viewModel.fetch(entry.id, song.track)
@@ -162,7 +163,7 @@ internal fun ModulesSetupPage(
                 key(entry.id) {
                     OnbToggleCard(
                         title = entry.module.info.name,
-                        description = moduleFetchDescription(entry.enabled, fetchResults[entry.id]),
+                        description = moduleFetchDescription(entry.enabled, entry.id == MonochromeModule.Id, fetchResults[entry.id]),
                         checked = entry.enabled,
                         onCheckedChange = { enabled ->
                             if (active) {
@@ -180,14 +181,15 @@ internal fun ModulesSetupPage(
 }
 
 @Composable
-private fun moduleFetchDescription(enabled: Boolean, result: ModuleFetchResult?): String = when {
-    !enabled -> stringResource(R.string.onb_modules_off)
+private fun moduleFetchDescription(enabled: Boolean, autoEnables: Boolean, result: ModuleFetchResult?): String = when {
     result == ModuleFetchResult.Fetching -> stringResource(R.string.onb_modules_fetching)
     result is ModuleFetchResult.Found -> stringResource(R.string.onb_modules_found, result.quality)
     result == ModuleFetchResult.NoMatch -> stringResource(R.string.onb_modules_no_match)
     result == ModuleFetchResult.Timeout -> stringResource(R.string.onb_modules_timeout)
     result == ModuleFetchResult.Unsupported -> stringResource(R.string.onb_modules_unsupported)
     result == ModuleFetchResult.Unavailable -> stringResource(R.string.onb_modules_unavailable)
+    !enabled && autoEnables -> stringResource(R.string.onb_modules_enable_on_success)
+    !enabled -> stringResource(R.string.onb_modules_off)
     else -> stringResource(R.string.onb_modules_ready)
 }
 

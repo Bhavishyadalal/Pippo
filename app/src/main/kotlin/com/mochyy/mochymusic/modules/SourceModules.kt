@@ -279,6 +279,32 @@ class SourceModules @Inject constructor(
     fun streamQuality(module: SourceModule, picks: Map<String, String>): String? =
         qualityChoice(module)?.let { picks[it.id] ?: it.options.firstOrNull()?.id }
 
+    internal sealed interface PlaybackLookup {
+        data class Found(val stream: SourceStream, val quality: String?) : PlaybackLookup
+        data class NotFound(val reason: String) : PlaybackLookup
+        data class Unavailable(val reason: String) : PlaybackLookup
+        data object WrongRecording : PlaybackLookup
+        data object UnsupportedAudio : PlaybackLookup
+    }
+
+    /** Shared by the player’s provider picker and the setup screen. */
+    internal suspend fun lookupForPlayback(
+        module: SourceModule,
+        track: TrackQuery,
+        option: Pair<String, String>? = null,
+    ): PlaybackLookup {
+        val picks = playbackPicks(module.info.id, module, option)
+        return when (val result = module.resolve(track, picks)) {
+            is ResolveResult.Found -> when {
+                !TrackMatcher.isCompatible(track, result.stream.matched) -> PlaybackLookup.WrongRecording
+                !DeviceDecoders.canPlay(result.stream) -> PlaybackLookup.UnsupportedAudio
+                else -> PlaybackLookup.Found(result.stream, streamQuality(module, picks))
+            }
+            is ResolveResult.NotFound -> PlaybackLookup.NotFound(result.reason)
+            is ResolveResult.Unavailable -> PlaybackLookup.Unavailable(result.reason)
+        }
+    }
+
     fun playbackPicks(id: String, module: SourceModule, requestedOption: Pair<String, String>? = null): Map<String, String> {
         val saved = picks(id)
         val picks = if (requestedOption == null) saved else saved + requestedOption
