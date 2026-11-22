@@ -51,6 +51,7 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.mochyy.mochymusic.BuildConfig
 import com.mochyy.mochymusic.R
+import com.mochyy.mochymusic.ui.component.PopupSheetHandle
 import com.mochyy.mochymusic.ui.component.PopupSheetState
 import com.mochyy.mochymusic.ui.component.RemoteFocus
 import com.mochyy.mochymusic.ui.component.pressBounce
@@ -58,6 +59,7 @@ import com.mochyy.mochymusic.ui.component.TopToaster
 import com.mochyy.mochymusic.ui.utils.AppMotion
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.IOException
 
 private data class AboutLink(
     @StringRes val label: Int,
@@ -83,9 +85,19 @@ private val aboutLinks = listOf(
 )
 
 fun PopupSheetState.showAboutSheet(onOpenDevSpace: (Int) -> Unit = {}) {
-    val popup = this
-    show(fullBleed = true, surface = Color.Black, buttonBar = { SheetPrimaryButton(stringResource(R.string.done), popup::dismiss) }) {
-        AboutContent(onLicense = { popup.showPippoLicense() })
+    var about: PopupSheetHandle? = null
+    var license: PopupSheetHandle? = null
+    about = showWithHandle(
+        fullBleed = true,
+        surface = Color.Black,
+        buttonBar = { SheetPrimaryButton(stringResource(R.string.done)) { about?.dismiss() } },
+        onClosed = { license?.dismiss() },
+    ) {
+        AboutContent(onLicense = {
+            if (about?.isClosing == false && license == null) {
+                license = showPippoLicense(onClosed = { license = null })
+            }
+        })
     }
 }
 
@@ -209,20 +221,29 @@ private fun AboutLinkBadge(link: AboutLink, modifier: Modifier = Modifier) {
     }
 }
 
-private fun PopupSheetState.showPippoLicense() {
-    val popup = this
-    show(buttonBar = { SheetPrimaryButton(stringResource(R.string.done), popup::dismiss) }) {
+private fun PopupSheetState.showPippoLicense(onClosed: () -> Unit): PopupSheetHandle {
+    var handle: PopupSheetHandle? = null
+    val opened = showWithHandle(
+        buttonBar = { SheetPrimaryButton(stringResource(R.string.done)) { handle?.dismiss() } },
+        onClosed = onClosed,
+    ) {
         val context = LocalContext.current
-        val license by produceState(initialValue = "", context) {
-            value = withContext(Dispatchers.IO) {
-                context.assets.open("LICENSE.txt").bufferedReader().use { it.readText() }
+        val license by produceState<String?>(initialValue = "", context) {
+            value = try {
+                withContext(Dispatchers.IO) {
+                    context.assets.open("LICENSE.txt").bufferedReader().use { it.readText() }
+                }
+            } catch (_: IOException) {
+                null
             }
         }
         Text(
-            text = license,
+            text = license ?: stringResource(R.string.pippo_about_license_unavailable),
             modifier = Modifier.fillMaxWidth().height(420.dp)
                 .verticalScroll(rememberScrollState()).padding(24.dp),
             style = MaterialTheme.typography.bodySmall,
         )
     }
+    handle = opened
+    return opened
 }

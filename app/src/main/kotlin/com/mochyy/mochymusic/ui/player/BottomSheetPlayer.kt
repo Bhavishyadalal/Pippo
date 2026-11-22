@@ -1163,11 +1163,7 @@ private fun PlayerSheet(
                 FlagshipLandscape(
                     pages = transition,
                     turntable = isTurntable,
-                    fullCoverOverride = when {
-                        studioSession -> false
-                        artworkFrame -> shownCoverStyle == PlayerCoverStyle.EDGE_TO_EDGE
-                        else -> null
-                    },
+                    fullCoverDefault = artworkFrame && shownCoverStyle == PlayerCoverStyle.EDGE_TO_EDGE,
                     artworkStrength = artworkStrength,
                     sheetShowing = sheetShowing,
                     interactive = remember(state) { { landscapeOpen } },

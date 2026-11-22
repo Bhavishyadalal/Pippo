@@ -110,7 +110,7 @@ fun <T> rememberPreference(
         derivedStateOf { PreferencesCache.snapshot.value[key] ?: defaultValue }
     }
 
-    return remember(key, store) {
+    return remember(key, store, valueState) {
         object : MutableState<T> {
             override var value: T
                 get() = valueState.value
@@ -135,7 +135,7 @@ inline fun <reified T : Enum<T>> rememberEnumPreference(
         derivedStateOf { PreferencesCache.snapshot.value[key].toEnum(defaultValue) }
     }
 
-    return remember(key, store) {
+    return remember(key, store, valueState) {
         object : MutableState<T> {
             override var value: T
                 get() = valueState.value
