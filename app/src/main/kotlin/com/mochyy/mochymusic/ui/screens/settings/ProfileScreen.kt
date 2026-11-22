@@ -176,6 +176,7 @@ import com.mochyy.mochymusic.ui.screens.settings.devspace.DevPeople
 import com.mochyy.mochymusic.ui.screens.settings.devspace.openDevUrl
 import com.mochyy.mochymusic.ui.screens.setup.onboarding.IdCardAspect
 import com.mochyy.mochymusic.ui.screens.setup.onboarding.ProfileIdCard
+import com.mochyy.mochymusic.ui.screens.profile.showEditProfileSheet
 import com.mochyy.mochymusic.ui.screens.update.UpdateHeadline
 import com.mochyy.mochymusic.ui.screens.update.rememberUpdateState
 import com.mochyy.mochymusic.ui.screens.update.showAboutSheet
@@ -279,7 +280,7 @@ fun ProfileScreen(navController: NavController) {
     }
     val cardNumber = cardNumberPref.ifBlank { "00000000000" }
     val joinedDate = if (joinedEpochDay >= 0L) LocalDate.ofEpochDay(joinedEpochDay) else LocalDate.now()
-    val joinedText = stringResource(R.string.profile_joined_at, joinedDate.format(DateLong)) + joinedDate.format(DateLong)
+    val joinedText = stringResource(R.string.profile_joined_at, joinedDate.format(DateLong))
     val photo: Any? = profilePicUri.takeIf { it.isNotBlank() }?.let { if (it.contains("://")) it else "file://$it" }
 
     // ---- header state -------------------------------------------------------------------------
@@ -656,6 +657,9 @@ fun ProfileScreen(navController: NavController) {
                                     photo = photo,
                                     cardNumber = cardNumber,
                                     joinedText = joinedText,
+                                    onPhotoClick = if (stage == HeaderStage.Collapsed && !profile.coversCard) {
+                                        { zoomOutState.showEditProfileSheet(accountName, photo) }
+                                    } else null,
                                     showIdCardOf = true,
                                     anchors = profile.card,
                                     partsAlpha = { if (profile.coversCard) 0f else 1f },
