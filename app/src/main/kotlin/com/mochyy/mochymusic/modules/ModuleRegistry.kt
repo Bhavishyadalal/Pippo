@@ -71,6 +71,7 @@ import javax.inject.Singleton
 /** where a module came from, for its page and for whether it can be removed */
 sealed interface ModuleOrigin {
     data object BuiltIn : ModuleOrigin
+    data class BundledWeb(val manifestUrl: String) : ModuleOrigin
     data class App(val packageName: String) : ModuleOrigin
     data class Web(val base: String) : ModuleOrigin
     data class File(val fileName: String) : ModuleOrigin
@@ -149,8 +150,11 @@ class ModuleRegistry @Inject constructor(
 
     fun all(): List<MochyModule> = modules.map { it.first }
 
-    // youtube starts on, modules start off until they're turned on (or signed in to)
-    fun isEnabled(id: String): Boolean = prefs.getBoolean("enabled_$id", id == SourceModules.YouTubeId)
+    fun isEnabled(id: String): Boolean = prefs.getBoolean(
+        "enabled_$id",
+        id == SourceModules.YouTubeId || id == MonochromeModule.Id || id == JioSaavnModule.Id ||
+            id in BundledAudioModules.ids,
+    )
 
     fun setEnabled(id: String, on: Boolean) {
         val module = module(id)
@@ -427,20 +431,24 @@ class ModuleRegistry @Inject constructor(
     fun install(ready: LinkCheck.Ready): String? {
         ready.code?.let { return installCode(ready, it) }
         val manifest = requireNotNull(WebModuleManifest.parse(ready.manifestText))
-        val base = ready.base
+        val base = ready.base?.let { BundledAudioModules.secureBase(WebModuleManifest.idFor(it, manifest), it) }
         val newId = if (base != null) WebModuleManifest.idFor(base, manifest) else LocalModule.idFor(manifest)
         // the zip's pictures and fonts go in first, so the module is built with them in place; a link brings none, and old ones go
         val files = ready.zip?.let { SkinFiles.unpack(context, it, newId, ready.zipRoot) }
         if (ready.zip == null) SkinFiles.delete(context, newId)
         val (module, origin) = if (base != null) {
-            WebModule(base, manifest, context.resources, files) to ModuleOrigin.Web(base)
+            WebModule(base, manifest, context.resources, files).let { it to webOrigin(it) }
         } else {
             LocalModule(manifest, files) to ModuleOrigin.File(ready.from)
         }
         val id = module.info.id
         synchronized(this) {
             if (base != null) {
-                val saved = savedWebModules().filter { it.optString("base") != base }
+                val saved = savedWebModules().filter { saved ->
+                    val previous = WebModuleManifest.parse(saved.optString("manifest"))
+                    saved.optString("base") != base &&
+                        (previous == null || WebModuleManifest.idFor(saved.optString("base"), previous) != id)
+                }
                 prefs.edit { putString(WebModulesKey, JSONArray(saved + JSONObject().put("base", base).put("manifest", ready.manifestText)).toString()) }
             } else {
                 val saved = savedLocalModules().filter { it.optString("id") != id }
@@ -562,10 +570,17 @@ class ModuleRegistry @Inject constructor(
         val (sites, kept) = savedWebModules().partition { WebModuleManifest.isWebsite(it.optString("manifest")) }
         if (sites.isNotEmpty()) prefs.edit { putString(WebModulesKey, JSONArray(kept).toString()) }
         val web = kept.mapNotNull { saved ->
-            val base = saved.optString("base").takeIf { it.isNotBlank() } ?: return@mapNotNull null
+            val savedBase = saved.optString("base").takeIf { it.isNotBlank() } ?: return@mapNotNull null
             val manifest = WebModuleManifest.parse(saved.optString("manifest")) ?: return@mapNotNull null
-            WebModule(base, manifest, context.resources, filesFor(WebModuleManifest.idFor(base, manifest))) to ModuleOrigin.Web(base)
+            val id = WebModuleManifest.idFor(savedBase, manifest)
+            val base = BundledAudioModules.secureBase(id, savedBase)
+            WebModule(base, manifest, context.resources, filesFor(id))
+        }.associateBy { it.info.id }
+        val bundled = BundledAudioModules.create(context.resources).map { default ->
+            val module = web[default.info.id] ?: default
+            module to webOrigin(module)
         }
+        val addedWeb = web.values.filter { it.info.id !in BundledAudioModules.ids }.map { it to webOrigin(it) }
         val local = savedLocalModules().mapNotNull { saved ->
             val manifest = WebModuleManifest.parse(saved.optString("manifest")) ?: return@mapNotNull null
             LocalModule(manifest, filesFor(LocalModule.idFor(manifest))) to ModuleOrigin.File(saved.optString("file"))
@@ -573,13 +588,17 @@ class ModuleRegistry @Inject constructor(
         // a module app or a zip's code replaces the built-in module with its id, so a module can be updated on its own
         val replacing = (apps + code).map { it.first.info.id }.toSet()
         migrateMonochromeSwitch()
-        return (builtIn.filter { it.first.info.id !in replacing } + apps + code + web + local)
+        return (builtIn.filter { it.first.info.id !in replacing } + apps + code + bundled + addedWeb + local)
             .distinctBy { it.first.info.id }
             .onEach { (module, _) ->
                 module.attach(hostFor(module))
                 handValues(module)
             }
     }
+
+    private fun webOrigin(module: WebModule): ModuleOrigin =
+        if (module.info.id in BundledAudioModules.ids) ModuleOrigin.BundledWeb("${module.base}/manifest.json")
+        else ModuleOrigin.Web(module.base)
 
     // the pictures and fonts a module's zip brought, when it came as one
     private fun filesFor(id: String): File? = SkinFiles.folderFor(context, id).takeIf { it.isDirectory }
@@ -592,7 +611,7 @@ class ModuleRegistry @Inject constructor(
         if (prefs.getBoolean("migrated_monochrome", false)) return
         val wasOn = runCatching { context.dataStore.get(EnableMonochromeBackendKey, false) }.getOrDefault(false)
         prefs.edit {
-            if (wasOn) putBoolean("enabled_${MonochromeModule.Id}", true)
+            if (wasOn && !prefs.contains("enabled_${MonochromeModule.Id}")) putBoolean("enabled_${MonochromeModule.Id}", true)
             putBoolean("migrated_monochrome", true)
         }
     }
