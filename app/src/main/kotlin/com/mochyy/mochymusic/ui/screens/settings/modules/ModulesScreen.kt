@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -53,6 +54,7 @@ import com.mochyy.mochymusic.R
 import com.mochyy.mochymusic.modules.ModuleEntry
 import com.mochyy.mochymusic.ui.component.ActionPromptDialog
 import com.mochyy.mochymusic.ui.component.LocalZoomOutOverlayState
+import com.mochyy.mochymusic.ui.component.PopupSheetHandle
 import com.mochyy.mochymusic.ui.component.SubSettingsScaffold
 import com.mochyy.mochymusic.ui.screens.audiolab.LabColors
 import com.mochyy.mochymusic.ui.screens.settings.devspace.openDevUrl
@@ -77,6 +79,10 @@ fun ModulesScreen(navController: NavController, viewModel: ModulesViewModel = hi
     val overlay = LocalZoomOutOverlayState.current
     val context = LocalContext.current
     var removing by remember { mutableStateOf<ModuleEntry?>(null) }
+    var tester by remember { mutableStateOf<PopupSheetHandle?>(null) }
+    DisposableEffect(overlay) {
+        onDispose { tester?.dismiss() }
+    }
     val looks = entries.filter { it.isLookOnly }
     val sources = entries.filter { !it.isLookOnly }
     val open: (ModuleEntry) -> Unit = { navController.navigate(moduleRoute(it.id)) }
@@ -113,9 +119,18 @@ fun ModulesScreen(navController: NavController, viewModel: ModulesViewModel = hi
         ModuleSectionTitle(stringResource(R.string.modules_sources), stringResource(R.string.modules_swipe_to_delete))
         Spacer(Modifier.height(12.dp))
         ModuleTesterCard {
-            var sheet: com.mochyy.mochymusic.ui.component.PopupSheetHandle? = null
-            sheet = overlay.showWithHandle(fullBleed = true, surface = Color(0xFF121C22)) {
-                ModulesSetupPage(active = true, onContinue = { sheet?.dismiss() }, inSettings = true)
+            if (tester == null) {
+                tester = overlay.showWithHandle(
+                    fullBleed = true,
+                    onClosed = { tester = null },
+                    surface = Color(0xFF121C22),
+                ) {
+                    ModulesSetupPage(
+                        active = tester?.isClosing == false,
+                        onContinue = { tester?.dismiss() },
+                        inSettings = true,
+                    )
+                }
             }
         }
         Spacer(Modifier.height(12.dp))

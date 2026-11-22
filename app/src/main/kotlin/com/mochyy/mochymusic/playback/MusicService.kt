@@ -535,6 +535,7 @@ class MusicService :
     private var lastPreferredRouteId: Int? = null
     private var externalRouteWasMissing = false
     private var outputRouteGeneration = 0L
+    private var audioOutputRecoveryAttempts = 0
     private var routeRefreshJob: Job? = null
     private var outputMonitorJob: Job? = null
     private var outputRebindAttempt: Pair<Long, Long>? = null
@@ -566,6 +567,7 @@ class MusicService :
         }
         val previous = lastAudioRoute
         val changed = preferenceChanged || previous != route || externalRouteWasMissing
+        if (changed) audioOutputRecoveryAttempts = 0
         if (refreshPass || (route != null && changed) || (route == null && !externalRouteWasMissing && previous?.external == true)) {
             audioPass.onOutputRouteChanged()
         }
@@ -2632,7 +2634,7 @@ class MusicService :
                 }
                 if (newItems.isEmpty()) return@repeat
 
-                val endedWithNothingNext = player.playbackState == Player.STATE_ENDED
+                val endedWithNothingNext = player.playbackState == Player.STATE_ENDED || waitingAtModuleEnd(player)
                 // Autoplay goes on the end; the queue's own pages go in front of it, so the songs
                 // the user picked still play before the similar ones.
                 val insertAt = if (fromInfinite) player.mediaItemCount else upcomingAutoplayStart()
@@ -3261,6 +3263,8 @@ class MusicService :
         bufferingRecoveryJob = null
         moduleEndRecoveryJob?.cancel()
         moduleEndRecoveryJob = null
+        moduleEndWaiting = null
+        audioOutputRecoveryAttempts = 0
         outputMonitorJob?.cancel()
         outputMonitorJob = null
         providerOccurrence++
@@ -3380,7 +3384,10 @@ class MusicService :
     }
 
     override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
-        if (!playWhenReady) clearNetworkWait()
+        if (!playWhenReady) {
+            clearNetworkWait()
+            moduleEndWaiting = null
+        }
 
         if (playWhenReady && castConnectionHandler?.isCasting?.value == true) {
             player.pause()
@@ -3462,6 +3469,11 @@ class MusicService :
     }
 
     private var moduleEndRecoveryJob: Job? = null
+    private var moduleEndWaiting: Pair<Long, Long>? = null
+
+    private fun waitingAtModuleEnd(target: Player): Boolean =
+        moduleEndWaiting == (providerOccurrence to transport.pauseGeneration) &&
+            target.duration > 0L && target.contentPosition >= target.duration
 
     private fun watchForModuleTrackEnd(target: Player) {
         moduleEndRecoveryJob?.cancel()
@@ -3491,28 +3503,37 @@ class MusicService :
                 if (!stillPlaying()) return@launch
             }
             val duration = target.duration
-            val position = target.contentPosition
-            delay(ModuleEndGraceMs)
-            if (!stillPlaying() || target.duration != duration || target.contentPosition < duration ||
-                transport.isFading || isCrossfading || crossmixDirector.isTransitioning
-            ) return@launch
-            // A healthy decoder drains or moves to the next period. Recover only if the clock
-            // has run past the end or stopped there with no additional buffered audio.
-            if (target.contentBufferedPosition > duration + ModuleEndBufferToleranceMs) return@launch
-            if (target.contentPosition - duration < ModuleEndGraceMs && target.contentPosition != position) return@launch
+            var position = target.contentPosition
+            // A healthy decoder drains or moves to the next period. On slower playback speeds,
+            // the first grace window can end while the clock is still draining near the end.
+            while (true) {
+                delay(ModuleEndGraceMs)
+                if (!stillPlaying() || target.duration != duration || target.contentPosition < duration ||
+                    transport.isFading || isCrossfading || crossmixDirector.isTransitioning
+                ) return@launch
+                if (target.contentBufferedPosition > duration + ModuleEndBufferToleranceMs) return@launch
+                val current = target.contentPosition
+                if (current == position || current - duration >= ModuleEndGraceMs) break
+                position = current
+            }
 
             Timber.tag(TAG).w("Module playback did not finish at the end of %s", mediaId)
             if (sleepTimer.pauseWhenSongEnd) {
                 sleepTimer.notifySongTransition()
             } else if (!advanceQueueAtEnd(target)) {
-                ensureQueueRunway()
-                if (!currentQueue.hasOwnNextPage() && !isInfiniteQueueEnabled()) target.pause()
+                if (currentQueue.hasOwnNextPage() || isInfiniteQueueEnabled()) {
+                    // A decoder stuck in READY never sends ENDED to the pagination callback.
+                    moduleEndWaiting = occurrence to pauseGeneration
+                    ensureQueueRunway()
+                } else {
+                    target.pause()
+                }
             }
         }
     }
 
     private fun advanceQueueAtEnd(target: Player): Boolean {
-        if (!target.playWhenReady || sleepTimer.pauseWhenSongEnd ||
+        if (!target.playWhenReady || transport.playIntent.value == false || sleepTimer.pauseWhenSongEnd ||
             castConnectionHandler?.isCasting?.value == true || handoffFor(target.currentMediaItem?.mediaId.orEmpty()) != null
         ) return false
         val timeline = target.currentTimeline
@@ -3520,6 +3541,7 @@ class MusicService :
         if (index !in 0 until timeline.windowCount) return false
         val next = timeline.getNextWindowIndex(index, target.repeatMode, target.shuffleModeEnabled)
         if (next == C.INDEX_UNSET) return false
+        moduleEndWaiting = null
         target.seekToDefaultPosition(next)
         target.prepare()
         return true
@@ -3848,10 +3870,12 @@ class MusicService :
         if (isAudioRendererError(error)) {
             lastPlaybackError = error
             val failedId = player.currentMediaItem?.mediaId
-            if (failedId != null && hasExceededRetryLimit(failedId)) {
-                stopOnError()
-                showBanner(getString(R.string.audio_output_reconnect))
-            } else handleAudioRendererError(failedId)
+            if (failedId == null || audioOutputRecoveryAttempts >= MAX_RETRY_PER_SONG) {
+                audioOutputRecoveryAttempts = 0
+                reportAudioOutputFailure()
+            } else {
+                handleAudioRendererError(failedId)
+            }
             return
         }
 
@@ -4001,13 +4025,13 @@ class MusicService :
         }
     }
 
-    private fun handleAudioRendererError(mediaId: String?) {
-        if (mediaId == null) {
-            handleFinalFailure()
-            return
-        }
+    private fun reportAudioOutputFailure() {
+        failStream(allowAutoRecovery = false)
+        showBanner(getString(R.string.audio_output_reconnect))
+    }
 
-        incrementRetryCount(mediaId)
+    private fun handleAudioRendererError(mediaId: String) {
+        audioOutputRecoveryAttempts++
 
         // whether it was playing, read before the pause below wipes it: the recovery used to go
         // by the audio-focus flag instead, so it re-prepared the song and left it paused
@@ -4051,13 +4075,15 @@ class MusicService :
                     Timber.tag(TAG).d("Retrying playback for $mediaId after AudioTrack error")
                 } else {
                     Timber.tag(TAG).w("Invalid media item index during AudioTrack recovery")
-                    handleFinalFailure()
+                    reportAudioOutputFailure()
                 }
             } catch (cancelled: kotlinx.coroutines.CancellationException) {
                 throw cancelled
             } catch (e: Exception) {
                 Timber.tag(TAG).e(e, "Error during AudioTrack error recovery")
-                handleFinalFailure()
+                if (player === target && providerOccurrence == occurrence &&
+                    transport.pauseGeneration == pauseGeneration
+                ) reportAudioOutputFailure()
             }
         }
     }
@@ -5086,6 +5112,7 @@ class MusicService :
         reason: Int
     ) {
         if (reason == Player.DISCONTINUITY_REASON_SEEK) {
+            moduleEndWaiting = null
             crossmixDirector.onUserSeek()
             scheduleCrossfade()
         }

@@ -436,4 +436,6 @@
     <string name="module_tester_description">Choose a song and see which enabled sources can find a stream.</string>
     <string name="customise_silver_song_title">Silver song titles</string>
     <string name="customise_silver_song_title_desc">Add a silver glint to song titles in both players.</string>
+    <string name="search_browse_offline">Browse categories are unavailable offline.</string>
+    <string name="search_browse_unavailable">Couldn’t load browse categories.</string>
 </resources>
