@@ -749,8 +749,8 @@ enum class PlayerStyle(val displayName: String, val selectorName: String) {
 
         // the selector's columns, each look with its variants stacked under it, a swipe down away
         val selectorColumns: List<List<PlayerStyle>> = listOf(
-            listOf(FLAGSHIP, CLASSIC),
             listOf(ARTWORK_FRAME, STUDIO_SESSION),
+            listOf(FLAGSHIP, CLASSIC),
             listOf(TURNTABLE),
             listOf(VIDEO),
             listOf(IPOD),
@@ -763,6 +763,7 @@ enum class PlayerStyle(val displayName: String, val selectorName: String) {
     }
 }
 
+val DefaultPlayerStyle = PlayerStyle.ARTWORK_FRAME
 val PlayerStyleKey = stringPreferencesKey("playerStyle")
 
 // the tv's "flagship square": the flagship with its whole cover as a rounded square
@@ -1366,6 +1367,7 @@ val EnableProgressiveBlurKey = booleanPreferencesKey("enableProgressiveBlur")
 val EnableElementBlurAnimatorKey = booleanPreferencesKey("enableElementBlurAnimator")
 val BlurStrengthPxKey = floatPreferencesKey("blurStrengthPx")
 // blur on things themselves (lyric lines, title morphs, menus, page wipes), apart from the glass blur
+val SilverSongTitleSpeedKey = floatPreferencesKey("silverSongTitleSpeed")
 val SilverSongTitleKey = booleanPreferencesKey("silverSongTitle")
 val ElementBlurKey = booleanPreferencesKey("elementBlur")
 // how fast animations run on top of android's own animation speed, 1 means just follow android

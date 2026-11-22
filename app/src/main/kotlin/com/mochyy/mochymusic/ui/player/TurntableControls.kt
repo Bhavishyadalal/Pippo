@@ -324,7 +324,7 @@ private fun TitleBlock(
         } else {
             for (slot in rememberTextSlots(carousel)) {
                 key(slot.uid) {
-                    TitleLines(slot.mediaId, slot.title, slot.artist, Modifier.carouselText(carousel, slot), onBadgeClick)
+                    TitleLines(slot.mediaId, slot.title, slot.artist, Modifier.carouselText(carousel, slot), onBadgeClick, slot.step == carousel.step)
                 }
             }
         }
@@ -332,7 +332,14 @@ private fun TitleBlock(
 }
 
 @Composable
-private fun TitleLines(mediaId: String, title: String, artist: String, modifier: Modifier, onBadgeClick: (() -> Unit)?) {
+private fun TitleLines(
+    mediaId: String,
+    title: String,
+    artist: String,
+    modifier: Modifier,
+    onBadgeClick: (() -> Unit)?,
+    animateTitle: Boolean = true,
+) {
     val connection = LocalPlayerConnection.current ?: return
     val (showBadge) = rememberPreference(ShowFormatBadgeKey, defaultValue = true)
     val (showSampleRate) = rememberPreference(ShowFormatSampleRateKey, defaultValue = false)
@@ -347,6 +354,7 @@ private fun TitleLines(mediaId: String, title: String, artist: String, modifier:
         Row(verticalAlignment = Alignment.CenterVertically) {
             FadingOverflowText(
                 text = title,
+                animateTitle = animateTitle,
                 style = TextStyle(
                     fontFamily = InterFontFamily,
                     fontWeight = FontWeight.Bold,

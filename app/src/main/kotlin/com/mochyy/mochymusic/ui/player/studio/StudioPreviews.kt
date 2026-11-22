@@ -311,7 +311,7 @@ internal fun FlagshipPreview(
             ) {
                 Column(modifier = Modifier.offset(y = -drawShift)) {
                     Spacer(Modifier.height(20.dp))
-                    SongInfoRow()
+                    SongInfoRow(animateTitle = false)
                     Spacer(Modifier.height(16.dp))
                     Column(modifier = Modifier.offset(y = -SeekBarLift)) {
                         PlayerProgressSlider(

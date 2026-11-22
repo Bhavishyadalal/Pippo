@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.LaunchedEffect
@@ -58,6 +59,7 @@ import com.mochyy.mochymusic.ui.player.styles.StyleTones
 import com.mochyy.mochymusic.ui.player.styles.TransportCircles
 import com.mochyy.mochymusic.ui.player.styles.rememberStyleShowing
 import com.mochyy.mochymusic.ui.player.styles.styleSongSwipe
+import com.mochyy.mochymusic.ui.utils.LocalSilverTitleVisible
 import com.mochyy.mochymusic.ui.utils.songTitleSilver
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
@@ -165,6 +167,7 @@ internal fun SongSlots(
     track: TrackInfo,
     content: @Composable (song: BedsideSong, slotModifier: Modifier) -> Unit,
 ) {
+    val silverVisible = LocalSilverTitleVisible.current
     if (carousel == null) {
         content(BedsideSong(track.title, track.artist, track.thumbnailUrl), Modifier)
         return
@@ -177,7 +180,9 @@ internal fun SongSlots(
                 artist = slot.artist.ifEmpty { if (playing) track.artist else "" },
                 artwork = slot.artworkUrl ?: if (playing) track.thumbnailUrl else null,
             )
-            content(song, Modifier.carouselText(carousel, slot))
+            CompositionLocalProvider(LocalSilverTitleVisible provides (silverVisible && playing)) {
+                content(song, Modifier.carouselText(carousel, slot))
+            }
         }
     }
 }

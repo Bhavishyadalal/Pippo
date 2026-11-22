@@ -2,10 +2,12 @@ package com.mochyy.mochymusic.ui.screens.setup.onboarding
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -74,6 +76,8 @@ import com.mochyy.mochymusic.R
 import com.mochyy.mochymusic.modules.ModuleEntry
 import com.mochyy.mochymusic.module.TrackQuery
 import com.mochyy.mochymusic.ui.component.AppSwitch
+import com.mochyy.mochymusic.ui.component.RemoteFocus
+import com.mochyy.mochymusic.ui.component.pressBounce
 import com.mochyy.mochymusic.ui.screens.settings.modules.ModuleLogo
 import com.mochyy.mochymusic.ui.utils.AppMotion
 import com.mochyy.mochymusic.viewmodels.ModuleFetchResult
@@ -92,15 +96,15 @@ import kotlinx.coroutines.withTimeoutOrNull
 private data class SetupSong(val track: TrackQuery, val cover: String? = null)
 
 private val OneKiss = SetupSong(onboardingSampleTrack)
-private val SetupDetail = Color(0xFFD0D9DF)
-private val SetupSilver = Color(0xFFE0EBF0)
-private val SetupAccent = Color(0xFFA4E8DB)
-private val SetupWarning = Color(0xFFF3CAA8)
-private val SetupOutline = Color(0xFF49555E)
+private val SetupDetail = Color(0xFFC9C9C9)
+private val SetupSilver = Color(0xFFEEEEEE)
+private val SetupAccent = Color(0xFFB8D8C1)
+private val SetupWarning = Color(0xFFEFCCAF)
+private val SetupOutline = Color(0xFF444444)
 private val SetupCard = RoundedCornerShape(24.dp)
 private val SetupRow = RoundedCornerShape(18.dp)
-private val SongBackdrop = Brush.linearGradient(listOf(Color(0xFF273742), Color(0xFF11191F), Color(0xFF1C2D31)))
-private val SongRim = Brush.linearGradient(listOf(Color(0xFF81939D), Color(0xFF38454D), Color(0xFF556967)))
+private val SongBackdrop = Brush.linearGradient(listOf(Color(0xFF262626), Color(0xFF111111), Color(0xFF191919)))
+private val SongRim = Brush.linearGradient(listOf(Color(0xFF737373), Color(0xFF353535), Color(0xFF525252)))
 
 private fun SongItem.toSetupSong() = SetupSong(
     TrackQuery(title, artists.map { it.name }, album?.name, duration?.takeIf { it > 0 }?.times(1000L)),
@@ -252,7 +256,7 @@ internal fun ModulesSetupPage(
                     }
                     results.isEmpty() -> Text(stringResource(R.string.onb_modules_no_results), color = SetupDetail, fontSize = 14.sp)
                     else -> Column(
-                        Modifier.fillMaxWidth().clip(SetupRow).background(Color(0xFF182127))
+                        Modifier.fillMaxWidth().clip(SetupRow).background(Color(0xFF171717))
                             .border(1.dp, SetupOutline, SetupRow).padding(horizontal = 10.dp, vertical = 4.dp),
                     ) {
                         results.forEach { item ->
@@ -349,27 +353,29 @@ private fun SetupModuleRow(
     }
     val reveal = remember { Animatable(1f) }
     val revealing by remember { derivedStateOf { reveal.value < 1f } }
-    LaunchedEffect(result) {
+    LaunchedEffect(result, motion) {
         reveal.snapTo(1f)
         if (motion && result != null && result != ModuleFetchResult.Fetching) {
             reveal.snapTo(0f)
             reveal.animateTo(1f, tween(780, easing = FastOutSlowInEasing))
         }
     }
-    val surface = if (found) Color(0xFF192B2C) else Color(0xFF1D252B)
-    val rim = if (found) Color(0xFF49766E) else if (checked) SetupOutline else Color(0xFF37434A)
+    val interaction = remember { MutableInteractionSource() }
+    val surface = if (found) Color(0xFF1B211D) else Color(0xFF181818)
+    val rim = if (found) Color(0xFF46594B) else if (checked) SetupOutline else Color(0xFF333333)
     Row(
         modifier = Modifier.fillMaxWidth().heightIn(min = 78.dp)
+            .pressBounce(interaction, pressedScale = 0.988f)
             .clip(SetupRow).background(surface)
             .then(if (found && motion && revealing) Modifier.resultRipple(reveal) else Modifier)
             .border(1.dp, rim, SetupRow)
-            .toggleable(checked, enabled = enabled, role = Role.Switch, onValueChange = onCheckedChange)
+            .toggleable(checked, interactionSource = interaction, indication = RemoteFocus, enabled = enabled, role = Role.Switch, onValueChange = onCheckedChange)
             .padding(14.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
-            Modifier.size(44.dp).clip(RoundedCornerShape(14.dp)).background(Color(0xFF10191D)),
+            Modifier.size(44.dp).clip(RoundedCornerShape(14.dp)).background(Color(0xFF242424)),
             contentAlignment = Alignment.Center,
         ) { leading() }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
@@ -418,18 +424,20 @@ private fun ModulesEmblem() {
 
 @Composable
 private fun SetupFetchButton(fetching: Boolean, enabled: Boolean, onClick: () -> Unit) {
+    val interaction = remember { MutableInteractionSource() }
     val label = stringResource(if (fetching) R.string.cancel else R.string.onb_modules_fetch)
     val shape = RoundedCornerShape(14.dp)
     val fill = when {
-        fetching -> Color(0xFF223238)
+        fetching -> Color(0xFF2B2B2B)
         enabled -> SetupSilver
-        else -> Color(0xFF394950)
+        else -> Color(0xFF272727)
     }
-    val ink = if (enabled && !fetching) Color(0xFF152329) else SetupDetail
+    val ink = if (enabled && !fetching) Color(0xFF171717) else SetupDetail
     Row(
-        Modifier.fillMaxWidth().heightIn(min = 48.dp).clip(shape).background(fill)
+        Modifier.fillMaxWidth().heightIn(min = 48.dp)
+            .pressBounce(interaction, pressedScale = 0.97f).clip(shape).background(fill)
             .border(1.dp, if (fetching) SetupOutline else Color.Transparent, shape)
-            .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+            .clickable(interactionSource = interaction, indication = RemoteFocus, enabled = enabled, role = Role.Button, onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
         verticalAlignment = Alignment.CenterVertically,
@@ -441,10 +449,11 @@ private fun SetupFetchButton(fetching: Boolean, enabled: Boolean, onClick: () ->
 
 @Composable
 private fun ModuleFetchProgress(completed: Int, total: Int) {
+    val progress by animateFloatAsState(completed.toFloat() / total.coerceAtLeast(1), tween(220), label = "moduleProgress")
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Box(Modifier.fillMaxWidth().height(3.dp).clip(CircleShape).background(SetupOutline)) {
             Box(
-                Modifier.fillMaxWidth(completed.toFloat() / total.coerceAtLeast(1))
+                Modifier.fillMaxWidth(progress.coerceIn(0f, 1f))
                     .fillMaxHeight().background(SetupAccent),
             )
         }
@@ -468,10 +477,10 @@ private fun Modifier.silverText(sweep: Animatable<Float, AnimationVector1D>, mot
         val band = size.width * 0.62f
         val silver = Brush.linearGradient(
             0f to Color.Transparent,
-            0.26f to Color(0x703C5363),
-            0.49f to Color(0xFFB7D4E0),
+            0.26f to Color(0x70555555),
+            0.49f to Color(0xFFC9C9C9),
             0.62f to Color.White,
-            0.75f to Color(0xB8DBF6FF),
+            0.75f to Color(0xB8EEEEEE),
             1f to Color.Transparent,
             start = Offset.Zero,
             end = Offset(band * 0.8f, size.height * 0.48f),
@@ -494,7 +503,7 @@ private fun Modifier.etchedSignal(): Modifier = drawWithCache {
     val w = size.width
     val h = size.height
     val amplitude = h * 0.16f
-    val trace = Brush.horizontalGradient(listOf(Color.Transparent, Color(0x38A8CDD8), Color(0x64C4E3E9)))
+    val trace = Brush.horizontalGradient(listOf(Color.Transparent, Color(0x38C0C0C0), Color(0x64DDDDDD)))
     repeat(3) { index ->
         val y = h * (0.47f + index * 0.10f)
         wave.moveTo(w * 0.25f, y)
@@ -506,7 +515,7 @@ private fun Modifier.etchedSignal(): Modifier = drawWithCache {
 
 private fun Modifier.resultRipple(reveal: Animatable<Float, AnimationVector1D>): Modifier = drawWithCache {
     val crestWidth = size.width * 0.5f
-    val crest = Brush.horizontalGradient(listOf(Color.Transparent, Color(0x406BDEC8), Color.Transparent), endX = crestWidth)
+    val crest = Brush.horizontalGradient(listOf(Color.Transparent, Color(0x409DB7A3), Color.Transparent), endX = crestWidth)
     val wave = Path().apply {
         moveTo(0f, size.height * 0.56f)
         cubicTo(crestWidth * 0.26f, size.height * 0.32f, crestWidth * 0.51f, size.height * 0.78f, crestWidth, size.height * 0.43f)
@@ -547,10 +556,10 @@ private fun SetupSongRow(song: SetupSong, enabled: Boolean, featured: Boolean = 
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
-            Modifier.size(if (featured) 64.dp else 44.dp).clip(RoundedCornerShape(12.dp)).background(Color(0xFF343F67)),
+            Modifier.size(if (featured) 64.dp else 44.dp).clip(RoundedCornerShape(12.dp)).background(Color(0xFF2A2A2A)),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(painterResource(R.drawable.music_note), null, tint = Color(0xFFDBE4FF), modifier = Modifier.size(21.dp))
+            Icon(painterResource(R.drawable.music_note), null, tint = Color(0xFFDDDDDD), modifier = Modifier.size(21.dp))
             if (song.cover != null) {
                 AsyncImage(song.cover, contentDescription = null, modifier = Modifier.matchParentSize(), contentScale = ContentScale.Crop)
             }

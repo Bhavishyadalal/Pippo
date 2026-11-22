@@ -1464,7 +1464,7 @@ class MainActivity : ComponentActivity() {
         // the full video mode fills the screen sideways, a status bar down one side of it would cut into the picture
         val (playerStyle) = com.mochyy.mochymusic.utils.rememberEnumPreference(
             com.mochyy.mochymusic.constants.PlayerStyleKey,
-            com.mochyy.mochymusic.constants.PlayerStyle.FLAGSHIP,
+            com.mochyy.mochymusic.constants.DefaultPlayerStyle,
         )
         // and the bedside is a clock on the nightstand, a row of notifications over it would only glow in the dark
         val portrait = LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_PORTRAIT

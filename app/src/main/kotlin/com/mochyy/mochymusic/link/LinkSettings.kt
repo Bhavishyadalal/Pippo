@@ -17,6 +17,7 @@ import com.mochyy.mochymusic.constants.CrossmixModeKey
 import com.mochyy.mochymusic.constants.DataSaverKey
 import com.mochyy.mochymusic.constants.InfiniteQueueKey
 import com.mochyy.mochymusic.constants.PlayerStyle
+import com.mochyy.mochymusic.constants.DefaultPlayerStyle
 import com.mochyy.mochymusic.constants.PlayerStyleKey
 import com.mochyy.mochymusic.constants.SkipSilenceKey
 import com.mochyy.mochymusic.constants.StudioForVideosKey
@@ -185,7 +186,7 @@ internal class LinkSettings(context: Context) {
             section = R.string.link_section_player,
             title = R.string.link_setting_player_style,
             options = { context, _ -> stylesOn(context).map { it.name to it.selectorName } },
-            read = { prefs, _ -> prefs[PlayerStyleKey] ?: PlayerStyle.FLAGSHIP.name },
+            read = { prefs, _ -> prefs[PlayerStyleKey] ?: stylesOn(context).first().name },
             write = { context, _, value ->
                 val style = stylesOn(context).first { it.name == value }
                 context.dataStore.edit { it[PlayerStyleKey] = style.name }
@@ -206,7 +207,8 @@ internal class LinkSettings(context: Context) {
 
         // a tv only draws the looks made for a big screen
         fun stylesOn(context: Context): List<PlayerStyle> =
-            if (DeviceKind.of(context).isTv) PlayerStyle.entries.filter { it.availableOnTv } else PlayerStyle.entries
+            if (DeviceKind.of(context).isTv) PlayerStyle.entries.filter { it.availableOnTv }
+            else listOf(DefaultPlayerStyle) + PlayerStyle.entries.filterNot { it == DefaultPlayerStyle }
 
         private fun speedLabel(speed: Float): String =
             if (speed % 1f == 0f) speed.toInt().toString() else speed.toString()

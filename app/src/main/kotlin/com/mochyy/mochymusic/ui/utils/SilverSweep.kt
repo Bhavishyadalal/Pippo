@@ -5,6 +5,7 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -22,28 +23,40 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.currentStateAsState
 import com.mochyy.mochymusic.constants.SilverSongTitleKey
+import com.mochyy.mochymusic.constants.SilverSongTitleSpeedKey
 import com.mochyy.mochymusic.utils.rememberPreference
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlin.math.roundToInt
+
+internal val LocalSilverTitleVisible = compositionLocalOf { true }
 
 @Composable
 internal fun Modifier.songTitleSilver(title: String, visible: Boolean = true): Modifier {
-    if (!visible || title.isBlank()) return this
+    if (!visible || title.isBlank() || !LocalSilverTitleVisible.current) return this
     val (enabled) = rememberPreference(SilverSongTitleKey, defaultValue = false)
-    return if (enabled) silverSweep(title) else this
+    if (!enabled) return this
+    val (speed) = rememberPreference(SilverSongTitleSpeedKey, defaultValue = 1f)
+    return silverSweep(title, repeat = true, speed = speed)
 }
 
-/** One pass on appearance or content change, with an offscreen layer only while the glint is moving. */
+/** Runs the silver pass while visible, with an offscreen layer only during the sweep. */
 @Composable
-internal fun Modifier.silverSweep(key: String): Modifier {
+internal fun Modifier.silverSweep(key: String, repeat: Boolean = false, speed: Float = 1f): Modifier {
     val lifecycle by LocalLifecycleOwner.current.lifecycle.currentStateAsState()
     if (!lifecycle.isAtLeast(Lifecycle.State.RESUMED) || AppMotion.durationScale.scaleFactor <= 0f) return this
 
     val sweep = remember(key) { Animatable(1f) }
     val drawing by remember(sweep) { derivedStateOf { sweep.value < 1f } }
-    LaunchedEffect(sweep) {
-        delay(160)
-        sweep.snapTo(0f)
-        sweep.animateTo(1f, tween(1_550, easing = LinearEasing))
+    val multiplier = speed.takeIf { it.isFinite() }?.coerceIn(0.5f, 3f) ?: 1f
+    LaunchedEffect(sweep, repeat, multiplier) {
+        sweep.snapTo(1f)
+        delay(160L)
+        do {
+            sweep.snapTo(0f)
+            sweep.animateTo(1f, tween((1_250 / multiplier).roundToInt(), easing = LinearEasing))
+            if (repeat) delay((3_200 / multiplier).roundToInt().toLong())
+        } while (repeat && isActive)
     }
     return graphicsLayer {
         compositingStrategy = if (drawing) CompositingStrategy.Offscreen else CompositingStrategy.Auto
