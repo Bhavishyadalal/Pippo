@@ -278,7 +278,7 @@ internal fun ModulesSetupPage(
                 SetupSongRow(selected, enabled = canFetch && !fetching, featured = true, onClick = { fetch() })
                 SetupFetchButton(
                     fetching = fetching,
-                    onClick = { if (fetching) cancelFetches() else fetch() },
+                    onClick = { if (jobs.isNotEmpty()) cancelFetches() else fetch() },
                     enabled = active && (fetching || canFetch),
                 )
                 if (showFetchProgress && fetchResults.isNotEmpty()) {

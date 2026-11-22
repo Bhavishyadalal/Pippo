@@ -9,6 +9,8 @@ import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
@@ -26,6 +28,8 @@ import com.mochyy.mochymusic.constants.SilverSongTitleKey
 import com.mochyy.mochymusic.constants.SilverSongTitleSpeedKey
 import com.mochyy.mochymusic.utils.rememberPreference
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.isActive
 import kotlin.math.roundToInt
 
@@ -48,14 +52,19 @@ internal fun Modifier.silverSweep(key: String, repeat: Boolean = false, speed: F
 
     val sweep = remember(key) { Animatable(1f) }
     val drawing by remember(sweep) { derivedStateOf { sweep.value < 1f } }
-    val multiplier = speed.takeIf { it.isFinite() }?.coerceIn(0.5f, 3f) ?: 1f
-    LaunchedEffect(sweep, repeat, multiplier) {
+    val latestSpeed by rememberUpdatedState(speed.takeIf { it.isFinite() }?.coerceIn(0.5f, 3f) ?: 1f)
+    LaunchedEffect(sweep, repeat) {
         sweep.snapTo(1f)
         delay(160L)
         do {
+            val multiplier = latestSpeed
             sweep.snapTo(0f)
             sweep.animateTo(1f, tween((1_250 / multiplier).roundToInt(), easing = LinearEasing))
-            if (repeat) delay((3_200 / multiplier).roundToInt().toLong())
+            if (repeat) {
+                withTimeoutOrNull((3_200 / multiplier).roundToInt().toLong()) {
+                    snapshotFlow { latestSpeed }.first { it != multiplier }
+                }
+            }
         } while (repeat && isActive)
     }
     return graphicsLayer {

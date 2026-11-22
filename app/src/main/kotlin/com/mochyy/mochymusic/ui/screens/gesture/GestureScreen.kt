@@ -54,7 +54,9 @@ import com.mochyy.mochymusic.R
 import com.mochyy.mochymusic.constants.HomeStyle
 import com.mochyy.mochymusic.constants.HomeStyleKey
 import com.mochyy.mochymusic.constants.PlayerStyle
+import com.mochyy.mochymusic.constants.ArtworkFrameCoverStyleKey
 import com.mochyy.mochymusic.constants.DefaultPlayerStyle
+import com.mochyy.mochymusic.constants.PlayerCoverStyle
 import com.mochyy.mochymusic.constants.PlayerStyleKey
 import com.mochyy.mochymusic.constants.PlaylistStyle
 import com.mochyy.mochymusic.constants.PlaylistStyleKey
@@ -282,14 +284,18 @@ private fun PlayerSection() {
         },
     )
     Spacer(Modifier.height(16.dp))
-    LandscapePlayerCard()
+    LandscapePlayerCard(playerStyle)
     }
 }
 
 // the flagship turned sideways: a rounded square beside the controls, or the whole cover melting into them
 @Composable
-private fun LandscapePlayerCard() {
-    val (fullCover, setFullCover) = rememberPreference(com.mochyy.mochymusic.constants.LandscapeFullCoverKey, defaultValue = false)
+private fun LandscapePlayerCard(playerStyle: PlayerStyle) {
+    val frameCover by rememberEnumPreference(ArtworkFrameCoverStyleKey, PlayerCoverStyle.SQUARED)
+    val (fullCover, setFullCover) = rememberPreference(
+        com.mochyy.mochymusic.constants.LandscapeFullCoverKey,
+        defaultValue = playerStyle == PlayerStyle.ARTWORK_FRAME && frameCover == PlayerCoverStyle.EDGE_TO_EDGE,
+    )
     LabCard(padding = CardPadding) {
         Text(
             stringResource(R.string.customise_landscape_player),

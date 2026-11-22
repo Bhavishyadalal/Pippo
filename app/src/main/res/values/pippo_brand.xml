@@ -14,4 +14,5 @@
     <string name="pippo_about_version">Version %1$s</string>
     <string name="pippo_about_license">GNU GPL v3 · License</string>
     <string name="pippo_about_link_error">Couldn’t open this link.</string>
+    <string name="pippo_about_license_unavailable">Couldn’t load the license text.</string>
 </resources>

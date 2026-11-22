@@ -56,8 +56,10 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
@@ -317,12 +319,14 @@ private fun BareSlider(
 ) {
     var widthPx by remember { mutableFloatStateOf(1f) }
     val shown = fraction.coerceIn(0f, 1f)
-    val currentShown by androidx.compose.runtime.rememberUpdatedState(shown)
+    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+    val currentRtl by androidx.compose.runtime.rememberUpdatedState(rtl)
     val currentOnChange by androidx.compose.runtime.rememberUpdatedState(onFractionChange)
     val currentOnFinished by androidx.compose.runtime.rememberUpdatedState(onValueChangeFinished)
 
     fun updateFromX(x: Float) {
-        currentOnChange((x / widthPx).coerceIn(0f, 1f))
+        val fractionAtTouch = (x / widthPx).coerceIn(0f, 1f)
+        currentOnChange(if (currentRtl) 1f - fractionAtTouch else fractionAtTouch)
     }
 
     // the finger's own spot, so a slider that snaps to steps still moves when each move is smaller than a step
@@ -358,7 +362,10 @@ private fun BareSlider(
                 state = dragState,
                 orientation = Orientation.Horizontal,
                 enabled = enabled,
-                onDragStarted = { dragX = currentShown * widthPx },
+                onDragStarted = { start ->
+                    dragX = start.x
+                    updateFromX(dragX)
+                },
                 onDragStopped = { currentOnFinished?.invoke() },
             ),
     ) {
@@ -367,7 +374,9 @@ private fun BareSlider(
         val start = stroke / 2f
         val end = size.width - stroke / 2f
         drawLine(Color.White.copy(alpha = 0.2f), Offset(start, y), Offset(end, y), stroke, StrokeCap.Round)
-        drawLine(Color.White, Offset(start, y), Offset(start + (end - start) * shown, y), stroke, StrokeCap.Round)
+        val filledStart = if (rtl) end else start
+        val filledEnd = if (rtl) end - (end - start) * shown else start + (end - start) * shown
+        drawLine(Color.White, Offset(filledStart, y), Offset(filledEnd, y), stroke, StrokeCap.Round)
     }
 }
 
