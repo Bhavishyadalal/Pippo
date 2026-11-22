@@ -385,6 +385,7 @@ dependencies {
 
     implementation(libs.activity)
     implementation(libs.hilt.viewmodel.compose)
+    implementation(libs.androidx.navigation.compose)
     implementation(libs.datastore)
 
     implementation(libs.compose.runtime)
