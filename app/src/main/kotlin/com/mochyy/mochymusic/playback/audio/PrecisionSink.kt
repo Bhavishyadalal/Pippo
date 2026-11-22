@@ -37,6 +37,8 @@ class PrecisionSink(
     // a reworked buffer the sink hasn't taken all of yet, and the decoder buffer it came from
     private var pending: ByteBuffer? = null
     private var pendingSource: ByteBuffer? = null
+    private var pendingTimeUs = C.TIME_UNSET
+    private var pendingAccessUnitCount = 0
 
     // scratch kept between buffers, so the playback thread doesn't allocate for every one
     private var planes = Array(2) { FloatArray(0) }
@@ -46,7 +48,9 @@ class PrecisionSink(
 
     // the decoder is asked for float only when float would make it all the way to the track
     override fun getFormatSupport(format: Format): Int {
-        if (format.pcmEncoding == C.ENCODING_PCM_FLOAT && MimeTypes.AUDIO_RAW == format.sampleMimeType && !outputs.floatAllowed) {
+        if (format.pcmEncoding == C.ENCODING_PCM_FLOAT && MimeTypes.AUDIO_RAW == format.sampleMimeType &&
+            (!outputs.floatAllowed || format.channelCount > 2)
+        ) {
             return AudioSink.SINK_FORMAT_SUPPORTED_WITH_TRANSCODING
         }
         return super.getFormatSupport(format)
@@ -76,7 +80,7 @@ class PrecisionSink(
         val reworked = nextResampler != null || hiRes
         val nextEncoding = when {
             !reworked -> encoding
-            configuredAllowed -> C.ENCODING_PCM_FLOAT
+            configuredAllowed && format.channelCount <= 2 -> C.ENCODING_PCM_FLOAT
             else -> C.ENCODING_PCM_16BIT
         }
         val handed = if (reworked) {
@@ -111,17 +115,31 @@ class PrecisionSink(
         if (pending == null || pendingSource !== buffer) {
             pending = rework(buffer, inputFormat!!)
             pendingSource = buffer
-            buffer.position(buffer.limit())
+            pendingTimeUs = presentationTimeUs
+            pendingAccessUnitCount = encodedAccessUnitCount
         }
-        val reworked = pending!!
+        return drainPending()
+    }
+
+    private fun drainPending(): Boolean {
+        val reworked = pending ?: return true
         // the resampler can hold a short buffer back whole while its filter fills
-        val done = !reworked.hasRemaining() || super.handleBuffer(reworked, presentationTimeUs, encodedAccessUnitCount)
+        val done = !reworked.hasRemaining() || super.handleBuffer(reworked, pendingTimeUs, pendingAccessUnitCount)
         if (done) {
+            pendingSource?.let { it.position(it.limit()) }
             pending = null
             pendingSource = null
         }
         return done
     }
+
+    override fun playToEndOfStream() {
+        if (drainPending()) super.playToEndOfStream()
+    }
+
+    override fun isEnded(): Boolean = pending == null && super.isEnded()
+
+    override fun hasPendingData(): Boolean = pending != null || super.hasPendingData()
 
     override fun flush() {
         pending = null
@@ -206,6 +224,7 @@ class PrecisionSink(
         dither = dither xor (dither shl 5)
         val a = (dither and 0xFFFF) / 65536f
         val b = ((dither ushr 16) and 0xFFFF) / 65536f
+        if (!sample.isFinite()) return 0
         val value = (sample * 32768f + a - b).roundToInt()
         return value.coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt()).toShort()
     }

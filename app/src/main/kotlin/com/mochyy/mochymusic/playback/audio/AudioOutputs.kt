@@ -163,7 +163,8 @@ class AudioOutputs(private val context: Context) {
     }
 
     /** sets the usb dac's mixer to the song's rate (bit-perfect when it takes exactly our format) just before a track opens */
-    fun prepareMixer(sampleRate: Int, channels: Int, encoding: Int) {
+    @Synchronized
+    fun prepareMixer(sampleRate: Int, channelMask: Int, encoding: Int) {
         if (!passthrough || Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) return
         val device = activeDevice()?.takeIf { kindOf(it.type) == Kind.USB }
         if (device == null) {
@@ -171,7 +172,7 @@ class AudioOutputs(private val context: Context) {
             return
         }
         if (mixedDevice != null && mixedDevice?.id != device.id) clearMixer()
-        val set = runCatching { UsbMixer.apply(audioManager, device, sampleRate, channels, encoding) }
+        val set = runCatching { UsbMixer.apply(audioManager, device, sampleRate, channelMask, encoding) }
             .onFailure { Timber.tag(Tag).w(it, "couldn't set the dac's mixer") }
             .getOrNull()
         mixedDevice = device.takeIf { set != null }
@@ -181,6 +182,7 @@ class AudioOutputs(private val context: Context) {
     /** audio pass's bit-perfect output is about to set the dac's mixer itself, so ours steps out of the way first */
     fun releaseMixer() = clearMixer()
 
+    @Synchronized
     private fun clearMixer() {
         val device = mixedDevice ?: return
         mixedDevice = null
@@ -275,10 +277,9 @@ class AudioOutputs(private val context: Context) {
 // android 14's per-device mixer, kept apart so older phones never load AudioMixerAttributes
 @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
 private object UsbMixer {
-    fun apply(audioManager: AudioManager, device: AudioDeviceInfo, sampleRate: Int, channels: Int, encoding: Int): AudioOutputs.Mixer? {
-        val mask = if (channels == 1) AudioFormat.CHANNEL_OUT_MONO else AudioFormat.CHANNEL_OUT_STEREO
+    fun apply(audioManager: AudioManager, device: AudioDeviceInfo, sampleRate: Int, channelMask: Int, encoding: Int): AudioOutputs.Mixer? {
         val atRate = audioManager.getSupportedMixerAttributes(device)
-            .filter { it.format.sampleRate == sampleRate && it.format.channelMask == mask }
+            .filter { it.format.sampleRate == sampleRate && it.format.channelMask == channelMask }
         val bitPerfect = atRate.firstOrNull {
             it.mixerBehavior == AudioMixerAttributes.MIXER_BEHAVIOR_BIT_PERFECT && it.format.encoding == encoding
         }
