@@ -46,23 +46,34 @@ class PassSink(private val pass: AudioPass) : AudioSink {
     /** whether this song can go out untouched right now */
     fun canTake(format: Format, source: Format?): Boolean = pass.canTake(format, source, this)
 
+    fun requiresReopen(format: Format, source: Format?): Boolean {
+        val open = transport ?: return false
+        val bits = PassPcm.sourceBits(format.pcmEncoding, source?.pcmEncoding)
+        return open.sampleRate != format.sampleRate || open.channels != format.channelCount || open.bits < bits
+    }
+
     /** the router hands over the file's own format with each song, so lossless and bit depth are known */
     fun configure(format: Format, source: Format?) {
         val bits = PassPcm.sourceBits(format.pcmEncoding, source?.pcmEncoding)
-        val open = transport
         // the next song in the same format keeps the output open, so an album plays gapless
-        if (open != null && (open.sampleRate != format.sampleRate || open.channels != format.channelCount || open.bits < bits)) closeTransport()
+        if (requiresReopen(format, source)) closeTransport()
         input = format
         this.source = source
         sourceBits = bits
         pending = null
         pendingSource = null
+        draining = false
+        transport?.let {
+            exact = true
+            pass.playing(it, bits, source, exact)
+        }
     }
 
     override fun configure(inputFormat: Format, specifiedBufferSize: Int, outputChannels: IntArray?) = configure(inputFormat, null)
 
     override fun handleBuffer(buffer: ByteBuffer, presentationTimeUs: Long, encodedAccessUnitCount: Int): Boolean {
         val format = input ?: return true
+        draining = false
         val output = transport ?: openTransport(format)
         if (startUs == C.TIME_UNSET) {
             startUs = presentationTimeUs
@@ -160,9 +171,11 @@ class PassSink(private val pass: AudioPass) : AudioSink {
         draining = true
         val output = transport ?: return
         pending?.let { out ->
-            writtenFrames += output.write(out) / (output.channels * output.bits / 8)
+            val frameBytes = output.channels * output.bits / 8
+            writtenFrames += output.write(out) / frameBytes
             if (!out.hasRemaining()) {
                 pendingSource?.let { it.position(it.limit()) }
+                queuedFrames += out.limit() / frameBytes
                 pending = null
                 pendingSource = null
             }
@@ -196,18 +209,23 @@ class PassSink(private val pass: AudioPass) : AudioSink {
     override fun flush() {
         runCatching { transport?.flush() }
         transportPlaying = false
+        resetBufferState()
+    }
+
+    private fun resetBufferState() {
         startUs = C.TIME_UNSET
         writtenFrames = 0
         queuedFrames = 0
         lastPlayedFrames = 0L
+        nextProgressSampleMs = 0L
         pending = null
         pendingSource = null
         draining = false
     }
 
     override fun reset() {
-        flush()
-        closeTransport()
+        if (transport == null) resetBufferState() else closeTransport()
+        playing = false
         input = null
         source = null
     }
@@ -218,6 +236,7 @@ class PassSink(private val pass: AudioPass) : AudioSink {
         val open = transport ?: return
         transport = null
         transportPlaying = false
+        resetBufferState()
         runCatching { open.release() }
         pass.release(this)
     }

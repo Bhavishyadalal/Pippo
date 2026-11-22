@@ -7,7 +7,10 @@
 package com.mochyy.mochymusic.importer
 
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
+import android.os.Build
+import android.provider.MediaStore
 import androidx.annotation.OptIn
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
@@ -23,13 +26,15 @@ import com.mochyy.mochymusic.db.entities.SongArtistMap
 import com.mochyy.mochymusic.db.entities.SongEntity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.File
+import java.io.IOException
 import java.time.LocalDateTime
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 
 private const val AlacProbeTimeoutSeconds = 5L
 
-/** adds one audio file to the library as a local song and returns its id, uri has to stay readable so a shared file is copied into the app first (importSharedAudio) */
+/** Adds an audio file with a URI that remains readable after import. */
 suspend fun importLocalAudio(
     context: Context,
     database: MusicDatabase,
@@ -179,30 +184,60 @@ private fun localAlbumId(title: String, albumArtist: String): String =
 // disc first, then track, so a two-disc album plays in order; a file with no number goes last on its disc
 private fun trackOrder(disc: Int?, track: Int?): Int = (disc ?: 1) * 1000 + (track ?: 999)
 
-/** copies a file another app shared into the app's own storage, then imports it */
+/** Reuses a durable file link or copies the audio when the share grants only temporary access. */
 suspend fun importSharedAudio(
     context: Context,
     database: MusicDatabase,
     shared: Uri,
 ) {
-    val name = withContext(Dispatchers.IO) {
-        context.contentResolver.query(shared, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)
-            ?.use { if (it.moveToFirst()) it.getString(0) else null }
-    }?.replace(Regex("[\\\\/:*?\"<>|]"), "_") ?: "audio"
-    val copy = withContext(Dispatchers.IO) {
-        val dir = java.io.File(context.filesDir, "shared_audio/${UUID.randomUUID()}").apply { mkdirs() }
-        java.io.File(dir, name).also { file ->
-            context.contentResolver.openInputStream(shared)!!.use { input ->
-                file.outputStream().use { input.copyTo(it) }
+    val original = withContext(Dispatchers.IO) { durableSharedAudioUri(context, shared) }
+    if (original != null) {
+        importLocalAudio(context, database, original)
+        return
+    }
+
+    val directory = File(context.filesDir, "shared_audio/${UUID.randomUUID()}")
+    try {
+        val copy = withContext(Dispatchers.IO) {
+            val resolver = context.contentResolver
+            val name = runCatching {
+                resolver.query(shared, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)
+                    ?.use { if (it.moveToFirst()) it.getString(0) else null }
+            }.getOrNull()?.replace(Regex("[\\\\/:*?\"<>|]"), "_")
+                ?.takeUnless { it.isBlank() || it == "." || it == ".." } ?: "audio"
+            if (!directory.mkdirs()) throw IOException("Could not create the imported audio directory")
+            File(directory, name).also { file ->
+                val input = resolver.openInputStream(shared) ?: throw IOException("Could not open the shared audio file")
+                input.use { source -> file.outputStream().use { source.copyTo(it) } }
             }
         }
-    }
-    try {
         importLocalAudio(context, database, Uri.fromFile(copy))
     } catch (e: Exception) {
-        copy.parentFile?.deleteRecursively()
+        directory.deleteRecursively()
         throw e
     }
+}
+
+private fun durableSharedAudioUri(context: Context, shared: Uri): Uri? {
+    if (shared.scheme != "content") return null
+    val resolver = context.contentResolver
+    fun canOpen(uri: Uri) = runCatching {
+        resolver.openFileDescriptor(uri, "r")?.use { true } == true
+    }.getOrDefault(false)
+
+    val grantKept = runCatching {
+        resolver.takePersistableUriPermission(shared, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }.isSuccess
+    if (grantKept && canOpen(shared)) return shared
+
+    if (!DeviceMusicScanner.hasAccess(context)) return null
+    val mediaUri = when {
+        shared.authority == MediaStore.AUTHORITY -> shared
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q ->
+            runCatching { MediaStore.getMediaUri(context, shared) }.getOrNull()
+        else -> null
+    }
+    return mediaUri?.takeIf(::canOpen)
 }
 
 private fun isMp4(mimeType: String?) = mimeType != null && (mimeType.contains("mp4") || mimeType.contains("m4a"))

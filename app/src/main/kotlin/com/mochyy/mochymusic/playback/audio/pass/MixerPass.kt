@@ -77,7 +77,11 @@ internal class MixerPass private constructor(
 
     override fun playedFrames(): Long {
         val head = track.playbackHeadPosition.toLong() and 0xffffffffL
-        if (head < lastHead) wraps += 1L shl 32
+        if (head < lastHead) {
+            // A small backward jump from a USB driver isn't a 32-bit rollover.
+            if (lastHead - head <= (1L shl 31)) return wraps + lastHead
+            wraps += 1L shl 32
+        }
         lastHead = head
         return wraps + head
     }
@@ -86,7 +90,11 @@ internal class MixerPass private constructor(
         runCatching { track.removeOnRoutingChangedListener(routing) }
         runCatching { audio.removeOnPreferredMixerAttributesChangedListener(mixerChanged) }
         runCatching { track.release() }
-        runCatching { audio.clearPreferredMixerAttributes(AudioOutputs.MediaAttributes, device) }
+        runCatching {
+            if (audio.getPreferredMixerAttributes(AudioOutputs.MediaAttributes, device) == mixer) {
+                audio.clearPreferredMixerAttributes(AudioOutputs.MediaAttributes, device)
+            }
+        }
     }
 
     private fun check() {

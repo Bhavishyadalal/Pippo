@@ -11,6 +11,7 @@ interface Queue {
 
     // the song this queue starts on, when that's known before it's read, so a pick can fetch it while the old song still plays
     val firstSongId: String? get() = preloadItem?.id
+    val continuesAsRadio: Boolean get() = false
 
     suspend fun getInitialStatus(): Status
 
