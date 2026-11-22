@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-    <background android:drawable="@color/pippo_master_03_vintage_sepia_bg" />
-    <foreground><inset android:drawable="@drawable/pippo_master_03_vintage_sepia" android:inset="18%" /></foreground>
-    <monochrome><inset android:drawable="@drawable/pippo_master_ribbon_mask" android:inset="18%" /></monochrome>
-</adaptive-icon>
