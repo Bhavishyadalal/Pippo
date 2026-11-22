@@ -52,6 +52,7 @@ import androidx.compose.ui.unit.sp
 import com.mochyy.mochymusic.ui.component.AppSwitch
 import com.mochyy.mochymusic.ui.theme.InterFontFamily
 import com.mochyy.mochymusic.ui.component.RemoteFocus
+import com.mochyy.mochymusic.ui.component.pressBounce
 
 internal object Onb {
     val Page = Color(0xFF1C1C1C)
@@ -175,17 +176,12 @@ internal fun OnbButton(
     enabled: Boolean = true,
 ) {
     val interaction = remember { MutableInteractionSource() }
-    val pressed by interaction.collectIsPressedAsState()
     Box(
         modifier = modifier
             .fillMaxWidth()
             .heightIn(min = 50.dp)
-            .graphicsLayer {
-                val s = if (pressed && enabled) 0.97f else 1f
-                scaleX = s
-                scaleY = s
-                alpha = if (enabled) 1f else 0.45f
-            }
+            .pressBounce(interaction, pressedScale = 0.97f)
+            .graphicsLayer { alpha = if (enabled) 1f else 0.45f }
             .clip(CircleShape)
             .background(if (style == OnbButtonStyle.Primary) Onb.ButtonPrimary else Onb.ButtonSecondary)
             .clickable(interactionSource = interaction, indication = RemoteFocus, enabled = enabled, onClick = onClick)

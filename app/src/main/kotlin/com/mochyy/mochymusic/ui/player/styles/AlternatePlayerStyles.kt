@@ -27,6 +27,8 @@ import androidx.compose.foundation.shape.GenericShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -67,6 +69,7 @@ import com.mochyy.mochymusic.lyrics.LyricsEntry
 import com.mochyy.mochymusic.lyrics.LyricsUtils
 import com.mochyy.mochymusic.utils.makeTimeString
 import com.mochyy.mochymusic.ui.player.carouselText
+import com.mochyy.mochymusic.ui.utils.LocalSilverTitleVisible
 import com.mochyy.mochymusic.ui.utils.songTitleSilver
 import com.mochyy.mochymusic.ui.utils.stableStatusBars
 
@@ -127,6 +130,7 @@ internal fun StyleSongs(
     lyrics: StyleLyrics,
     content: @Composable (song: StyleSong, slotModifier: Modifier) -> Unit,
 ) {
+    val silverVisible = LocalSilverTitleVisible.current
     if (carousel == null) {
         content(StyleSong(track, lyrics.lines), Modifier)
         return
@@ -142,7 +146,9 @@ internal fun StyleSongs(
                 album = slot.album,
                 artwork = slot.artworkUrl,
             )
-            content(StyleSong(details, held[0]), Modifier.carouselText(carousel, slot))
+            CompositionLocalProvider(LocalSilverTitleVisible provides (silverVisible && playing)) {
+                content(StyleSong(details, held[0]), Modifier.carouselText(carousel, slot))
+            }
         }
     }
 }
@@ -159,6 +165,8 @@ internal fun StyleFrame(
 ) {
     val connection = LocalPlayerConnection.current
     var menuOpen by remember { mutableStateOf(false) }
+    val showing = rememberStyleShowing()
+    val titleVisible by remember(showing, preview) { derivedStateOf { !preview && showing() } }
     StyleStage(
         tones = tones,
         background = background,
@@ -189,7 +197,9 @@ internal fun StyleFrame(
             androidx.compose.material3.ProvideTextStyle(
                 androidx.compose.ui.text.TextStyle(fontFamily = com.mochyy.mochymusic.ui.theme.InterFontFamily)
             ) {
-                content(landscape, menuOpen) { menuOpen = it }
+                CompositionLocalProvider(LocalSilverTitleVisible provides titleVisible) {
+                    content(landscape, menuOpen) { menuOpen = it }
+                }
             }
         }
     }

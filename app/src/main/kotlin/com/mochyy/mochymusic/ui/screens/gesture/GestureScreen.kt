@@ -54,6 +54,7 @@ import com.mochyy.mochymusic.R
 import com.mochyy.mochymusic.constants.HomeStyle
 import com.mochyy.mochymusic.constants.HomeStyleKey
 import com.mochyy.mochymusic.constants.PlayerStyle
+import com.mochyy.mochymusic.constants.DefaultPlayerStyle
 import com.mochyy.mochymusic.constants.PlayerStyleKey
 import com.mochyy.mochymusic.constants.PlaylistStyle
 import com.mochyy.mochymusic.constants.PlaylistStyleKey
@@ -129,7 +130,7 @@ private enum class CustomiseSection(@StringRes val titleRes: Int, val keys: List
     HOME(R.string.customise_home_styles, listOf("Home styles"), "home styles Pippo listen now hop in hero"),
     BLUR(R.string.appearance_blur, listOf("Blur", "Progressive blur", "Blur quality", "Blur strength"), "blur glass frosted progressive flat quality low high strength px"),
     ARTWORK_BACKGROUND(R.string.player_artwork_background_strength, listOf("Artwork background"), "player blur tint contrast cover brightness dark amoled oled true black"),
-    SILVER_SONG_TITLE(R.string.customise_silver_song_title, listOf("Silver song titles"), "player mini player song title silver shimmer"),
+    SILVER_SONG_TITLE(R.string.customise_silver_song_title, listOf("Silver song titles"), "player mini player song title silver shimmer flow speed"),
     ELEMENT_BLUR(R.string.customise_element_blur, listOf("Element blur"), "element blur lyrics lines cover zoom titles menus page swipes"),
     ANIMATION(R.string.appearance_animation, listOf("Animation", "Animation speed"), "animation speed motion transitions off faster slower"),
     LYRICS(R.string.appearance_lyrics_animation, listOf("Lyrics animation"), "lyrics animation style 1 2 boring plain shader glow wave"),
@@ -265,7 +266,7 @@ private fun PlayerSection() {
     val context = LocalContext.current
     val playerConnection = LocalPlayerConnection.current
     val playerSheetState = LocalPlayerBottomSheetState.current
-    val playerStyle by rememberEnumPreference(PlayerStyleKey, defaultValue = PlayerStyle.FLAGSHIP)
+    val playerStyle by rememberEnumPreference(PlayerStyleKey, defaultValue = DefaultPlayerStyle)
     val playFirst = stringResource(R.string.customise_play_first)
     Column {
     PlayerStyleCard(

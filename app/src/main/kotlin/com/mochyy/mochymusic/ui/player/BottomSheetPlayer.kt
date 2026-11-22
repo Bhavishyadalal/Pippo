@@ -288,13 +288,16 @@ private fun PlayerSheet(
     val (showPlayerBottomCard) = rememberPreference(ShowPlayerBottomCardKey, defaultValue = true)
 
     // the player studio: the selector the player shrinks into, and the flagship's in-place editor
-    // a look module with a player of its own puts that style first in the selector, for as long as it's on
+    // A player contributed by an enabled look remains available alongside the built-ins.
     val onTv = com.mochyy.mochymusic.ui.utils.isTvLayout()
     val hasModuleStyle = !onTv && com.mochyy.mochymusic.modules.skin.ActiveSkin.current?.player != null
     val playerStyles = remember(hasModuleStyle) { PlayerStyle.entries.filter { it != PlayerStyle.MODULE || hasModuleStyle } }
     // The selector uses indices in the available list, which can omit the module player.
     val selectorColumns = remember(playerStyles, hasModuleStyle, onTv) {
-        val columns = if (hasModuleStyle) listOf(listOf(PlayerStyle.MODULE)) + PlayerStyle.selectorColumns else PlayerStyle.selectorColumns
+        val builtIn = PlayerStyle.selectorColumns
+        val columns = if (hasModuleStyle) {
+            builtIn.take(1) + listOf(listOf(PlayerStyle.MODULE)) + builtIn.drop(1)
+        } else builtIn
         // a tv only offers the looks made for it
         val shown = if (onTv) columns.map { column -> column.filter { it.availableOnTv } }.filter { it.isNotEmpty() } else columns
         shown.map { column -> column.map(playerStyles::indexOf) }
@@ -341,7 +344,7 @@ private fun PlayerSheet(
     var coverStyle by rememberEnumPreference(PlayerCoverStyleKey, DefaultPlayerCoverStyle)
     val (savedPlayerStyle, savePlayerStyle) = rememberEnumPreference(
         com.mochyy.mochymusic.constants.PlayerStyleKey,
-        com.mochyy.mochymusic.constants.PlayerStyle.FLAGSHIP,
+        com.mochyy.mochymusic.constants.DefaultPlayerStyle,
     )
     // A style picked in the studio shows at once. The saved one only comes back after the
     // settings file is written, which landed in the middle of the player growing back out of its
@@ -492,7 +495,7 @@ private fun PlayerSheet(
     val exitVideoMode = androidx.compose.runtime.rememberUpdatedState {
         val back = PlayerStyle.entries.firstOrNull { it.name == videoModeReturn && it != PlayerStyle.VIDEO }
             ?: PlayerStyle.fromStored(videoModeReturn)
-        onPlayerStyleChange(back ?: PlayerStyle.FLAGSHIP)
+        onPlayerStyleChange(back ?: com.mochyy.mochymusic.constants.DefaultPlayerStyle)
     }
     // the song's whole lyrics, opened over an alternate style from its ••• menu
     var styleLyricsOpen by remember { mutableStateOf(false) }
@@ -1507,6 +1510,7 @@ private fun PlayerSheet(
                             }
                     ) {
                         SongInfoRow(
+                            animateTitle = !lyricsMounted && sheetShowing,
                             // Only while the sheet is up: during a slide the title's root position
                             // moves every frame, and the header morph that reads it recomposed with
                             // it. Its place on the sheet itself doesn't change.
