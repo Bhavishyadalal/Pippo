@@ -75,6 +75,7 @@ import androidx.compose.ui.graphics.asComposeRenderEffect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
@@ -88,6 +89,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import coil3.request.CachePolicy
+import coil3.request.ImageRequest
 import com.mochyy.mochymusic.R
 import com.mochyy.mochymusic.ui.component.BlurDirection
 import com.mochyy.mochymusic.ui.component.FlatBarScrimAlpha
@@ -608,6 +611,7 @@ fun MoodTile(
     title: String,
     stripeColor: Long,
     covers: List<String?>,
+    offline: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -664,6 +668,7 @@ fun MoodTile(
 
             LayeredCover(
                 url = covers.getOrNull(1),
+                offline = offline,
                 rotation = -24f,
                 offsetX = (-2).dp,
                 offsetY = 2.dp,
@@ -673,6 +678,7 @@ fun MoodTile(
             )
             LayeredCover(
                 url = covers.getOrNull(0),
+                offline = offline,
                 rotation = -6f,
                 offsetX = 28.dp,
                 offsetY = 13.dp,
@@ -706,6 +712,7 @@ fun MoodTile(
 @Composable
 private fun BoxScope.LayeredCover(
     url: String?,
+    offline: Boolean,
     rotation: Float,
     offsetX: Dp,
     offsetY: Dp,
@@ -729,9 +736,15 @@ private fun BoxScope.LayeredCover(
             .background(SearchColors.TileHigh),
     ) {
         if (url != null) {
+            val context = LocalContext.current
+            val request = remember(context, url, offline) {
+                ImageRequest.Builder(context)
+                    .data(com.mochyy.mochymusic.viewmodels.searchTileCoverUrl(url))
+                    .networkCachePolicy(if (offline) CachePolicy.DISABLED else CachePolicy.ENABLED)
+                    .build()
+            }
             AsyncImage(
-
-                model = com.mochyy.mochymusic.viewmodels.searchTileCoverUrl(url),
+                model = request,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),

@@ -34,6 +34,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -86,7 +87,6 @@ import com.mochyy.mochymusic.ui.component.GlassState
 import com.mochyy.mochymusic.ui.component.glassRoot
 import com.mochyy.mochymusic.utils.rememberPreference
 import com.mochyy.mochymusic.viewmodels.MoodAndGenresViewModel
-import com.mochyy.mochymusic.viewmodels.coverKey
 import com.mochyy.mochymusic.viewmodels.OnlineSearchSuggestionViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -355,7 +355,7 @@ private fun SearchBrowseContent(
     topPadding: Dp = searchTopBarHeight(withTitle = true),
 ) {
     val sections by viewModel.moodAndGenres.collectAsState()
-    val tileCovers by viewModel.covers.collectAsState()
+    val offline by rememberPreference(com.mochyy.mochymusic.constants.OfflineModeKey, defaultValue = false)
     val bottomInset = LocalPlayerAwareWindowInsets.current
         .asPaddingValues()
         .calculateBottomPadding()
@@ -376,6 +376,21 @@ private fun SearchBrowseContent(
                     contentAlignment = Alignment.Center,
                 ) {
                     SearchLoadingDots()
+                }
+            }
+        } else if (list.isEmpty()) {
+            item(key = "unavailable") {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Text(
+                        stringResource(if (offline) R.string.search_browse_offline else R.string.search_browse_unavailable),
+                        color = SearchColors.Secondary,
+                    )
+                    if (!offline) TextButton(onClick = viewModel::retrySections) {
+                        Text(stringResource(R.string.retry))
+                    }
                 }
             }
         } else {
@@ -401,15 +416,19 @@ private fun SearchBrowseContent(
                     ) {
                         row.forEach { item ->
 
-                            LaunchedEffect(item.endpoint.browseId, item.endpoint.params) {
-                                viewModel.requestCovers(item.endpoint.browseId, item.endpoint.params)
+                            val browseId = item.endpoint.browseId
+                            val params = item.endpoint.params
+                            val covers by remember(viewModel, browseId, params) {
+                                viewModel.observeCovers(browseId, params)
+                            }.collectAsState(initial = emptyList())
+                            LaunchedEffect(browseId, params, offline) {
+                                viewModel.requestCovers(browseId, params)
                             }
                             MoodTile(
                                 title = item.title,
                                 stripeColor = item.stripeColor,
-                                covers = tileCovers[
-                                    coverKey(item.endpoint.browseId, item.endpoint.params)
-                                ].orEmpty(),
+                                offline = offline,
+                                covers = covers,
                                 onClick = {
                                     navController.navigate(
                                         "genre/${item.endpoint.browseId}?params=${item.endpoint.params}"
