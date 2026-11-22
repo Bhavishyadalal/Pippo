@@ -2,6 +2,8 @@
 
 package com.mochyy.mochymusic.ui.screens.search
 
+import com.mochyy.mochymusic.ui.theme.PippoCorners
+import com.mochyy.mochymusic.ui.component.rememberCoverBlurAvailable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -303,6 +305,8 @@ private fun GenreHeader(
     val pageColor = SearchColors.page(pureBlack)
     val density = LocalDensity.current
     val parallaxPx = with(density) { 90.dp.toPx() }
+    val blurArtwork = rememberCoverBlurAvailable()
+    val fallbackSurfaces = listOf(SearchColors.TileHigh, SearchColors.Tile, pageColor)
 
     Box(
         modifier =
@@ -322,13 +326,12 @@ private fun GenreHeader(
                         .graphicsLayer {
                             translationY = progressProvider() * parallaxPx
 
-                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
-                                renderEffect =
-                                    com.mochyy.mochymusic.ui.component.BlurEffectCache.get(
-                                        60f,
-                                        android.graphics.Shader.TileMode.CLAMP,
-                                    )
-                            }
+                            renderEffect = if (blurArtwork) {
+                                com.mochyy.mochymusic.ui.component.BlurEffectCache.get(
+                                    60f,
+                                    android.graphics.Shader.TileMode.CLAMP,
+                                )
+                            } else null
                             alpha = 1f - progressProvider() * 0.5f
                         },
             )
@@ -339,7 +342,7 @@ private fun GenreHeader(
                         .fillMaxSize()
                         .background(
                             Brush.verticalGradient(
-                                listOf(Color(0xFF3A3A44), Color(0xFF1A1A1F), pageColor),
+                                fallbackSurfaces,
                             ),
                         ),
             )
@@ -589,9 +592,9 @@ private fun GenreCommunityCard(
             Modifier
                 .width(268.dp)
                 .height(320.dp)
-                .clip(RoundedCornerShape(20.dp))
-                .background(Color(0xFF151519))
-                .searchCardBorder(20.dp)
+                .clip(RoundedCornerShape(PippoCorners.Card))
+                .background(SearchColors.Tile)
+                .searchCardBorder()
                 .clickable(onClick = onClick),
     ) {
         Box(

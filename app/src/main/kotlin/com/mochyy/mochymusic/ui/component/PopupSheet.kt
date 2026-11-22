@@ -635,6 +635,7 @@ private fun BoxWithConstraintsScope.PopupSheetFrame(
     val shape = remember(centred, metrics.floating) { sheetSurfaceShape(centred, metrics.floating) }
     val minHeight = if (centred) 0.dp else with(LocalDensity.current) { frame.minHeightPx.toDp() }
 
+    val surface = frame.surface ?: MenuSurface
     Box(
         modifier = Modifier
             .align(if (centred || metrics.floating) Alignment.Center else Alignment.BottomCenter)
@@ -665,7 +666,7 @@ private fun BoxWithConstraintsScope.PopupSheetFrame(
                 val frames = state.frames
                 val index = frames.indexOf(frame)
                 val recede = if (index < 0) 0f else frames.depthAbove(index).coerceAtMost(1f)
-                drawRect(lerp(frame.surface ?: MenuSurface, MenuRowSurface, recede))
+                drawRect(lerp(surface, MenuRowSurface, recede))
             }
             // The whole sheet is a touch target, not just the parts of its content that have one -
             // otherwise a tap on an empty patch (beside a row, around the button bar) fell
