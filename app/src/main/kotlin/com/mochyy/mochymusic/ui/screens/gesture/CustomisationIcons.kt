@@ -33,6 +33,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
@@ -130,14 +131,15 @@ internal fun IconsSection() {
 
 @Composable
 private fun IconArtwork(icon: AppIcon, contentDescription: String?, modifier: Modifier) {
-    Box(modifier) {
+    val background = icon.background?.let { colorResource(it) } ?: Color.Transparent
+    Box(modifier.background(background)) {
         AsyncImage(
             model = icon.foreground,
             contentDescription = contentDescription,
             contentScale = ContentScale.Crop,
             modifier = Modifier.matchParentSize().graphicsLayer {
-                scaleX = icon.family.pickerScale
-                scaleY = icon.family.pickerScale
+                scaleX = icon.foregroundScale
+                scaleY = icon.foregroundScale
             },
         )
     }
