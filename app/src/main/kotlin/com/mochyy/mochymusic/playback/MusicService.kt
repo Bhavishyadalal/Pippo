@@ -238,6 +238,7 @@ import com.mochyy.mochymusic.scrobble.ScrobbleTimer
 import com.mochyy.mochymusic.scrobble.Scrobbler
 import com.mochyy.mochymusic.utils.SyncUtils
 import com.mochyy.mochymusic.module.TrackMatcher
+import com.mochyy.mochymusic.modules.SourceModules.PlaybackLookup
 import com.mochyy.mochymusic.utils.YTPlayerUtils
 import com.mochyy.mochymusic.constants.ShowStreamSourceToastKey
 import com.mochyy.mochymusic.constants.YtReportPlaysKey
@@ -5641,25 +5642,17 @@ class MusicService :
         option: Pair<String, String>?,
     ): ProviderSwitch.Resolution {
         val track = trackQueryOf(mediaItem.mediaId, mediaItem.metadata) ?: return ProviderSwitch.Resolution.Rejected()
-        val picks = sourceModules.playbackPicks(module.info.id, module, option)
-        return when (val result = module.resolve(track, picks)) {
-            is com.mochyy.mochymusic.module.ResolveResult.Found -> {
-                val stream = result.stream
-                when {
-                    !TrackMatcher.isCompatible(track, stream.matched) ->
-                        ProviderSwitch.Resolution.Rejected(getString(R.string.pc_force_wrong_recording))
-                    !com.mochyy.mochymusic.modules.DeviceDecoders.canPlay(stream) ->
-                        ProviderSwitch.Resolution.Rejected(getString(R.string.pc_force_unsupported_audio))
-                    else -> ProviderSwitch.Resolution.Found(
-                        ForcedRoute(
-                            module.info.id, stream, option, expectedDurationMs = track.durationMs,
-                            selectedModuleQuality = sourceModules.streamQuality(module, picks),
-                        )
-                    )
-                }
-            }
-            is com.mochyy.mochymusic.module.ResolveResult.NotFound -> ProviderSwitch.Resolution.Rejected(result.reason)
-            is com.mochyy.mochymusic.module.ResolveResult.Unavailable -> {
+        return when (val result = sourceModules.lookupForPlayback(module, track, option)) {
+            is PlaybackLookup.Found -> ProviderSwitch.Resolution.Found(
+                ForcedRoute(
+                    module.info.id, result.stream, option, expectedDurationMs = track.durationMs,
+                    selectedModuleQuality = result.quality,
+                )
+            )
+            PlaybackLookup.WrongRecording -> ProviderSwitch.Resolution.Rejected(getString(R.string.pc_force_wrong_recording))
+            PlaybackLookup.UnsupportedAudio -> ProviderSwitch.Resolution.Rejected(getString(R.string.pc_force_unsupported_audio))
+            is PlaybackLookup.NotFound -> ProviderSwitch.Resolution.Rejected(result.reason)
+            is PlaybackLookup.Unavailable -> {
                 if (sourceModules.isUsable(module.info.id)) ProviderSwitch.Resolution.Retry
                 else ProviderSwitch.Resolution.Rejected(result.reason)
             }
