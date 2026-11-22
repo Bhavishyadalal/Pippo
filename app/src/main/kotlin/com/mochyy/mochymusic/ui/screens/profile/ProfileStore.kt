@@ -33,7 +33,8 @@ object ProfileStore {
             copy = file
             val stream = if (preset != null) context.resources.openRawResource(ProfileAvatars.pictures[preset])
                 else requireNotNull(context.contentResolver.openInputStream(uri))
-            stream.use { input -> file.outputStream().use { input.copyTo(it) } }
+            val bytes = stream.use { input -> file.outputStream().use { input.copyTo(it) } }
+            if (bytes == 0L) throw IOException("The profile picture was empty")
             file.absolutePath
         }.onFailure {
             copy?.delete()

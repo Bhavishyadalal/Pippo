@@ -15,7 +15,7 @@ private val RetryWaitsMs = longArrayOf(1_000L, 3_000L)
 object ImageRetry : Interceptor {
     override suspend fun intercept(chain: Interceptor.Chain): ImageResult {
         var result = chain.proceed()
-        if (!isFromWeb(chain.request.data)) return result
+        if (!chain.request.networkCachePolicy.readEnabled || !isFromWeb(chain.request.data)) return result
         var tries = 0
         for (wait in RetryWaitsMs) {
             val error = result as? ErrorResult ?: return result

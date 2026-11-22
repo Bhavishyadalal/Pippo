@@ -75,7 +75,9 @@ class App : Application(), SingletonImageLoader.Factory {
         // before super, because that's where hilt builds the database and the player caches
         com.mochyy.mochymusic.importer.transfer.TransferRestore.applyPending(this)
         // the folders a move to another drive left behind, cleared once nothing has them open
-        com.mochyy.mochymusic.playback.StoragePlaces.cleanUpLeftovers(this)
+        if (com.mochyy.mochymusic.importer.transfer.TransferRestore.isMainProcess(this)) {
+            com.mochyy.mochymusic.playback.StoragePlaces.cleanUpLeftovers(this)
+        }
         super.onCreate()
 
         AppLanguage.initialize(this)

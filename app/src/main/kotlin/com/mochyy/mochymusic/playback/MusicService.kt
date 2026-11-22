@@ -1457,21 +1457,23 @@ class MusicService :
             val initialVolume = playerVolume.value
             scope.launch {
                 val (restoredQueue, restoredAutomix, restoredVolume) = withContext(Dispatchers.IO) {
-                    val state = readQueueFile<PersistPlayerState>(PERSISTENT_PLAYER_STATE_FILE)
-                    val queue = readQueueFile<PersistQueue>(PERSISTENT_QUEUE_FILE)
-                        ?.takeIf { it.items.isNotEmpty() }?.let { saved ->
-                            val index = saved.mediaItemIndex.coerceIn(saved.items.indices)
-                            val resume = state?.takeIf { it.currentMediaItemIndex == index && it.currentPosition >= 0L }
-                            runCatching {
-                                saved.copy(mediaItemIndex = index, position = resume?.currentPosition ?: saved.position)
-                                    .toQueue().withRestoredManualSongs()
-                            }.onFailure { Timber.tag(TAG).w(it, "Failed to restore persisted queue") }.getOrNull()
+                    synchronized(queueFileLock) {
+                        val state = readQueueFile<PersistPlayerState>(PERSISTENT_PLAYER_STATE_FILE)
+                        val queue = readQueueFile<PersistQueue>(PERSISTENT_QUEUE_FILE)
+                            ?.takeIf { it.items.isNotEmpty() }?.let { saved ->
+                                val index = saved.mediaItemIndex.coerceIn(saved.items.indices)
+                                val resume = state?.takeIf { it.currentMediaItemIndex == index && it.currentPosition >= 0L }
+                                runCatching {
+                                    saved.copy(mediaItemIndex = index, position = resume?.currentPosition ?: saved.position)
+                                        .toQueue().withRestoredManualSongs()
+                                }.onFailure { Timber.tag(TAG).w(it, "Failed to restore persisted queue") }.getOrNull()
+                            }
+                        val automix = readQueueFile<PersistQueue>(PERSISTENT_AUTOMIX_FILE)?.let { saved ->
+                            runCatching { saved.items.map { it.toMediaItem() } }
+                                .onFailure { Timber.tag(TAG).w(it, "Failed to restore automix queue") }.getOrNull()
                         }
-                    val automix = readQueueFile<PersistQueue>(PERSISTENT_AUTOMIX_FILE)?.let { saved ->
-                        runCatching { saved.items.map { it.toMediaItem() } }
-                            .onFailure { Timber.tag(TAG).w(it, "Failed to restore automix queue") }.getOrNull()
+                        Triple(queue, automix, state?.volume)
                     }
-                    Triple(queue, automix, state?.volume)
                 }
                 if (destroying || restoreGeneration != queueGeneration || player.mediaItemCount != 0 ||
                     !dataStore.get(PersistentQueueKey, true)
@@ -1854,7 +1856,7 @@ class MusicService :
     }
 
     private inline fun <reified T> readQueueFile(name: String): T? = try {
-        filesDir.resolve(name).inputStream().use { input ->
+        androidx.core.util.AtomicFile(filesDir.resolve(name)).openRead().use { input ->
             ObjectInputStream(input).use { it.readObject() as T }
         }
     } catch (_: FileNotFoundException) {
@@ -4152,25 +4154,33 @@ class MusicService :
                     .Factory()
                     .setCache(playerCache)
                     .setUpstreamDataSourceFactory(
-                        DefaultDataSource.Factory(
-                            this,
-                            OkHttpDataSource.Factory(
-                                OkHttpClient
-                                    .Builder()
-                                    .dns(object : Dns {
-                                        override fun lookup(hostname: String): List<InetAddress> {
-                                            val addresses = Dns.SYSTEM.lookup(hostname)
-                                            return when (this@MusicService.ipVersion) {
-                                                IpVersion.IPV4 -> addresses.filter { it is Inet4Address }.ifEmpty { addresses }
-                                                IpVersion.IPV6 -> addresses.filter { it is Inet6Address }.ifEmpty { addresses }
-                                                IpVersion.AUTO -> addresses
+                        ResolvingDataSource.Factory(
+                            DefaultDataSource.Factory(
+                                this,
+                                OkHttpDataSource.Factory(
+                                    OkHttpClient
+                                        .Builder()
+                                        .dns(object : Dns {
+                                            override fun lookup(hostname: String): List<InetAddress> {
+                                                val addresses = Dns.SYSTEM.lookup(hostname)
+                                                return when (this@MusicService.ipVersion) {
+                                                    IpVersion.IPV4 -> addresses.filter { it is Inet4Address }.ifEmpty { addresses }
+                                                    IpVersion.IPV6 -> addresses.filter { it is Inet6Address }.ifEmpty { addresses }
+                                                    IpVersion.AUTO -> addresses
+                                                }
                                             }
-                                        }
-                                    })
-                                    .followAppProxy()
-                                    .build(),
+                                        })
+                                        .followAppProxy()
+                                        .build(),
+                                ),
                             ),
-                        ),
+                        ) { request ->
+                            val scheme = request.uri.scheme
+                            if (com.mochyy.mochymusic.utils.OfflineMode.isOn && (scheme == "http" || scheme == "https")) {
+                                throw com.music.innertube.OfflineModeException()
+                            }
+                            request
+                        },
                     ),
             ).setCacheWriteDataSinkFactory(null)
             .setFlags(FLAG_IGNORE_CACHE_ON_ERROR)
@@ -4351,15 +4361,28 @@ class MusicService :
     // the song share's preview and video read the song through this, so they hit the same cache and get the same links playback does
     fun shareDataSourceFactory(): DataSource.Factory = createDataSourceFactory()
 
+    private fun hasCachedStreamRange(key: String, request: DataSpec): Boolean {
+        val length = request.length.takeIf { it > 0 } ?: runCatching {
+            androidx.media3.datasource.cache.ContentMetadata.getContentLength(playerCache.getContentMetadata(key)) -
+                request.position
+        }.getOrDefault(0L)
+        return length > 0 && playerCache.isCached(key, request.position, length)
+    }
+
     private fun createDataSourceFactory(): DataSource.Factory {
         return ResolvingDataSource.Factory(createCacheDataSource()) { dataSpec ->
             // a stream a source module or backend resolved to a real URL (an HLS playlist, given
             // as a data: URI when the module rewrote it, and its segments) carries no media id:
             // it's fetched as it is
-            val mediaId = dataSpec.key ?: run {
-                val scheme = dataSpec.uri.scheme
-                if (scheme == "https" || scheme == "http" || scheme == "data") return@Factory dataSpec
-                error("No media id")
+            val offline = com.mochyy.mochymusic.utils.OfflineMode.isOn
+            if (dataSpec.uri.scheme == "data") return@Factory dataSpec
+            val mediaId = dataSpec.key ?: when (dataSpec.uri.scheme) {
+                "file", "content" -> return@Factory dataSpec
+                "https", "http" -> {
+                    if (!offline) return@Factory dataSpec
+                    dataSpec.uri.toString() // Media3's default cache key for an unkeyed URL.
+                }
+                else -> throw java.io.IOException("No cache key for this audio request")
             }
 
             // A DASH stream's init and media segments (a source module's Tidal stream) are keyed by
@@ -4368,7 +4391,7 @@ class MusicService :
             // keeping its per-segment key for the cache. Taking it for a song id sent the segment
             // URL to YouTube as a video id, and the song failed as "unavailable".
             if (isResolvedUrlCacheKey(mediaId)) {
-                if (com.mochyy.mochymusic.utils.OfflineMode.isOn) throw com.music.innertube.OfflineModeException()
+                if (offline && !hasCachedStreamRange(mediaId, dataSpec)) throw com.music.innertube.OfflineModeException()
                 return@Factory dataSpec
             }
 
@@ -4378,8 +4401,7 @@ class MusicService :
             // wasn't already in the cache: the song played as Opus with a FLAC badge until the
             // decoder said otherwise.
             if (mediaId.startsWith(ModuleCacheKeyPrefix)) {
-                // offline mode switched on mid-song: the rest of it isn't fetched either
-                if (com.mochyy.mochymusic.utils.OfflineMode.isOn) throw com.music.innertube.OfflineModeException()
+                if (offline && !hasCachedStreamRange(mediaId, dataSpec)) throw com.music.innertube.OfflineModeException()
                 return@Factory dataSpec.withRequestHeaders(
                     dataSpec.httpRequestHeaders + moduleStreamHeaders[mediaId].orEmpty()
                 )
@@ -4570,6 +4592,7 @@ class MusicService :
      */
     private fun forceFallBack(mediaId: String, includeYouTube: Boolean = false, announce: Boolean = true): Boolean {
         val failed = resolvedSourceIds[mediaId] ?: return false
+        if (failed == PlayingFrom.Device || failed == PlayingFrom.Downloads) return false
         if (failed == com.mochyy.mochymusic.modules.SourceModules.YouTubeId &&
             (!includeYouTube || !dataStore.get(ForcePlaybackKey, false))
         ) {
@@ -4785,6 +4808,7 @@ class MusicService :
     private val queueSavePlaying = MutableStateFlow(false)
     private var queueEditSaveJob: Job? = null
     private var savedQueueKey: Int? = null
+    private var savedQueueIndex = 0
     private var savedPosition = -1L
 
     override fun onTimelineChanged(timeline: Timeline, reason: Int) {
@@ -4832,16 +4856,22 @@ class MusicService :
             // The saved format doesn't carry the Autoplay flag.
             val currentIndex = player.currentMediaItemIndex
             val savedItems = if (writeQueue) {
+                var itemsBeforeCurrent = 0
                 player.mediaItems.filterIndexed { index, item ->
-                    index <= currentIndex || !item.isAutoplay
-                }.filter { it.metadata != null }
+                    val keep = (index <= currentIndex || !item.isAutoplay) && item.metadata != null
+                    if (keep && index < currentIndex) itemsBeforeCurrent++
+                    keep
+                }.also { items ->
+                    savedQueueIndex = itemsBeforeCurrent.coerceAtMost(items.lastIndex.coerceAtLeast(0))
+                }
             } else null
+            val resumePosition = if (player.currentMediaItem?.metadata == null) 0L else position
             val persistQueue = savedItems?.let { items ->
                 currentQueue.toPersistQueue(
                     title = queueTitle,
                     items = items.mapNotNull { it.metadata },
-                    mediaItemIndex = currentIndex,
-                    position = position,
+                    mediaItemIndex = savedQueueIndex,
+                    position = resumePosition,
                 )
             }
 
@@ -4868,18 +4898,20 @@ class MusicService :
                 // ducked and anywhere at all mid-crossfade, and coming back to it next launch left
                 // the app silent until the slider was touched
                 volume = playerVolume.value,
-                currentPosition = player.currentPosition,
-                currentMediaItemIndex = player.currentMediaItemIndex,
+                currentPosition = resumePosition,
+                currentMediaItemIndex = savedQueueIndex,
                 playbackState = player.playbackState
             )
 
             // Serialize snapshots in production order. Atomic writes preserve the last complete
             // file if Android kills the process mid-save, including during service destruction.
             queueFileWriter.execute {
-                persistQueue?.let { writeQueueFile(PERSISTENT_QUEUE_FILE, it) }
-                manualIndices?.let { writeQueueFile(PERSISTENT_MANUAL_QUEUE_FILE, it) }
-                persistAutomix?.let { writeQueueFile(PERSISTENT_AUTOMIX_FILE, it) }
-                writeQueueFile(PERSISTENT_PLAYER_STATE_FILE, persistPlayerState)
+                synchronized(queueFileLock) {
+                    persistQueue?.let { writeQueueFile(PERSISTENT_QUEUE_FILE, it) }
+                    manualIndices?.let { writeQueueFile(PERSISTENT_MANUAL_QUEUE_FILE, it) }
+                    persistAutomix?.let { writeQueueFile(PERSISTENT_AUTOMIX_FILE, it) }
+                    writeQueueFile(PERSISTENT_PLAYER_STATE_FILE, persistPlayerState)
+                }
             }
         } catch (e: Exception) {
             Timber.tag(TAG).e(e, "Error during queue save operation")
@@ -5582,12 +5614,14 @@ class MusicService :
             else -> null
         }
         if (file != null) {
+            resolvedSourceIds[mediaId] = PlayingFrom.Device
             forgetModuleFacts(mediaId)
             notePlayingFrom(mediaId, PlayingFrom(PlayingFrom.Device, "This device"))
             // announced as "Playing from this device"
             return com.mochyy.mochymusic.playback.custom.CustomStreamResult(streamUrl = file, source = "this device")
         }
         if (isFullyDownloaded(mediaId)) {
+            resolvedSourceIds[mediaId] = PlayingFrom.Downloads
             forgetModuleFacts(mediaId)
             notePlayingFrom(mediaId, PlayingFrom(PlayingFrom.Downloads, "Your downloads"))
             // the same item: the data source finds the download under its media id
@@ -5598,6 +5632,7 @@ class MusicService :
         }
         // on a tv, the linked phone's downloads and song files stream from the phone over the wi-fi
         com.mochyy.mochymusic.link.PhoneFiles.streamUrl(mediaId)?.let { url ->
+            resolvedSourceIds[mediaId] = PlayingFrom.Device
             forgetModuleFacts(mediaId)
             notePlayingFrom(mediaId, PlayingFrom(PlayingFrom.Device, "Your phone"))
             return com.mochyy.mochymusic.playback.custom.CustomStreamResult(
@@ -5868,7 +5903,7 @@ class MusicService :
             val item = player.currentMediaItem ?: return null
             if (item.mediaId.startsWith("LOCAL_") || item.localConfiguration?.uri?.scheme == "content" ||
                 item.localConfiguration?.uri?.scheme == "file") return null
-            return ProviderSwitch.Target(item.mediaId, player.currentMediaItemIndex, providerOccurrence)
+            return ProviderSwitch.Target(item.mediaId, providerOccurrence)
         }
 
         override suspend fun resolve(
@@ -5957,9 +5992,13 @@ class MusicService :
         private fun reload(target: ProviderSwitch.Target, position: Long) {
             // Reopen the same queue entry. Leave playWhenReady alone so pause/play still responds
             // during the fetch and handoff.
-            player.stop()
-            player.seekTo(target.index, position)
-            player.prepare()
+            if (currentTarget() != target) return
+            val activePlayer = player
+            val index = activePlayer.currentMediaItemIndex
+            if (index !in 0 until activePlayer.mediaItemCount) return
+            activePlayer.stop()
+            activePlayer.seekTo(index, position)
+            activePlayer.prepare()
         }
     }
 
@@ -6198,6 +6237,7 @@ class MusicService :
 
     companion object {
         private val queueFileWriter = Executors.newSingleThreadExecutor()
+        private val queueFileLock = Any()
 
         const val ROOT = "root"
         const val SONG = "song"
