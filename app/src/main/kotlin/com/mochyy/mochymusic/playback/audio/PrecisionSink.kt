@@ -96,9 +96,6 @@ class PrecisionSink(
         pending = null
         pendingSource = null
         handedFormat = handed
-        if (MimeTypes.AUDIO_RAW == format.sampleMimeType) {
-            outputs.prepareMixer(handed.sampleRate, outputChannels?.size ?: format.channelCount, handed.pcmEncoding)
-        }
         super.configure(handed, bufferSize, outputChannels)
     }
 
