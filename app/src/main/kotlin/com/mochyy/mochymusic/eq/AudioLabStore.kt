@@ -184,7 +184,7 @@ class AudioLabStore @Inject constructor(
 
     /** whether anything here changes the sound: offloaded playback skips every effect, so it has to stay off while this is true */
     val shapesSound: Flow<Boolean> = combine(eq, reverb, loudness, spatial, songPreset) { eq, reverb, loudness, spatial, songPreset ->
-        eq.enabled || songPreset != null || reverb.enabled || loudness.enabled || spatial.enabled || spatial.mono
+        eq.enabled || songPreset != null || reverb.enabled || loudness.enabled || spatial.enabled || spatial.mono || spatial.surround
     }.distinctUntilChanged()
 
     init {

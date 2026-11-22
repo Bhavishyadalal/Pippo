@@ -270,6 +270,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.conflate
@@ -1474,23 +1475,24 @@ class MusicService :
             }
         }
 
-        // the timed saves only write what changed: a queue edit (they're the only thing that saves one), or the place in the song
+        // Paused playback has no timer. Queue edits and the final position are saved by events.
         scope.launch {
-            while (isActive) {
-                delay(30.seconds)
-                if (dataStore.get(PersistentQueueKey, true)) {
-                    saveQueueToDisk(onlyChanges = true)
+            combine(
+                dataStore.data.map { it[PersistentQueueKey] ?: true },
+                queueSavePlaying,
+            ) { persistent, playing -> persistent && playing }
+                .distinctUntilChanged()
+                .collectLatest { saving ->
+                    if (!saving) return@collectLatest
+                    while (isActive) {
+                        delay(10.seconds)
+                        if (player.isPlaying) saveQueueToDisk(onlyChanges = true)
+                    }
                 }
-            }
         }
 
-        scope.launch {
-            while (isActive) {
-                delay(10.seconds)
-                if (dataStore.get(PersistentQueueKey, true) && player.isPlaying) {
-                    saveQueueToDisk(onlyChanges = true)
-                }
-            }
+        automixItems.debounce(1000).collect(scope) {
+            if (!destroying && dataStore.get(PersistentQueueKey, true)) saveQueueToDisk(onlyChanges = true)
         }
     }
 
@@ -2447,7 +2449,7 @@ class MusicService :
      */
     private fun scheduleRunwayRetry(generation: Int) {
         if (runwayRetries >= MAX_RUNWAY_RETRIES || com.mochyy.mochymusic.utils.OfflineMode.isOn) return
-        val canGrow = (dataStore.get(AutoLoadMoreKey, true) && currentQueue.hasNextPage()) ||
+        val canGrow = currentQueue.hasOwnNextPage() ||
             (isInfiniteQueueEnabled() && player.repeatMode == REPEAT_MODE_OFF)
         if (!canGrow) return
         val delayMs = RUNWAY_RETRY_BASE_MS shl runwayRetries
@@ -2525,9 +2527,12 @@ class MusicService :
     private fun wantsAutoplayPreview(): Boolean {
         if (!isInfiniteQueueEnabled() || player.repeatMode != REPEAT_MODE_OFF) return false
         if (android.os.SystemClock.elapsedRealtime() < autoplayPreviewRetryAt) return false
-        if (dataStore.get(AutoLoadMoreKey, true) && currentQueue.hasNextPage()) return false
+        if (currentQueue.hasOwnNextPage()) return false
         return upcomingAutoplayStart() == player.mediaItemCount
     }
+
+    private fun Queue.hasOwnNextPage(): Boolean =
+        !continuesAsRadio && hasNextPage() && dataStore.get(AutoLoadMoreKey, true)
 
     /** Drops the Autoplay songs still to come, e.g. when infinite queue is switched off. */
     private fun removeUpcomingAutoplay() {
@@ -2589,6 +2594,7 @@ class MusicService :
         if (initialQueueLoading || runwayJob?.isActive == true) return
         if (player.mediaItemCount == 0 || !connectivityObserver.isCurrentlyConnected()) return
         if (dataStore.get(DisableLoadMoreWhenRepeatAllKey, false) && player.repeatMode == REPEAT_MODE_ALL) return
+        if (!currentQueue.hasOwnNextPage() && (!isInfiniteQueueEnabled() || player.repeatMode != REPEAT_MODE_OFF)) return
         val lowOnSongs = upcomingItemCount(QUEUE_RUNWAY_SIZE + 1) <= QUEUE_RUNWAY_SIZE
         val previewOnly = !lowOnSongs && wantsAutoplayPreview()
         if (!lowOnSongs && !previewOnly) return
@@ -2605,6 +2611,7 @@ class MusicService :
                     return@launch
                 }
                 if (generation != queueGeneration || player.mediaItemCount == 0) return@launch
+                if (fromInfinite && (!isInfiniteQueueEnabled() || player.repeatMode != REPEAT_MODE_OFF)) return@launch
 
                 val newItems = if (fromInfinite) {
                     // Radio mixes repeat songs that are already queued (including their own seed).
@@ -2652,7 +2659,7 @@ class MusicService :
         val hideVideos = dataStore.get(HideVideoSongsKey, false)
 
         val queue = currentQueue
-        if (dataStore.get(AutoLoadMoreKey, true)) {
+        if (queue.hasOwnNextPage()) {
             // Try a few pages when entire pages are hidden by filters, keeping their
             // continuation ahead of generated Autoplay entries.
             repeat(MAX_RUNWAY_ATTEMPTS) {
@@ -2688,13 +2695,17 @@ class MusicService :
         val hidden = NotRecommended.songs
         fun List<MediaItem>.fresh() = filter { it.mediaId !in queued && it.mediaId !in hidden }
 
-        infiniteSource?.takeIf { it.hasNextPage() }?.let { source ->
-            runCatching { withContext(Dispatchers.IO) { source.nextPage() } }
-                .onFailure { Timber.tag(TAG).w(it, "Failed to load next infinite queue page") }
-                .getOrNull()
-                ?.fresh()
-                ?.takeIf { it.isNotEmpty() }
-                ?.let { return it }
+        val continuation = infiniteSource ?: currentQueue.takeIf { it.continuesAsRadio }
+        if (continuation?.hasNextPage() == true) {
+            val page = try {
+                withContext(Dispatchers.IO) { continuation.nextPage() }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Timber.tag(TAG).w(e, "Failed to load next infinite queue page")
+                emptyList()
+            }.fresh()
+            if (page.isNotEmpty()) return page
         }
 
         // Seed a fresh radio from the most recent online song we haven't seeded from yet, so the
@@ -3477,7 +3488,7 @@ class MusicService :
                 sleepTimer.notifySongTransition()
             } else if (!advanceQueueAtEnd(target)) {
                 ensureQueueRunway()
-                if (!currentQueue.hasNextPage() && !isInfiniteQueueEnabled()) target.pause()
+                if (!currentQueue.hasOwnNextPage() && !isInfiniteQueueEnabled()) target.pause()
             }
         }
     }
@@ -3500,6 +3511,14 @@ class MusicService :
         player: Player,
         events: Player.Events,
     ) {
+        if (player === this.player && !destroying && playerInitialized.value) {
+            if (events.contains(Player.EVENT_IS_PLAYING_CHANGED)) queueSavePlaying.value = player.isPlaying
+            if (events.contains(Player.EVENT_TIMELINE_CHANGED) ||
+                (!player.isPlaying && events.contains(Player.EVENT_POSITION_DISCONTINUITY))
+            ) {
+                if (dataStore.get(PersistentQueueKey, true)) saveQueueToDisk(onlyChanges = true)
+            }
+        }
         if (events.containsAny(
                 Player.EVENT_PLAYBACK_STATE_CHANGED,
                 Player.EVENT_PLAY_WHEN_READY_CHANGED,
@@ -3589,8 +3608,7 @@ class MusicService :
         if (events.containsAny(Player.EVENT_IS_PLAYING_CHANGED)) {
             scrobbleTimer.onPlayingChanged(player.isPlaying, player.currentMetadata, player.duration)
             playReporter.onPlayingChanged(player.isPlaying, player.currentMetadata, player.duration)
-            // a pause is often the last thing before the app is closed, and the timed saves only
-            // run every 30 seconds while paused: save the exact place now so it comes back there
+            // Save the exact position at pause before the periodic saves stop.
             if (!player.isPlaying && player.playbackState == Player.STATE_READY && dataStore.get(PersistentQueueKey, true)) {
                 saveQueueToDisk()
             }
@@ -3992,6 +4010,7 @@ class MusicService :
                     handoffFor(mediaId) != null || castConnectionHandler?.isCasting?.value == true
                 ) return@launch
                 target.pause()
+                audioOutputs.releaseMixer()
                 Timber.tag(TAG).d("Paused playback due to AudioTrack error")
 
                 delay(RETRY_DELAY_MS * 3)
@@ -4631,7 +4650,7 @@ class MusicService :
                     // Configure the USB mixer for the track Media3 is actually opening, after
                     // the previous format has drained and its AudioTrack has been released.
                     if (androidx.media3.common.util.Util.isEncodingLinearPcm(config.encoding)) {
-                        audioOutputs.prepareMixer(config.sampleRate, Integer.bitCount(config.channelConfig), config.encoding)
+                        audioOutputs.prepareMixer(config.sampleRate, config.channelConfig, config.encoding)
                     }
                     DefaultAudioSink.AudioTrackProvider.DEFAULT.getAudioTrack(config, attributes, sessionId)
                         .also(platformOutput::attach)
@@ -4723,7 +4742,7 @@ class MusicService :
         }
     }
 
-    // what the last save wrote, so a timed save can tell nothing changed (it used to write all three files every 30 s, paused or not)
+    private val queueSavePlaying = MutableStateFlow(false)
     private var savedQueueKey: Int? = null
     private var savedPosition = -1L
 
@@ -4734,6 +4753,7 @@ class MusicService :
             val item = player.getMediaItemAt(i)
             key = 31 * key + item.mediaId.hashCode()
             if (item.isManualQueued) key = 31 * key + 1
+            if (item.isAutoplay) key = 31 * key + 2
         }
         automixItems.value.forEach { key = 31 * key + it.mediaId.hashCode() }
         return key
@@ -4754,22 +4774,28 @@ class MusicService :
         savedPosition = position
 
         try {
-
-            // the whole queue is only gathered when it's going to be written
-            val persistQueue = if (writeQueue) currentQueue.toPersistQueue(
-                title = queueTitle,
-                items = player.mediaItems.mapNotNull { it.metadata },
-                mediaItemIndex = player.currentMediaItemIndex,
-                position = player.currentPosition
-            ) else null
+            // Refill unplayed Autoplay suggestions after restore using the current preference.
+            // The saved format doesn't carry the Autoplay flag.
+            val currentIndex = player.currentMediaItemIndex
+            val savedItems = if (writeQueue) {
+                player.mediaItems.filterIndexed { index, item ->
+                    index <= currentIndex || !item.isAutoplay
+                }.filter { it.metadata != null }
+            } else null
+            val persistQueue = savedItems?.let { items ->
+                currentQueue.toPersistQueue(
+                    title = queueTitle,
+                    items = items.mapNotNull { it.metadata },
+                    mediaItemIndex = currentIndex,
+                    position = position,
+                )
+            }
 
             // which of those songs the user queued by hand: they keep their place ahead of the rest after a restart
             // (a separate file, so the saved queue's own format stays readable by older saves)
-            val manualIndices = if (writeQueue) {
-                player.mediaItems.filter { it.metadata != null }
-                    .mapIndexedNotNull { i, item -> if (item.isManualQueued) i else null }
-                    .toIntArray()
-            } else null
+            val manualIndices = savedItems
+                ?.mapIndexedNotNull { i, item -> if (item.isManualQueued) i else null }
+                ?.toIntArray()
 
             val persistAutomix = if (writeQueue) {
                 PersistQueue(
@@ -5273,6 +5299,7 @@ class MusicService :
         fadingPlayer = currentPlayer
         player = nextPlayer
         _playerFlow.value = player
+        queueSavePlaying.value = nextPlayer.isPlaying
         secondaryPlayer = null
 
         fadingPlayer?.removeListener(this)
@@ -5982,6 +6009,7 @@ class MusicService :
             fadingPlayer = outgoing
             player = incoming
             _playerFlow.value = incoming
+            queueSavePlaying.value = incoming.isPlaying
             // set when it was made, seconds ago: a mute, an unmute or a slider move since then
             // never reached it, and the song carried on at the old volume (0, if it was muted)
             incoming.volume = targetVolume()
