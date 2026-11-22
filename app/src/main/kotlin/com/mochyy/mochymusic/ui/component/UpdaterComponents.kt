@@ -38,14 +38,10 @@ import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.Alignment
-import android.content.Intent
-import android.net.Uri
-import androidx.compose.foundation.text.ClickableText
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextDecoration
-import androidx.core.content.ContextCompat
 import com.mochyy.mochymusic.core.updater.extractUrls
 @Composable
 fun AnimatedActionButton(
@@ -192,12 +188,11 @@ fun ChangelogItem(
         shape = shape,
         color = MaterialTheme.colorScheme.surfaceContainerHigh
     ) {
-        val context = LocalContext.current
-        val urls = text.extractUrls()
+        val urls = text.trim().extractUrls()
         val annotatedText = buildAnnotatedString {
             append(text.trim())
             urls.forEach { (range, url) ->
-                addStringAnnotation("URL", url, range.first, range.last + 1)
+                addLink(LinkAnnotation.Url(url), range.first, range.last + 1)
                 addStyle(
                     SpanStyle(
                         color = MaterialTheme.colorScheme.primary,
@@ -219,13 +214,8 @@ fun ChangelogItem(
                     .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(50))
             )
             androidx.compose.foundation.layout.Spacer(modifier = Modifier.size(16.dp))
-            ClickableText(
+            Text(
                 text = annotatedText,
-                onClick = { offset ->
-                    annotatedText.getStringAnnotations("URL", offset, offset).firstOrNull()?.let {
-                        ContextCompat.startActivity(context, Intent(Intent.ACTION_VIEW, Uri.parse(it.item)), null)
-                    }
-                },
                 style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface)
             )
         }

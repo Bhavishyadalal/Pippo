@@ -246,6 +246,7 @@ import com.mochyy.mochymusic.constants.ForcePlaybackKey
 import com.mochyy.mochymusic.constants.transitionModeOf
 import com.mochyy.mochymusic.constants.CrossmixAlwaysMixKey
 import com.mochyy.mochymusic.utils.dataStore
+import com.mochyy.mochymusic.utils.PreferencesCache
 import com.mochyy.mochymusic.utils.get
 import com.mochyy.mochymusic.utils.reportException
 import com.mochyy.mochymusic.widget.MochyWidgetManager
@@ -312,12 +313,12 @@ private const val SpeedApplyGapMs = 60L
 // the longest the playback loop may sleep while playing; the position the lyrics, seek bar and video sync read only moves when it wakes
 private const val PositionWakeUs = 100_000L
 
-@OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
 @androidx.annotation.OptIn(UnstableApi::class)
 /** A stream that failed at [startedAt] (elapsedRealtime) and skips to the next track [timeoutMs] later. */
 data class StreamFailure(val startedAt: Long, val timeoutMs: Long)
 
 @AndroidEntryPoint
+@OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
 class MusicService :
     MediaLibraryService(),
     Player.Listener,
@@ -468,15 +469,12 @@ class MusicService :
     private var autoplayPreviewRetryAt = 0L
 
     val currentMediaMetadata = MutableStateFlow<com.mochyy.mochymusic.models.MediaMetadata?>(null)
+    private val currentTrackId = currentMediaMetadata.map { it?.id }.distinctUntilChanged()
+
     private val currentSong =
-        currentMediaMetadata
-            .flatMapLatest { mediaMetadata ->
-                database.song(mediaMetadata?.id)
-            }.stateIn(scope, SharingStarted.Lazily, null)
-    private val currentFormat =
-        currentMediaMetadata.flatMapLatest { mediaMetadata ->
-            database.format(mediaMetadata?.id)
-        }
+        currentTrackId.flatMapLatest { database.song(it) }.stateIn(scope, SharingStarted.Lazily, null)
+
+    private val currentFormat = currentTrackId.flatMapLatest { database.format(it) }
 
     lateinit var playerVolume: MutableStateFlow<Float>
     val isMuted = MutableStateFlow(false)
@@ -1453,27 +1451,34 @@ class MusicService :
             }
 
         if (dataStore.get(PersistentQueueKey, true)) {
-            val savedQueue = readQueueFile<PersistQueue>(PERSISTENT_QUEUE_FILE)
-            val savedAutomix = readQueueFile<PersistQueue>(PERSISTENT_AUTOMIX_FILE)
-            val savedState = readQueueFile<PersistPlayerState>(PERSISTENT_PLAYER_STATE_FILE)
-            if (savedAutomix != null) {
-                runCatching { savedAutomix.items.map { it.toMediaItem() } }
-                    .onSuccess { automixItems.value = it }
-                    .onFailure { Timber.tag(TAG).w(it, "Failed to restore automix queue") }
-            }
-            // Apply saved position to the queue being restored. A delayed seek can affect a
-            // completely different song if the user starts playback during launch.
-            if (savedState != null && savedState.volume in MinRestoredVolume..1f) {
-                playerVolume.value = savedState.volume
-            }
-            if (savedQueue != null && savedQueue.items.isNotEmpty()) {
-                val start = savedQueue.mediaItemIndex.coerceIn(savedQueue.items.indices)
-                val resume = savedState?.takeIf { it.currentMediaItemIndex == start && it.currentPosition >= 0L }
-                runCatching {
-                    savedQueue.copy(mediaItemIndex = start, position = resume?.currentPosition ?: savedQueue.position)
-                        .toQueue().withRestoredManualSongs()
-                }.onSuccess { playQueue(it, playWhenReady = false) }
-                    .onFailure { Timber.tag(TAG).w(it, "Failed to restore persisted queue") }
+            val restoreGeneration = queueGeneration
+            val initialVolume = playerVolume.value
+            scope.launch {
+                val (restoredQueue, restoredAutomix, restoredVolume) = withContext(Dispatchers.IO) {
+                    val state = readQueueFile<PersistPlayerState>(PERSISTENT_PLAYER_STATE_FILE)
+                    val queue = readQueueFile<PersistQueue>(PERSISTENT_QUEUE_FILE)
+                        ?.takeIf { it.items.isNotEmpty() }?.let { saved ->
+                            val index = saved.mediaItemIndex.coerceIn(saved.items.indices)
+                            val resume = state?.takeIf { it.currentMediaItemIndex == index && it.currentPosition >= 0L }
+                            runCatching {
+                                saved.copy(mediaItemIndex = index, position = resume?.currentPosition ?: saved.position)
+                                    .toQueue().withRestoredManualSongs()
+                            }.onFailure { Timber.tag(TAG).w(it, "Failed to restore persisted queue") }.getOrNull()
+                        }
+                    val automix = readQueueFile<PersistQueue>(PERSISTENT_AUTOMIX_FILE)?.let { saved ->
+                        runCatching { saved.items.map { it.toMediaItem() } }
+                            .onFailure { Timber.tag(TAG).w(it, "Failed to restore automix queue") }.getOrNull()
+                    }
+                    Triple(queue, automix, state?.volume)
+                }
+                if (destroying || restoreGeneration != queueGeneration || player.mediaItemCount != 0 ||
+                    !dataStore.get(PersistentQueueKey, true)
+                ) return@launch
+                if (restoredAutomix != null && automixItems.value.isEmpty()) automixItems.value = restoredAutomix
+                if (restoredVolume != null && restoredVolume in MinRestoredVolume..1f && playerVolume.value == initialVolume) {
+                    playerVolume.value = restoredVolume
+                }
+                restoredQueue?.let { playQueue(it, playWhenReady = player.playWhenReady) }
             }
         }
 
@@ -1570,11 +1575,9 @@ class MusicService :
             }
         }
 
-        runBlocking {
-            val skipSilence = dataStore.get(SkipSilenceKey, false)
-            val instantSkip = dataStore.get(SkipSilenceInstantKey, false)
-            silenceProcessor.instantModeEnabled = skipSilence && instantSkip
-        }
+        val prefs = PreferencesCache.current(dataStore)
+        val skipSilence = prefs[SkipSilenceKey] ?: false
+        silenceProcessor.instantModeEnabled = skipSilence && prefs[SkipSilenceInstantKey] == true
 
         val player = ExoPlayer.Builder(this)
             .setMediaSourceFactory(createMediaSourceFactory())
@@ -1634,16 +1637,10 @@ class MusicService :
         player.addAnalyticsListener(inspector)
         player.setPreferredAudioDevice(audioOutputs.preferredDevice())
 
-        player.apply {
-                runBlocking {
-                    val offload = dataStore.get(AudioOffload, false)
-                    val transitions = transitionModeOf(dataStore.data.first()) != CrossmixMode.OFF
-                    setOffloadEnabled(if (transitions) false else offload)
-                    skipSilenceEnabled = dataStore.get(SkipSilenceKey, false)
-                }
-                addAnalyticsListener(PlaybackStatsListener(false, this@MusicService))
-
-            }
+        val transitions = transitionModeOf(prefs) != CrossmixMode.OFF
+        player.setOffloadEnabled(!transitions && prefs[AudioOffload] == true)
+        player.skipSilenceEnabled = skipSilence
+        player.addAnalyticsListener(PlaybackStatsListener(false, this))
         if (publish) _playerFlow.value = player
         return player
     }
@@ -3292,7 +3289,7 @@ class MusicService :
         prefetchNeighbours()
 
         if (reason == Player.MEDIA_ITEM_TRANSITION_REASON_AUTO) {
-            val repeatMode = runBlocking { dataStore.get(RepeatModeKey, REPEAT_MODE_OFF) }
+            val repeatMode = dataStore.get(RepeatModeKey, REPEAT_MODE_OFF)
             if (repeatMode == REPEAT_MODE_ONE &&
                 previousMediaItemIndex != C.INDEX_UNSET &&
                 previousMediaItemIndex != player.currentMediaItemIndex) {
@@ -5283,10 +5280,10 @@ class MusicService :
     private fun crossfadeInto(durationMs: Long, skipCurve: Boolean, load: (ExoPlayer) -> Unit) {
         // a skip calls off what crossmix had lined up for the old song, its tempo ramp included, before the new one copies the speed
         if (skipCurve) crossmixDirector.onItemChanged()
-        val savedRepeatMode = runBlocking { dataStore.get(RepeatModeKey, REPEAT_MODE_OFF) }
-        val savedShuffleEnabled = runBlocking { dataStore.get(ShuffleModeKey, false) }
+        val savedRepeatMode = player.repeatMode
+        val savedShuffleEnabled = player.shuffleModeEnabled
 
-        secondaryPlayer = createExoPlayer()
+        secondaryPlayer = createExoPlayer(publish = false)
         val secPlayer = secondaryPlayer!!
         secPlayer.addListener(secondaryPlayerListener)
 

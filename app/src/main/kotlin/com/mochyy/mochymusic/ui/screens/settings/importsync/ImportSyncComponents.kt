@@ -27,13 +27,14 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
@@ -50,6 +51,7 @@ import com.mochyy.mochymusic.ui.component.DefaultDialog
 import com.mochyy.mochymusic.utils.rememberPreference
 import com.mochyy.mochymusic.viewmodels.ImportSyncViewModel
 import com.mochyy.mochymusic.viewmodels.PendingImport
+import kotlinx.coroutines.launch
 import com.music.innertube.utils.parseCookieString
 
 const val ImportSyncRoute = "import_sync"
@@ -88,7 +90,8 @@ fun LinkInputDialog(
     onSubmit: (String) -> Unit,
 ) {
     var link by rememberSaveable { mutableStateOf("") }
-    val clipboard = LocalClipboardManager.current
+    val clipboard = LocalClipboard.current
+    val clipboardScope = rememberCoroutineScope()
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { focusRequester.requestFocus() } }
 
@@ -98,12 +101,13 @@ fun LinkInputDialog(
         title = { Text(stringResource(R.string.import_component_from_source, source.label)) },
         buttons = {
             TextButton(onClick = {
-                clipboard
-                    .getText()
-                    ?.text
-                    ?.trim()
-                    ?.takeIf { it.isNotEmpty() }
-                    ?.let { link = it }
+                clipboardScope.launch {
+                    val clip = clipboard.getClipEntry()?.clipData ?: return@launch
+                    if (clip.itemCount > 0) {
+                        clip.getItemAt(0).text?.toString()?.trim()
+                            ?.takeIf { it.isNotEmpty() }?.let { link = it }
+                    }
+                }
             }) { Text(stringResource(R.string.import_component_paste)) }
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.yt_sync_cancel)) }
             TextButton(

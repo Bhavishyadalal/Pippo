@@ -3,41 +3,18 @@ package com.mochyy.mochymusic.core
 import android.content.Context
 import android.media.AudioDeviceInfo
 import android.media.AudioManager
-import android.os.Build
-import androidx.annotation.RequiresApi
+import com.mochyy.mochymusic.playback.audio.AudioOutputs
 
-fun isBluetoothHeadphoneConnected(context: Context): Boolean {
-    val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+fun isBluetoothHeadphoneConnected(context: Context): Boolean = bluetoothOutput(context) != null
 
-    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-        val audioDevices = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
-        audioDevices.any { device ->
-            device.type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP ||
-                    device.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO
-        }
-    } else {
+fun getConnectedBluetoothDeviceName(context: Context): String? =
+    bluetoothOutput(context)?.productName?.toString()
 
-        @Suppress("DEPRECATION")
-        audioManager.isBluetoothA2dpOn || audioManager.isBluetoothScoOn
-    }
-}
-
-fun getConnectedBluetoothDeviceName(context: Context): String? {
-    val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-
-    val isBluetoothActive = audioManager.isBluetoothA2dpOn || audioManager.isBluetoothScoOn
-    if (!isBluetoothActive) return null
-
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-        val audioDevices = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
-
-        val activeBluetoothDevice = audioDevices.find { it.type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP }
-            ?: audioDevices.find { it.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO }
-
-        return activeBluetoothDevice?.productName?.toString()
-    } else {
-        return null
-    }
+private fun bluetoothOutput(context: Context): AudioDeviceInfo? {
+    val devices = context.getSystemService(AudioManager::class.java)
+        ?.getDevices(AudioManager.GET_DEVICES_OUTPUTS).orEmpty()
+    return devices.firstOrNull { AudioOutputs.kindOf(it.type) == AudioOutputs.Kind.BLUETOOTH }
+        ?: devices.firstOrNull { it.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO }
 }
 
 fun isBuds(name: String?): Boolean {

@@ -19,7 +19,7 @@ jobs:
           distribution: "temurin"
 
       - name: Set Up Gradle
-        uses: gradle/actions/setup-gradle@v5
+        uses: gradle/actions/setup-gradle@v6
         with:
           cache-read-only: true
           cache-cleanup: on-success
@@ -43,7 +43,7 @@ jobs:
           fi
 
       - name: Build and Lint Universal FOSS Debug APK
-        run: ./gradlew --console=plain assembleUniversalFossDebug :app:lintUniversalFossDebug --warning-mode summary
+        run: ./gradlew --console=plain assembleUniversalFossDebug :app:lintUniversalFossDebug -PpippoBuildAbi=universal --warning-mode summary
         env:
           GITHUB_EVENT_NAME: ${{ github.event_name }}
           PULL_REQUEST: "true"
@@ -54,7 +54,7 @@ jobs:
           DISCORD_CLIENT_ID: ${{ secrets.DISCORD_CLIENT_ID }}
 
       - name: Upload APK
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: app-universal-debug-pr-${{ github.event.number }}
           path: app/build/outputs/apk/universalFoss/debug/*.apk

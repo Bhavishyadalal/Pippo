@@ -1,5 +1,7 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import com.android.build.api.dsl.ApplicationExtension
+import com.android.build.api.variant.ApplicationAndroidComponentsExtension
+import com.android.build.api.variant.ResValue
 import java.util.Properties
 import java.security.MessageDigest
 import java.net.URL
@@ -25,7 +27,6 @@ extensions.configure<ApplicationExtension> {
 
     defaultConfig {
         applicationId = "com.bhavishyadalal.pippo"
-        resValue("string", "shortcut_target_package", "com.bhavishyadalal.pippo")
         minSdk = 24
         targetSdk = 37
         versionCode = 74
@@ -185,7 +186,6 @@ extensions.configure<ApplicationExtension> {
         }
         debug {
             applicationIdSuffix = ".debug"
-            resValue("string", "shortcut_target_package", "com.bhavishyadalal.pippo.debug")
             isDebuggable = true
             signingConfig = signingConfigs.getByName("debug")
         }
@@ -202,7 +202,6 @@ extensions.configure<ApplicationExtension> {
         create("profileable") {
             initWith(getByName("release"))
             applicationIdSuffix = ".profileable"
-            resValue("string", "shortcut_target_package", "com.bhavishyadalal.pippo.profileable")
             isProfileable = true
             signingConfig = signingConfigs.getByName("debug")
             // The provider modules only publish debug/release variants; without this, resolving
@@ -215,7 +214,6 @@ extensions.configure<ApplicationExtension> {
         create("fast") {
             initWith(getByName("debug"))
             applicationIdSuffix = ".fast"
-            resValue("string", "shortcut_target_package", "com.bhavishyadalal.pippo.fast")
             isDebuggable = false
             isProfileable = true
             isMinifyEnabled = false
@@ -285,6 +283,24 @@ extensions.configure<ApplicationExtension> {
             excludes += "META-INF/INDEX.LIST"
             excludes += "META-INF/io.netty.versions.properties"
         }
+    }
+}
+
+extensions.configure<ApplicationAndroidComponentsExtension> {
+    val buildAbi = providers.gradleProperty("pippoBuildAbi").orNull
+    if (buildAbi != null) {
+        require(buildAbi in setOf("universal", "arm64", "armeabi", "x86", "x86_64")) {
+            "Unknown Pippo ABI flavor: $buildAbi"
+        }
+        beforeVariants { variant ->
+            if (("abi" to buildAbi) !in variant.productFlavors) variant.enable = false
+        }
+    }
+    onVariants { variant ->
+        variant.resValues.put(
+            variant.makeResValueKey("string", "shortcut_target_package"),
+            variant.applicationId.map { ResValue(it) },
+        )
     }
 }
 
@@ -366,7 +382,7 @@ dependencies {
     implementation(libs.concurrent.futures)
 
     implementation(libs.activity)
-    implementation(libs.hilt.navigation)
+    implementation(libs.hilt.viewmodel.compose)
     implementation(libs.datastore)
 
     implementation(libs.compose.runtime)

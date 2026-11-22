@@ -43,7 +43,7 @@ jobs:
           distribution: temurin
 
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
         with:
           packages: platform-tools
           log-accepted-android-sdk-licenses: false
@@ -52,13 +52,13 @@ jobs:
         run: sdkmanager "platforms;android-37.0" "build-tools;36.0.0" "ndk;27.0.12077973" "cmake;3.22.1"
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
         with:
           cache-read-only: false
 
       # Reuse native compilation across manual runs. Never cache signing material.
       - name: Cache ARM64 native build files
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             app/.cxx
@@ -78,14 +78,14 @@ jobs:
         shell: bash
         run: |
           chmod +x gradlew
-          ./gradlew :app:assembleArm64GmsRelease \
+          ./gradlew :app:assembleArm64GmsRelease -PpippoBuildAbi=arm64 \
             --no-daemon --no-configuration-cache --build-cache --parallel --max-workers=2 \
             --console=plain --warning-mode=summary \
             '-Dorg.gradle.jvmargs=-Xmx4g -XX:+UseParallelGC -Dfile.encoding=UTF-8' \
             -Pkotlin.compiler.execution.strategy=in-process
 
       - name: Upload release APK
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: pippo-arm64-gms-release-signed
           path: app/build/outputs/apk/arm64Gms/release/*.apk

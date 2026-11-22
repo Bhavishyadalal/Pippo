@@ -100,7 +100,7 @@ runs:
         fi
 
     - name: Set up Android SDK
-      uses: android-actions/setup-android@v3
+      uses: android-actions/setup-android@v4
       with:
         packages: platform-tools
         log-accepted-android-sdk-licenses: false
@@ -110,12 +110,12 @@ runs:
       run: sdkmanager "platforms;android-37.0" "build-tools;36.0.0" "ndk;27.0.12077973" "cmake;3.22.1"
 
     - name: Set up Gradle dependency and task caches
-      uses: gradle/actions/setup-gradle@v4
+      uses: gradle/actions/setup-gradle@v6
       with:
         cache-read-only: false
 
     - name: Cache native compilation
-      uses: actions/cache@v4
+      uses: actions/cache@v6
       with:
         path: |
           app/.cxx
@@ -126,6 +126,7 @@ runs:
       shell: bash
       env:
         APK_TASK: ${{ steps.configure.outputs.task }}
+        APK_ARCHITECTURE: ${{ steps.configure.outputs.architecture }}
         STORE_PASSWORD: ${{ steps.configure.outputs.signing == 'preview' && 'android' || env.STORE_PASSWORD }}
         KEY_PASSWORD: ${{ steps.configure.outputs.signing == 'preview' && 'android' || env.KEY_PASSWORD }}
         KEY_ALIAS: ${{ steps.configure.outputs.signing == 'preview' && 'androiddebugkey' || env.KEY_ALIAS }}
@@ -133,6 +134,7 @@ runs:
         set -euo pipefail
         chmod +x gradlew
         ./gradlew ":app:$APK_TASK" \
+          "-PpippoBuildAbi=$APK_ARCHITECTURE" \
           --no-daemon --no-configuration-cache --build-cache --parallel --max-workers=2 \
           --console=plain --warning-mode=summary \
           '-Dorg.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g -XX:+UseParallelGC -Dfile.encoding=UTF-8' \
@@ -168,7 +170,7 @@ runs:
 
     - name: Upload installable APK
       id: apk
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: pippo-${{ steps.configure.outputs.architecture }}-gms-${{ steps.configure.outputs.signing }}-${{ inputs.artifact-label }}-${{ github.run_number }}
         path: app/build/outputs/apk/${{ steps.configure.outputs.flavor }}/release/*.apk
@@ -177,7 +179,7 @@ runs:
         retention-days: 14
 
     - name: Upload R8 mapping for crash diagnosis
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: pippo-${{ steps.configure.outputs.architecture }}-${{ inputs.mapping-label }}-${{ github.run_number }}
         path: app/build/outputs/mapping/${{ steps.configure.outputs.flavor }}Release/mapping.txt

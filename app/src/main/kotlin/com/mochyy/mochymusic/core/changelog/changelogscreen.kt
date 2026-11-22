@@ -1,8 +1,6 @@
 package com.mochyy.mochymusic.core.changelog
 
 import android.content.Context
-import android.content.Intent
-import android.net.Uri
 import android.util.Log
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.foundation.background
@@ -24,7 +22,6 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.ClickableText
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Error
@@ -51,7 +48,6 @@ import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -64,6 +60,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -73,7 +70,6 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.content.ContextCompat
 import androidx.navigation.NavController
 import coil3.compose.AsyncImage
 import com.mochyy.mochymusic.BuildConfig
@@ -287,23 +283,18 @@ fun ChangelogScreen(
                                         }
 
                                         section.items.forEach { item ->
-                                            val urls = item.extractUrls()
+                                            val urls = item.trim().extractUrls()
                                             val annotatedText = buildAnnotatedString {
                                                 append(item.trim())
                                                 urls.forEach { (range, url) ->
-                                                    addStringAnnotation("URL", url, range.first, range.last + 1)
+                                                    addLink(LinkAnnotation.Url(url), range.first, range.last + 1)
                                                     addStyle(SpanStyle(color = MaterialTheme.colorScheme.primary, textDecoration = TextDecoration.Underline), range.first, range.last + 1)
                                                 }
                                             }
                                             Row(modifier = Modifier.padding(vertical = 4.dp), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                                 Box(modifier = Modifier.padding(top = 8.dp).size(6.dp).background(MaterialTheme.colorScheme.primary, CircleShape))
-                                                ClickableText(
+                                                Text(
                                                     text = annotatedText,
-                                                    onClick = { offset ->
-                                                        annotatedText.getStringAnnotations("URL", offset, offset).firstOrNull()?.let {
-                                                            ContextCompat.startActivity(context, Intent(Intent.ACTION_VIEW, Uri.parse(it.item)), null)
-                                                        }
-                                                    },
                                                     style = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface)
                                                 )
                                             }
@@ -399,9 +390,9 @@ private fun loadChangelogFromCache(context: Context, versionTag: String): Cached
 
         CachedChangelogData(
             sections = sections,
-            image = cacheData.optString("image", null).takeIf { !it.isNullOrBlank() },
-            description = cacheData.optString("description", null).takeIf { !it.isNullOrBlank() },
-            warning = cacheData.optString("warning", null).takeIf { !it.isNullOrBlank() }
+            image = cacheData.takeUnless { it.isNull("image") }?.optString("image")?.takeIf { it.isNotBlank() },
+            description = cacheData.takeUnless { it.isNull("description") }?.optString("description")?.takeIf { it.isNotBlank() },
+            warning = cacheData.takeUnless { it.isNull("warning") }?.optString("warning")?.takeIf { it.isNotBlank() }
         )
     } catch (e: Exception) { null }
 }

@@ -71,7 +71,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
@@ -589,16 +589,16 @@ fun HomeScreen(
     // read only where they're used - inside each card, track row and the hero - never out here: a
     // play/pause or a new song used to recompose the whole of Home, every row and card on screen,
     // which landed as a hitch whenever the track changed mid-scroll
-    val isPlayingState = playerConnection.isEffectivelyPlaying.collectAsState()
-    val mediaMetadataState = playerConnection.mediaMetadata.collectAsState()
+    val isPlayingState = playerConnection.isEffectivelyPlaying.collectAsStateWithLifecycle()
+    val mediaMetadataState = playerConnection.mediaMetadata.collectAsStateWithLifecycle()
     // handed to the cards as a lambda so only the active cover's indicator reads it
     val isPlayingNow: () -> Boolean = remember(isPlayingState) { { isPlayingState.value } }
 
-    val forgottenFavorites by viewModel.forgottenFavorites.collectAsState()
-    val keepListening by viewModel.keepListening.collectAsState()
-    val accountPlaylists by viewModel.accountPlaylists.collectAsState()
-    val localPlaylists by viewModel.localPlaylists.collectAsState()
-    val libraryArtists by viewModel.libraryArtists.collectAsState()
+    val forgottenFavorites by viewModel.forgottenFavorites.collectAsStateWithLifecycle()
+    val keepListening by viewModel.keepListening.collectAsStateWithLifecycle()
+    val accountPlaylists by viewModel.accountPlaylists.collectAsStateWithLifecycle()
+    val localPlaylists by viewModel.localPlaylists.collectAsStateWithLifecycle()
+    val libraryArtists by viewModel.libraryArtists.collectAsStateWithLifecycle()
     // playlists the user made (or imported), put forward in the hero; Play loads and queues them
     val heroScope = rememberCoroutineScope()
     val playlistPicks = remember(localPlaylists) {
@@ -626,7 +626,7 @@ fun HomeScreen(
     }
     // a new install's hero: what was just imported, or else a song from each artist picked in
     // onboarding (the artists themselves if their songs couldn't be fetched)
-    val starterSongs by viewModel.starterSongs.collectAsState()
+    val starterSongs by viewModel.starterSongs.collectAsStateWithLifecycle()
     val starterItems = remember(localPlaylists, libraryArtists, starterSongs) {
         val imported = localPlaylists.orEmpty()
             .filter { it.songCount > 0 && it.id != "liked" }
@@ -660,26 +660,26 @@ fun HomeScreen(
             }
         }
     }
-    val homePage by viewModel.homePage.collectAsState()
-    val dailyDiscover by viewModel.dailyDiscover.collectAsState()
-    val similarRecommendations by viewModel.similarRecommendations.collectAsState()
-    val communityPlaylists by viewModel.communityPlaylists.collectAsState()
-    val recentlyPlayed by viewModel.recentlyPlayed.collectAsState()
-    val mostPlayedSongsForHome by viewModel.mostPlayedSongsForHome.collectAsState()
-    val recentHistorySongs by viewModel.recentHistorySongs.collectAsState()
-    val artistListItems by viewModel.artistListItems.collectAsState()
-    val allTimeHits by viewModel.allTimeHits.collectAsState()
-    val liveRow by viewModel.liveRow.collectAsState()
-    val musicVideoRow by viewModel.musicVideoRow.collectAsState()
-    val feedVideoKinds by viewModel.feedVideoKinds.collectAsState()
-    val feedVideoRows by viewModel.feedVideoRows.collectAsState()
-    val homeCategories by viewModel.homeCategories.collectAsState()
+    val homePage by viewModel.homePage.collectAsStateWithLifecycle()
+    val dailyDiscover by viewModel.dailyDiscover.collectAsStateWithLifecycle()
+    val similarRecommendations by viewModel.similarRecommendations.collectAsStateWithLifecycle()
+    val communityPlaylists by viewModel.communityPlaylists.collectAsStateWithLifecycle()
+    val recentlyPlayed by viewModel.recentlyPlayed.collectAsStateWithLifecycle()
+    val mostPlayedSongsForHome by viewModel.mostPlayedSongsForHome.collectAsStateWithLifecycle()
+    val recentHistorySongs by viewModel.recentHistorySongs.collectAsStateWithLifecycle()
+    val artistListItems by viewModel.artistListItems.collectAsStateWithLifecycle()
+    val allTimeHits by viewModel.allTimeHits.collectAsStateWithLifecycle()
+    val liveRow by viewModel.liveRow.collectAsStateWithLifecycle()
+    val musicVideoRow by viewModel.musicVideoRow.collectAsStateWithLifecycle()
+    val feedVideoKinds by viewModel.feedVideoKinds.collectAsStateWithLifecycle()
+    val feedVideoRows by viewModel.feedVideoRows.collectAsStateWithLifecycle()
+    val homeCategories by viewModel.homeCategories.collectAsStateWithLifecycle()
 
-    val speedDialItems by viewModel.speedDialItems.collectAsState()
-    val lastPlayedSong by viewModel.lastPlayedSong.collectAsState()
+    val speedDialItems by viewModel.speedDialItems.collectAsStateWithLifecycle()
+    val lastPlayedSong by viewModel.lastPlayedSong.collectAsStateWithLifecycle()
 
-    val isLoading: Boolean by viewModel.isLoading.collectAsState()
-    val isLoadingMore by viewModel.isLoadingMore.collectAsState()
+    val isLoading: Boolean by viewModel.isLoading.collectAsStateWithLifecycle()
+    val isLoadingMore by viewModel.isLoadingMore.collectAsStateWithLifecycle()
     // keepListening stays null until the first local load lands, which also covers the moment
     // before load() has flipped isLoading on
     // right after a launch Home shows its bones through the intro and reveals its content after
@@ -729,8 +729,8 @@ fun HomeScreen(
             .take(6)
     }
 
-    val accountName by viewModel.accountName.collectAsState()
-    val accountImageUrl by viewModel.accountImageUrl.collectAsState()
+    val accountName by viewModel.accountName.collectAsStateWithLifecycle()
+    val accountImageUrl by viewModel.accountImageUrl.collectAsStateWithLifecycle()
     val profilePicUri by rememberPreference(ProfilePicUriKey, "")
 
     val localProfileImageUrl = profilePicUri
@@ -784,7 +784,7 @@ fun HomeScreen(
         as? androidx.navigation.NavBackStackEntry
     val scrollToTop = remember(backStackEntry) {
         backStackEntry?.savedStateHandle?.getStateFlow("scrollToTop", false)
-    }?.collectAsState()
+    }?.collectAsStateWithLifecycle()
 
     LaunchedEffect(scrollToTop?.value) {
         if (scrollToTop?.value == true) {

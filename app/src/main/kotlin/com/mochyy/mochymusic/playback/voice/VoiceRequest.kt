@@ -36,6 +36,8 @@ object VoiceSearch {
     const val FocusArtist = MediaStore.Audio.Artists.ENTRY_CONTENT_TYPE
     const val FocusAlbum = MediaStore.Audio.Albums.ENTRY_CONTENT_TYPE
     const val FocusSong = MediaStore.Audio.Media.ENTRY_CONTENT_TYPE
+    // Voice assistants still send the platform's legacy playlist MIME type and extra.
+    @Suppress("DEPRECATION")
     const val FocusPlaylist = MediaStore.Audio.Playlists.ENTRY_CONTENT_TYPE
     const val FocusGenre = MediaStore.Audio.Genres.ENTRY_CONTENT_TYPE
     // what google sends when it couldn't tell what kind of thing was asked for
@@ -44,6 +46,7 @@ object VoiceSearch {
     // a play-from-search reaches the session as an item with no id and the spoken words as its search query
     fun isRequest(item: MediaItem): Boolean = item.mediaId.isEmpty() && item.requestMetadata.searchQuery != null
 
+    @Suppress("DEPRECATION")
     fun parse(query: String?, extras: Bundle?): VoiceRequest = parse(
         query = query,
         focus = extras?.getString(MediaStore.EXTRA_MEDIA_FOCUS),
@@ -138,6 +141,7 @@ object VoiceSearch {
             .split(NotWord)
             .filter { it.isNotEmpty() && it !in Filler }
 
+    @Suppress("DEPRECATION")
     private val Keys = listOf(
         MediaStore.EXTRA_MEDIA_FOCUS,
         MediaStore.EXTRA_MEDIA_TITLE,
