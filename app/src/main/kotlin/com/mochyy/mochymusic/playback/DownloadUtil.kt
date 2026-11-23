@@ -130,7 +130,7 @@ constructor(
     val downloads = MutableStateFlow<Map<String, Download>>(emptyMap())
 
     private class NoLosslessDownload : java.io.IOException("No downloadable FLAC or ALAC stream")
-    private class SelectedDownloadUnavailable(val lossless: Boolean) :
+    private class SelectedDownloadUnavailable(val providerId: String, val quality: DownloadQuality) :
         java.io.IOException("The selected download provider has no compatible file for this song")
     private val repairLock = Mutex()
     private val fileOperationLock = Mutex()
@@ -141,7 +141,7 @@ constructor(
     private val pendingDownloadRequests = mutableSetOf<String>()
     private val unavailableLossless = MutableStateFlow<Set<String>>(emptySet())
     internal val losslessFailures = unavailableLossless.asStateFlow()
-    private val _providerFailures = MutableStateFlow<Set<String>>(emptySet())
+    private val _providerFailures = MutableStateFlow<Map<String, Pair<String, DownloadQuality>>>(emptyMap())
     internal val providerFailures = _providerFailures.asStateFlow()
 
     private val _batch = MutableStateFlow(TransferBatch())
@@ -201,7 +201,7 @@ constructor(
             }
 
             if (selection.providerId != null && (lossless || selection.providerId != SourceModules.YouTubeId)) {
-                throw SelectedDownloadUnavailable(lossless)
+                throw SelectedDownloadUnavailable(selection.providerId, quality)
             }
             if (lossless) throw NoLosslessDownload()
 
@@ -303,11 +303,14 @@ constructor(
                         if (download.state != Download.STATE_REMOVING) pendingDownloadRequests.remove(id)
                         downloads.update { it + (id to download) }
                         val causes = generateSequence<Throwable>(finalException) { it.cause }
-                        val providerFailed = download.state == Download.STATE_FAILED && causes.any { it is SelectedDownloadUnavailable }
+                        val providerFailure = causes.filterIsInstance<SelectedDownloadUnavailable>().firstOrNull()
+                            ?.takeIf { download.state == Download.STATE_FAILED }
                         val losslessFailed = download.state == Download.STATE_FAILED &&
-                            causes.any { it is NoLosslessDownload || it is SelectedDownloadUnavailable && it.lossless }
+                            (providerFailure?.quality == DownloadQuality.LOSSLESS || causes.any { it is NoLosslessDownload })
                         unavailableLossless.update { if (losslessFailed) it + id else it - id }
-                        _providerFailures.update { if (providerFailed) it + id else it - id }
+                        _providerFailures.update {
+                            if (providerFailure == null) it - id else it + (id to (providerFailure.providerId to providerFailure.quality))
+                        }
 
                         scope.launch {
                             val completed = repairLock.withLock {
