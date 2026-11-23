@@ -66,6 +66,8 @@ import com.mochyy.mochymusic.constants.CrossmixModeKey
 import com.mochyy.mochymusic.constants.DefaultTransitionMode
 import com.mochyy.mochymusic.eq.EqPresets
 import com.mochyy.mochymusic.eq.EqSettings
+import com.mochyy.mochymusic.module.AccountState
+import com.mochyy.mochymusic.module.ModuleFeature
 import com.mochyy.mochymusic.playback.audio.AudioOutputs
 import com.mochyy.mochymusic.ui.component.damageBoundary
 import com.mochyy.mochymusic.ui.component.pressBounce
@@ -92,14 +94,12 @@ fun AudioLabScreen(
     val playback by viewModel.playback.collectAsState()
     val volume by viewModel.volume.collectAsState()
     val (quality) = rememberEnumPreference(AudioQualityKey, defaultValue = AudioQuality.AUTO)
-    val order by viewModel.sources.order.collectAsState()
     val modules by viewModel.sources.entries.collectAsState()
     val youTubeOn by viewModel.sources.youTubeEnabled.collectAsState()
     androidx.compose.runtime.LaunchedEffect(Unit) { viewModel.sources.refresh() }
-    // whichever provider plays first sets what "quality" means
-    val firstProvider = order.firstOrNull { id ->
-        if (id == com.mochyy.mochymusic.modules.SourceModules.YouTubeId) youTubeOn
-        else modules.any { it.module.info.id == id && it.enabled && it.account is com.mochyy.mochymusic.module.AccountState.SignedIn }
+    val hasAudioModules = modules.any {
+        it.enabled && it.adds(ModuleFeature.AudioSource) &&
+            (it.module.signIn == null || it.account is AccountState.SignedIn)
     }
     val (mode) = rememberEnumPreference(CrossmixModeKey, defaultValue = DefaultTransitionMode)
 
@@ -130,10 +130,14 @@ fun AudioLabScreen(
         val qualityCard: @Composable (Modifier) -> Unit = { modifier ->
             SmallHubCard(
                 title = stringResource(R.string.lab_audio_quality),
-                status = qualityName(quality, firstProvider),
+                status = when {
+                    hasAudioModules -> stringResource(R.string.lab_quality_auto)
+                    youTubeOn -> youtubeQualityName(quality)
+                    else -> stringResource(R.string.aq_nothing_on)
+                },
                 onClick = { navController.navigate("audio_quality") },
                 modifier = modifier,
-            ) { QualitySketch(quality, firstProvider) }
+            ) { QualitySketch(quality, hasAudioModules) }
         }
         val transition: @Composable (Modifier) -> Unit = { modifier ->
             SmallHubCard(
@@ -213,10 +217,8 @@ private fun equalizerStatus(eq: EqSettings, userPresets: Map<String, String>): S
 }
 
 @Composable
-private fun qualityName(q: AudioQuality, firstProvider: String?): String = when (firstProvider) {
-    com.mochyy.mochymusic.module.monochrome.MonochromeModule.Id -> stringResource(R.string.lab_quality_monochrome)
-    com.mochyy.mochymusic.module.applemusic.AppleMusicModule.Id -> stringResource(R.string.lab_quality_apple_music)
-    else -> stringResource(
+private fun youtubeQualityName(q: AudioQuality): String =
+    stringResource(
         R.string.lab_quality_youtube,
         stringResource(
             when (q) {
@@ -227,7 +229,6 @@ private fun qualityName(q: AudioQuality, firstProvider: String?): String = when 
             },
         ),
     )
-}
 
 /** the equalizer's and effects' card, a green dot and the state in small type with the name under it */
 @Composable
@@ -386,12 +387,11 @@ private fun BoxScope.FxSketch(active: Boolean) {
     }
 }
 
-/** a little waveform, as coarse as what's streaming */
+/** A waveform for the streaming quality card. */
 @Composable
-private fun BoxScope.QualitySketch(quality: AudioQuality, firstProvider: String?) {
+private fun BoxScope.QualitySketch(quality: AudioQuality, hasAudioModules: Boolean) {
     val fine = when {
-        firstProvider == com.mochyy.mochymusic.module.monochrome.MonochromeModule.Id -> 1f
-        firstProvider == com.mochyy.mochymusic.module.applemusic.AppleMusicModule.Id -> 0.65f
+        hasAudioModules -> 1f
         quality == AudioQuality.LOW -> 0f
         quality == AudioQuality.MEDIUM -> 0.35f
         else -> 0.65f

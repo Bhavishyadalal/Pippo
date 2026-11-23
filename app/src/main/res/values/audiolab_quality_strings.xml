@@ -4,6 +4,7 @@
     <string name="aq_title_second">Quality</string>
     <string name="aq_nothing_on">Nothing is on</string>
     <string name="aq_turn_provider_on">Turn a provider on</string>
+    <string name="aq_automatic_provider">Automatic provider selection</string>
     <string name="aq_youtube_tier">YouTube · %1$s</string>
     <string name="aq_section_streaming">Streaming</string>
     <string name="aq_section_download">Download</string>
