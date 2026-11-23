@@ -100,12 +100,12 @@ import com.mochyy.mochymusic.constants.DontSkipOnFailureKey
 import com.mochyy.mochymusic.constants.StreamFailureTimeoutKey
 import com.mochyy.mochymusic.constants.CrossfadeDurationKey
 import com.mochyy.mochymusic.constants.TransportEffect
-import com.mochyy.mochymusic.constants.TransportEffectKey
+import com.mochyy.mochymusic.constants.TransportFadeDefaultEnabled
 import com.mochyy.mochymusic.constants.TransportFadeDefaultSeconds
 import com.mochyy.mochymusic.constants.TransportFadeEnabledKey
-import com.mochyy.mochymusic.constants.TransportFadeMaxSeconds
-import com.mochyy.mochymusic.constants.TransportFadeMinSeconds
 import com.mochyy.mochymusic.constants.TransportFadeSecondsKey
+import com.mochyy.mochymusic.constants.activeTransportEffect
+import com.mochyy.mochymusic.constants.transportFadeSeconds
 import com.mochyy.mochymusic.constants.CrossfadeGaplessKey
 import com.mochyy.mochymusic.constants.SkipBlendKey
 import com.mochyy.mochymusic.constants.SkipBlendAheadKey
@@ -1308,15 +1308,15 @@ class MusicService :
         dataStore.data
             .map { prefs ->
                 Triple(
-                    prefs[TransportFadeEnabledKey] ?: true,
-                    prefs[TransportFadeSecondsKey] ?: TransportFadeDefaultSeconds,
-                    prefs[TransportEffectKey].toEnum(TransportEffect.OFF),
+                    prefs[TransportFadeEnabledKey] ?: TransportFadeDefaultEnabled,
+                    transportFadeSeconds(prefs[TransportFadeSecondsKey] ?: TransportFadeDefaultSeconds),
+                    activeTransportEffect(prefs),
                 )
             }
             .distinctUntilChanged()
             .collect(scope) { (enabled, seconds, effect) ->
                 transport.enabled = enabled
-                transport.lengthMs = seconds.coerceIn(TransportFadeMinSeconds, TransportFadeMaxSeconds) * 1_000f
+                transport.lengthMs = seconds * 1_000f
                 transport.effect = effect
             }
 
@@ -1666,7 +1666,7 @@ class MusicService :
             (prefs[HiResOutputKey] ?: false) &&
                 !(prefs[SkipSilenceKey] ?: false) &&
                 !(prefs[MusicHapticsEnabledKey] ?: false) &&
-                prefs[TransportEffectKey].toEnum(TransportEffect.OFF) == TransportEffect.OFF &&
+                activeTransportEffect(prefs) == TransportEffect.OFF &&
                 transitionModeOf(prefs) != CrossmixMode.CROSSMIX
         }
         combine(wantsFloat, audioLab.shapesSound, audioLab.playback) { wants, shapesSound, playback ->

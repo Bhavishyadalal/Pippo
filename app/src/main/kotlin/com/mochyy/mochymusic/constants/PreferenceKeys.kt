@@ -13,6 +13,7 @@ import java.time.LocalDateTime
 import java.time.ZoneOffset
 
 import com.music.innertube.models.IpVersion
+import com.mochyy.mochymusic.extensions.toEnum
 
 val IsFirstRunKey = booleanPreferencesKey("isFirstRun")
 // Legacy storage key; refresh selection is now automatic and ignores this old switch.
@@ -312,7 +313,8 @@ enum class CrossmixTempoMatch(val maxSpeedUp: Float) {
     FULL(0.10f),
 }
 
-// pause, play and skip fades: on by default, 2 s long, no layered effect until one is picked
+// Pause, play and skip fades are opt-in, with a two-second default duration.
+const val TransportFadeDefaultEnabled = false
 val TransportFadeEnabledKey = booleanPreferencesKey("transportFadeEnabled")
 val TransportFadeSecondsKey = floatPreferencesKey("transportFadeSeconds")
 val TransportEffectKey = stringPreferencesKey("transportEffect")
@@ -331,6 +333,10 @@ const val TransportFadeDefaultSeconds = 2f
 const val TransportFadeMinSeconds = 0.5f
 const val TransportFadeMaxSeconds = 10f
 
+fun transportFadeSeconds(value: Float): Float =
+    if (value.isFinite()) value.coerceIn(TransportFadeMinSeconds, TransportFadeMaxSeconds)
+    else TransportFadeDefaultSeconds
+
 // the crossmix effect layered over a pause, play or skip fade
 enum class TransportEffect(val label: String) {
     OFF("None"),
@@ -341,6 +347,13 @@ enum class TransportEffect(val label: String) {
     REVERB("Reverb wash"),
     FILTER("Filter sweep"),
 }
+
+fun activeTransportEffect(prefs: Preferences): TransportEffect =
+    if (prefs[TransportFadeEnabledKey] ?: TransportFadeDefaultEnabled) {
+        prefs[TransportEffectKey].toEnum(TransportEffect.OFF)
+    } else {
+        TransportEffect.OFF
+    }
 
 val MaxImageCacheSizeKey = intPreferencesKey("maxImageCacheSize")
 val MaxSongCacheSizeKey = intPreferencesKey("maxSongCacheSize")
