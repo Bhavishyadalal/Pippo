@@ -85,6 +85,10 @@ private data class SettingsEntry(
 
 // search ids stay english so rows can find themselves, what's shown and matched follows the app's language
 private val LocalizedSettingsTitles = mapOf(
+    "Downloads" to R.string.download_settings_title,
+    "Download quality" to R.string.download_settings_quality,
+    "Download provider" to R.string.download_settings_provider,
+    "Download folder" to R.string.download_settings_folder,
     "Customisation" to R.string.settings_customisation_category,
     "Blur" to R.string.appearance_blur,
     "Progressive blur" to R.string.appearance_progressive_blur,
@@ -144,6 +148,7 @@ private val LocalizedSettingsTitles = mapOf(
     "Open with your finger" to R.string.customise_swipe_up_follows,
 )
 private val LocalizedSettingsPages = mapOf(
+    "Downloads" to R.string.download_settings_title,
     "App behaviour" to R.string.settings_app_behaviour,
     "Playback" to R.string.settings_playback_category,
     "Now playing" to R.string.settings_now_playing,
@@ -257,6 +262,10 @@ private val SettingsIndex = listOf(
     SettingsEntry("YouTube Music", "Integrations", YouTubeSyncRoute, "youtube ytm sync account sign in likes library playlists history"),
 
     // Storage
+    SettingsEntry("Downloads", "Downloads", "download_settings", "offline music saved songs download settings"),
+    SettingsEntry("Download quality", "Downloads", "download_settings", "lossless flac alac high medium low"),
+    SettingsEntry("Download provider", "Downloads", "download_settings", "source module order monochrome flac relay pocket"),
+    SettingsEntry("Download folder", "Downloads", "download_settings", "destination path sd card files export"),
     SettingsEntry("Storage", "Storage", "storage_settings", "space disk size cache downloads clear free junk delete"),
     SettingsEntry("Music cache limit", "Storage", "storage_settings", "cache size limit space song stream"),
     SettingsEntry("Manage downloads", "Storage", "storage_settings", "downloads delete remove biggest offline space"),
@@ -511,6 +520,13 @@ fun MochySettingsScreen(navController: NavController, pane: SettingsPane? = null
                             iconRes = R.drawable.storage,
                             selected = selected == "storage_settings",
                             onClick = { open("storage_settings") }
+                        )
+
+                        CategoryBubble(
+                            title = stringResource(R.string.download_settings_title),
+                            iconRes = R.drawable.download,
+                            selected = selected == "download_settings",
+                            onClick = { open("download_settings") }
                         )
 
                         CategoryBubble(

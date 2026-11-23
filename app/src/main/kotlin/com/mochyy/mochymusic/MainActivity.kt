@@ -1713,6 +1713,7 @@ val SubSettingsRoutes = setOf(
     "developer_space",
     "developer_playground",
     "storage_settings",
+    "download_settings",
     "gesture_settings",
     "customisation_settings",
     // Audio Lab keeps the bar, as in its designs

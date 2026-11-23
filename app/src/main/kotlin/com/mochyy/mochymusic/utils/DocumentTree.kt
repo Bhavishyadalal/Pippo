@@ -66,6 +66,33 @@ class DocumentTree(private val resolver: ContentResolver, private val tree: Uri)
         }
     }
 
+    /** Publish a completed file once without replacing a document already in the chosen folder. */
+    fun writeNew(parentId: String, name: String, block: (OutputStream) -> Unit) {
+        val children = childrenOf(parentId)
+        if (name in children) return
+        val temporaryName = ".pippo-${UUID.nameUUIDFromBytes(name.toByteArray())}.partial"
+        children[temporaryName]?.let { id ->
+            if (!DocumentsContract.deleteDocument(resolver, documentUri(id))) {
+                throw IOException("Couldn't clear the previous incomplete copy")
+            }
+            children.remove(temporaryName)
+        }
+        val temp = DocumentsContract.createDocument(
+            resolver, documentUri(parentId), "application/octet-stream", temporaryName,
+        ) ?: throw IOException("Couldn't create a temporary document")
+        var published = false
+        try {
+            val output = resolver.openOutputStream(temp, "w") ?: throw IOException("Couldn't open the document")
+            output.buffered(256 * 1024).use(block)
+            val result = DocumentsContract.renameDocument(resolver, temp, name)
+                ?: throw IOException("This folder cannot publish a completed file")
+            published = true
+            children[name] = DocumentsContract.getDocumentId(result)
+        } finally {
+            if (!published) runCatching { DocumentsContract.deleteDocument(resolver, temp) }
+        }
+    }
+
     private fun documentUri(id: String): Uri = DocumentsContract.buildDocumentUriUsingTree(tree, id)
 
     private fun childrenOf(parentId: String): MutableMap<String, String> = listed.getOrPut(parentId) {

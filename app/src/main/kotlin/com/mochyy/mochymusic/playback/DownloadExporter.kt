@@ -31,9 +31,11 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.IOException
 import java.io.OutputStream
 import java.io.SequenceInputStream
 import java.util.Collections
+import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -86,6 +88,17 @@ class DownloadExporter @Inject constructor(
 
     fun clear() {
         if (_step.value !is ExportStep.Working) _step.value = ExportStep.Idle
+    }
+
+    internal suspend fun copyCompletedDownload(tree: Uri, mediaId: String) {
+        if (downloadUtil.downloads.value[mediaId]?.state != Download.STATE_COMPLETED) return
+        val song = database.song(mediaId).first() ?: throw IOException("Downloaded song metadata is unavailable")
+        val audio = audioOf(mediaId) ?: throw IOException("The download is incomplete")
+        val documents = DocumentTree(context.contentResolver, tree)
+        // Different recordings can have identical titles and credits. Keep a stable name on retry.
+        val identity = "$mediaId:${audio.spans.sumOf(File::length)}"
+        val suffix = UUID.nameUUIDFromBytes(identity.toByteArray()).toString().take(12)
+        writeAudio(documents, documents.rootId, "${baseName(song)} [$suffix]", audio, tagsOf(song, null, null), keepExisting = true)
     }
 
     private suspend fun export(tree: Uri, choice: ExportChoice): ExportStep.Done {
@@ -200,12 +213,22 @@ class DownloadExporter @Inject constructor(
     }
 
     // the song's own audio, only youtube's webm opus moves into an .opus file since players skip .webm; opus and flac carry the song's tags
-    private fun writeAudio(documents: DocumentTree, folder: String, base: String, audio: CachedAudio, tags: ExportTags) {
+    private fun writeAudio(
+        documents: DocumentTree,
+        folder: String,
+        base: String,
+        audio: CachedAudio,
+        tags: ExportTags,
+        keepExisting: Boolean = false,
+    ) {
+        fun write(name: String, block: (OutputStream) -> Unit) {
+            if (keepExisting) documents.writeNew(folder, name, block) else documents.write(folder, name, block)
+        }
         if (audio.extension == "webm" && Build.VERSION.SDK_INT >= 29) {
             val temp = File.createTempFile("export", ".opus", context.cacheDir)
             try {
                 if (OggOpusRemux.remux(audio.spans, temp)) {
-                    documents.write(folder, "$base.opus") { out -> temp.inputStream().buffered(256 * 1024).use { ExportTagWriter.copyOpus(it, out, tags) } }
+                    write("$base.opus") { out -> temp.inputStream().buffered(256 * 1024).use { ExportTagWriter.copyOpus(it, out, tags) } }
                     return
                 }
             } finally {
@@ -216,11 +239,11 @@ class DownloadExporter @Inject constructor(
         if (audio.extension == "m4a") {
             Mp4FlacRemux.flacHeader(audio.spans)?.let { header ->
                 val tagged = ExportTagWriter.retagFlacHeader(header, tags) ?: header
-                documents.write(folder, "$base.flac") { out -> Mp4FlacRemux.write(audio.spans, tagged, out) }
+                write("$base.flac") { out -> Mp4FlacRemux.write(audio.spans, tagged, out) }
                 return
             }
         }
-        documents.write(folder, "$base.${audio.extension}") { out ->
+        write("$base.${audio.extension}") { out ->
             when (audio.extension) {
                 "opus" -> audio.open().use { ExportTagWriter.copyOpus(it, out, tags) }
                 "flac" -> audio.open().use { ExportTagWriter.copyFlac(it, out, tags) }

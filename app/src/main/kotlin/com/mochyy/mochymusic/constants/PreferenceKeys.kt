@@ -195,6 +195,8 @@ enum class AudioQuality {
 
 // Quality for future downloads. Lossless requires a compatible lossless provider.
 val DownloadQualityKey = stringPreferencesKey("downloadQuality")
+val DownloadProviderKey = stringPreferencesKey("downloadProvider")
+val DownloadFolderKey = stringPreferencesKey("downloadFolder")
 
 enum class DownloadQuality(val title: String, val description: String) {
     LOSSLESS("Lossless", "Save original FLAC or ALAC when available"),
