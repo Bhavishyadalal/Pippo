@@ -47,6 +47,8 @@ import com.mochyy.mochymusic.constants.CrossmixModeKey
 import com.mochyy.mochymusic.constants.DisableAiFilterKey
 import com.mochyy.mochymusic.constants.DisableBlurKey
 import com.mochyy.mochymusic.constants.DefaultTransitionMode
+import com.mochyy.mochymusic.constants.TransportFadeDefaultEnabled
+import com.mochyy.mochymusic.constants.TransportFadeEnabledKey
 import com.mochyy.mochymusic.importer.account.AccountImportState
 import com.mochyy.mochymusic.importer.account.AccountService
 import com.mochyy.mochymusic.ui.screens.settings.importsync.onSignInTick
@@ -265,6 +267,7 @@ fun SetupWizardScreen(
     // ---- settings the last pages flip ----
     val (disableBlur, onDisableBlurChange) = rememberPreference(DisableBlurKey, defaultValue = true)
     val (crossmixMode, onCrossmixModeChange) = rememberEnumPreference(CrossmixModeKey, defaultValue = DefaultTransitionMode)
+    val (transportFade, onTransportFadeChange) = rememberPreference(TransportFadeEnabledKey, defaultValue = TransportFadeDefaultEnabled)
     val (disableAiFilter, onDisableAiFilterChange) = rememberPreference(DisableAiFilterKey, defaultValue = false)
 
     val card = CardInfo(username = username, photo = profilePicUri, cardNumber = vm.cardNumber, joinedText = vm.joinedText)
@@ -449,6 +452,8 @@ fun SetupWizardScreen(
                         Step.LastOne -> LastOnePage(
                             autoCrossfade = crossmixMode != CrossmixMode.OFF,
                             onAutoCrossfadeChange = { on -> onCrossmixModeChange(if (on) CrossmixMode.CROSSMIX else CrossmixMode.OFF) },
+                            transportFade = transportFade,
+                            onTransportFadeChange = onTransportFadeChange,
                             aiArtistFilter = !disableAiFilter,
                             onAiArtistFilterChange = { on -> onDisableAiFilterChange(!on) },
                             onNext = { go(Step.Done) },

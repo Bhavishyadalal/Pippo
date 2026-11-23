@@ -608,6 +608,8 @@ internal fun BlurWarningPage(
 internal fun LastOnePage(
     autoCrossfade: Boolean,
     onAutoCrossfadeChange: (Boolean) -> Unit,
+    transportFade: Boolean,
+    onTransportFadeChange: (Boolean) -> Unit,
     aiArtistFilter: Boolean,
     onAiArtistFilterChange: (Boolean) -> Unit,
     onNext: () -> Unit,
@@ -625,6 +627,12 @@ internal fun LastOnePage(
                 checked = autoCrossfade,
                 onCheckedChange = onAutoCrossfadeChange,
                 header = { CrossfadeBanner() },
+            )
+            OnbToggleCard(
+                title = stringResource(R.string.transition_fade_title),
+                description = stringResource(R.string.transition_fade_desc),
+                checked = transportFade,
+                onCheckedChange = onTransportFadeChange,
             )
             OnbToggleCard(
                 title = stringResource(R.string.onb_ai_filter_title),
