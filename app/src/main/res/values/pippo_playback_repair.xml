@@ -17,4 +17,5 @@
     <string name="pippo_provider_found_quality">Found %1$s</string>
     <string name="pippo_playback_stalled">The stream took too long to start</string>
     <string name="pippo_provider_temporarily_unavailable">A playback provider could not return a stream.</string>
+    <string name="pippo_provider_trying_another">%1$s couldn’t play this · trying another provider</string>
 </resources>

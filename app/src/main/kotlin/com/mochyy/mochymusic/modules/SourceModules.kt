@@ -1,8 +1,9 @@
-// where songs play and download from: the provider order and the download order over youtube and the modules that add audio, and the walk down each
+// Playback races audio modules. Downloads follow their own provider order.
 
 package com.mochyy.mochymusic.modules
 
 import android.content.Context
+import android.os.SystemClock
 import androidx.core.content.edit
 import com.mochyy.mochymusic.module.AccountState
 import com.mochyy.mochymusic.module.ModuleFeature
@@ -24,11 +25,14 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -41,12 +45,16 @@ class SourceModules @Inject constructor(
 
     // where modules look songs up, apart from whoever asked, so a call that won't stop never keeps a song waiting
     private val resolveScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val lastStallAt = ConcurrentHashMap<String, Long>()
+
+    fun notePlaybackStall(id: String) {
+        lastStallAt[id] = SystemClock.elapsedRealtime()
+    }
 
     // ---- provider order -----------------------------------------------------------------------
     //
-    // The order songs are looked for in: the modules and YouTube Music. Each song plays from the
-    // first switched-on provider that has it. YouTube is on unless the user turns it off, and then
-    // a song none of the modules have is skipped rather than quietly played from YouTube.
+    // Provider order breaks close results at the same quality. YouTube can play by catalog ID
+    // when none of the usable modules return a compatible recording.
 
     private val _order = MutableStateFlow(readOrder())
 
@@ -124,24 +132,112 @@ class SourceModules @Inject constructor(
         data class Exhausted(val temporaryFailure: Boolean) : Route
     }
 
-    /**
-     * Walks the provider order for [track], passing over the providers in [skip] (the ones that
-     * already failed on this song). YouTube in the order means "play it from YouTube now".
-     * [onUndecodable] hears of each stream passed over because this phone has no decoder for it.
-     */
+    private data class PlaybackAnswer(
+        val module: SourceModule,
+        val response: Pair<ResolveResult, String?>?,
+    )
+
+    /** Ask every enabled audio module together, using its selected quality. */
     suspend fun route(
         track: TrackQuery?,
         skip: Set<String>,
         onUndecodable: (id: String, stream: SourceStream) -> Unit = { _, _ -> },
-    ): Route = walk(_order.value, track, skip, ::isUsable, { id, module -> playbackPicks(id, module) }) { id, stream ->
-        // a stream this phone has no decoder for would play in silence: the next provider has it
-        DeviceDecoders.canPlay(stream).also { playable ->
-            if (!playable) {
-                android.util.Log.i(Tag, "$id: ${track?.title}: this phone can't decode ${stream.codec} at ${stream.sampleRateHz} Hz, passing over")
-                onUndecodable(id, stream)
+    ): Route = withContext(Dispatchers.IO) {
+        fun fallback(temporaryFailure: Boolean): Route =
+            if (YouTubeId !in skip && isUsable(YouTubeId)) Route.YouTube
+            else Route.Exhausted(temporaryFailure)
+
+        if (track == null) return@withContext fallback(false)
+        val sources = _order.value.distinct()
+            .filter { it != YouTubeId && it !in skip && isUsable(it) }
+            .mapNotNull(::module)
+        if (sources.isEmpty()) return@withContext fallback(false)
+
+        val startedAt = SystemClock.elapsedRealtime()
+        val recentlyStalled = sources.mapNotNullTo(mutableSetOf()) { module ->
+            val id = module.info.id
+            id.takeIf { lastStallAt[id]?.let { startedAt - it < StallMemoryMs } == true }
+        }
+        val providerPositions = sources.mapIndexed { index, source -> source.info.id to index }.toMap()
+        val preferLossless = !DataSaver.isActive(context)
+        fun priority(stream: SourceStream) = if (preferLossless && stream.isLosslessPlayback) 1 else 0
+        val candidates = mutableListOf<Route.Module>()
+        val answers = Channel<PlaybackAnswer>(sources.size)
+        val jobs = sources.map { module ->
+            resolveScope.launch {
+                val response = resolve(module, track) { playbackPicks(module.info.id, module) }
+                answers.trySend(PlaybackAnswer(module, response))
             }
         }
+        var deadline = startedAt + ModuleTimeoutMs
+        var remaining = sources.size
+        var temporaryFailure = false
+        var undecodable: Pair<String, SourceStream>? = null
+        try {
+            while (remaining > 0) {
+                val left = deadline - SystemClock.elapsedRealtime()
+                // Drain completed replies at the deadline, including when a slower module is still running.
+                val answer = answers.tryReceive().getOrNull()
+                    ?: if (left > 0) withTimeoutOrNull(left) { answers.receive() } else null
+                if (answer == null) {
+                    temporaryFailure = true
+                    break
+                }
+                remaining--
+                val (module, response) = answer
+                val id = module.info.id
+                if (!isUsable(id) || module(id) !== module) continue
+                if (response == null) {
+                    temporaryFailure = true
+                    continue
+                }
+                val (result, quality) = response
+                when (result) {
+                    is ResolveResult.Found -> {
+                        val stream = result.stream
+                        if (!TrackMatcher.isCompatible(track, stream.matched)) continue
+                        if (!DeviceDecoders.canPlay(stream)) {
+                            if (undecodable == null) undecodable = id to stream
+                            continue
+                        }
+                        candidates += Route.Module(module, stream, quality)
+                        val grace = if ((preferLossless && priority(stream) == 0) || id in recentlyStalled) {
+                            AlternateGraceMs
+                        } else {
+                            ProviderTieMs
+                        }
+                        deadline = minOf(deadline, SystemClock.elapsedRealtime() + grace)
+                    }
+                    is ResolveResult.Unavailable -> temporaryFailure = true
+                    is ResolveResult.NotFound -> Unit
+                }
+            }
+            currentCoroutineContext().ensureActive()
+            val winner = candidates.filter { isUsable(it.module.info.id) && module(it.module.info.id) === it.module }
+                .minWithOrNull(
+                    compareByDescending<Route.Module> { priority(it.stream) }
+                        .thenBy { it.module.info.id in recentlyStalled }
+                        .thenBy { providerPositions.getValue(it.module.info.id) },
+                )
+            if (winner != null) return@withContext winner
+            undecodable?.let { (id, stream) -> if (isUsable(id)) onUndecodable(id, stream) }
+            fallback(temporaryFailure)
+        } finally {
+            jobs.forEach { it.cancel() }
+            answers.cancel()
+        }
     }
+
+    private suspend fun resolve(
+        module: SourceModule,
+        track: TrackQuery,
+        picksFor: () -> Map<String, String>,
+    ): Pair<ResolveResult, String?>? = runCatching {
+        val picks = picksFor()
+        module.resolve(track, picks) to streamQuality(module, picks)
+    }.onFailure {
+        if (it !is CancellationException) android.util.Log.w(Tag, "${module.info.id} failed for ${track.title}", it)
+    }.getOrNull()
 
     /** The first compatible whole file from the download order. */
     suspend fun downloadRoute(track: TrackQuery?, skip: Set<String>, lossless: Boolean = false): Route =
@@ -190,13 +286,7 @@ class SourceModules @Inject constructor(
         val answers = if (track == null) emptyMap() else asked.mapNotNull { id ->
             val module = module(id) ?: return@mapNotNull null
             val response = resolveScope.async {
-                runCatching {
-                    val picks = picksFor(id, module)
-                    val quality = streamQuality(module, picks)
-                    module.resolve(track, picks) to quality
-                }
-                    .onFailure { if (it !is CancellationException) android.util.Log.w(Tag, "$id failed for ${track.title}", it) }
-                    .getOrNull()
+                resolve(module, track) { picksFor(id, module) }
             }
             id to (module to response)
         }.toMap()
@@ -349,6 +439,9 @@ class SourceModules @Inject constructor(
         private const val Tag = "SourceModules"
         // how long a module may take to find a song before the next provider in the order plays it
         private const val ModuleTimeoutMs = 12_000L
+        private const val AlternateGraceMs = 1_750L
+        private const val ProviderTieMs = 200L
+        private const val StallMemoryMs = 60_000L
         // the choice every module names its stream quality with, and the option data saver steps down to
         const val QualityChoice = "quality"
         private const val SaverOption = "high"
@@ -358,6 +451,12 @@ class SourceModules @Inject constructor(
         private val KnownOrder = listOf(MonochromeModule.Id, AppleMusicModule.Id, YouTubeId)
     }
 }
+
+private val SourceStream.isLosslessPlayback: Boolean
+    get() = when (codec?.trim()?.uppercase()) {
+        "FLAC", "ALAC", "PCM", "WAV" -> true
+        else -> false
+    }
 
 internal val SourceStream.isLosslessDownload: Boolean
     get() = when (codec?.trim()?.uppercase()) {

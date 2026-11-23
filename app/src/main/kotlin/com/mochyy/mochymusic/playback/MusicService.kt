@@ -239,6 +239,7 @@ import com.mochyy.mochymusic.scrobble.Scrobbler
 import com.mochyy.mochymusic.utils.SyncUtils
 import com.mochyy.mochymusic.module.TrackMatcher
 import com.mochyy.mochymusic.modules.SourceModules.PlaybackLookup
+import com.mochyy.mochymusic.playback.custom.CustomStreamResult
 import com.mochyy.mochymusic.utils.YTPlayerUtils
 import com.mochyy.mochymusic.constants.ShowStreamSourceToastKey
 import com.mochyy.mochymusic.constants.YtReportPlaysKey
@@ -3431,7 +3432,45 @@ class MusicService :
             !waitingForNetworkConnection.value
 
         bufferingRecoveryJob = scope.launch {
-            delay(25_000L)
+            val deadline = android.os.SystemClock.elapsedRealtime() + 25_000L
+            var sampledStream: CustomStreamResult? = null
+            var sampledPosition = C.TIME_UNSET
+            var lastBufferedMs = C.TIME_UNSET
+            var sampleStartedAt = 0L
+            var lastProgressAt = 0L
+            while (true) {
+                val remaining = deadline - android.os.SystemClock.elapsedRealtime()
+                if (remaining <= 0L) break
+                delay(minOf(remaining, BufferProgressSampleMs))
+                if (!isStillStalled()) return@launch
+
+                // A URL can resolve quickly and still deliver audio too slowly. Only measure
+                // automatic module streams, after the media source has received their URL.
+                val stream = playingStreams[mediaId]?.takeIf {
+                    it.cacheKey?.startsWith(ModuleCacheKeyPrefix) == true && forcedRoutes[mediaId] == null
+                }
+                val now = android.os.SystemClock.elapsedRealtime()
+                val position = target.contentPosition
+                val bufferedMs = target.totalBufferedDuration
+                if (stream !== sampledStream || position != sampledPosition) {
+                    sampledStream = stream
+                    sampledPosition = position
+                    lastBufferedMs = bufferedMs
+                    sampleStartedAt = now
+                    lastProgressAt = now
+                } else if (bufferedMs - lastBufferedMs >= 250L) {
+                    lastBufferedMs = bufferedMs
+                    lastProgressAt = now
+                }
+                if (stream != null &&
+                    (now - lastProgressAt >= ModuleNoBufferProgressMs || now - sampleStartedAt >= ModuleBufferWaitMs) &&
+                    !com.mochyy.mochymusic.utils.OfflineMode.isOn && connectivityObserver.isCurrentlyConnected() &&
+                    providerSwitch.state.value !is ProviderSwitchState.Working &&
+                    providerSwitch.state.value !is ProviderSwitchState.Starting &&
+                    !isCrossfading && !crossmixDirector.isTransitioning &&
+                    forceFallBack(mediaId, announce = false, stalledStream = stream)
+                ) return@launch
+            }
             if (!isStillStalled()) return@launch
 
             if (bufferingRecoveredOccurrence == occurrence) {
@@ -4586,14 +4625,20 @@ class MusicService :
     }
 
     /**
-     * A song that failed from one provider starts again from the next one in the order, where it
+     * A song that failed from one provider starts again from another enabled source, where it
      * left off. A module's stream always gives way like this - a module this phone can't play (its
      * codec, its DRM, its server) used to leave the song retrying, then skipped, with YouTube never
      * asked. Force playback adds YouTube's own failures, which get YouTube's recoveries first (a
      * stale URL is refreshed, a cipher retried) and only come here once those are spent, via
      * [handleFinalFailure]. Without [announce] it says nothing: a decoder notice follows instead.
      */
-    private fun forceFallBack(mediaId: String, includeYouTube: Boolean = false, announce: Boolean = true): Boolean {
+    private fun forceFallBack(
+        mediaId: String,
+        includeYouTube: Boolean = false,
+        announce: Boolean = true,
+        stalledStream: CustomStreamResult? = null,
+    ): Boolean {
+        if (player.currentMediaItem?.mediaId != mediaId) return false
         val failed = resolvedSourceIds[mediaId] ?: return false
         if (failed == PlayingFrom.Device || failed == PlayingFrom.Downloads) return false
         if (failed == com.mochyy.mochymusic.modules.SourceModules.YouTubeId &&
@@ -4601,22 +4646,33 @@ class MusicService :
         ) {
             return false
         }
-        recentFailures(mediaId)
+        val recent = recentFailures(mediaId)
+        val hasAlternate = sourceModules.order.value.any {
+            it != failed && it !in recent && sourceModules.isUsable(it)
+        }
+        // Slowness alone shouldn't disqualify a stream when it is the only source left.
+        if (stalledStream != null && (!hasAlternate || playingStreams[mediaId] !== stalledStream)) return false
         val skip = failedSources.getOrPut(mediaId) { java.util.concurrent.ConcurrentHashMap.newKeySet() }
         if (!skip.add(failed)) return false
         forcedRoutes[mediaId]?.takeIf { it.providerId == failed }?.let { forcedRoutes.remove(mediaId, it) }
         failedSourcesAt.putIfAbsent(mediaId, System.currentTimeMillis())
-        val next = sourceModules.order.value.firstOrNull { it !in skip && sourceModules.isUsable(it) } ?: return false
-        Timber.tag(TAG).i("Force playback: $mediaId failed from $failed, trying $next")
-        android.util.Log.i("SourceModules", "Force playback: ${sourceModules.nameOf(failed)} failed on $mediaId, trying ${sourceModules.nameOf(next)}")
+        if (!hasAlternate) return false
+        Timber.tag(TAG).i("Playback: $mediaId stalled or failed from $failed, trying another provider")
         resolvedStreamSources.remove(mediaId)
         songUrlCache.remove(mediaId)
         val index = player.currentMediaItemIndex
         val position = player.currentPosition
         val wasPlaying = player.playWhenReady
-        if (announce) showBanner("${sourceModules.nameOf(failed)} couldn't play this · trying ${sourceModules.nameOf(next)}")
+        if (announce) showBanner(getString(R.string.pippo_provider_trying_another, sourceModules.nameOf(failed)))
+        val previousStream = playingStreams[mediaId]
+        if (stalledStream != null) {
+            sourceModules.notePlaybackStall(failed)
+            bufferingRecoveryJob = null
+            playingStreams.remove(mediaId, stalledStream)
+            resolvedSourceIds.remove(mediaId, failed)
+        }
         player.stop()
-        discardFailedRendition(playingStreams[mediaId]?.cacheKey)
+        if (stalledStream == null) discardFailedRendition(previousStream?.cacheKey)
         player.seekTo(index, position)
         player.prepare()
         player.playWhenReady = wasPlaying
@@ -5272,7 +5328,8 @@ class MusicService :
     // only songs youtube plays get their start fetched ahead: a source module's stream is found and cached its own way
     private fun canFetchAhead(): Boolean =
         !com.mochyy.mochymusic.utils.OfflineMode.isOn &&
-            sourceModules.order.value.firstOrNull { sourceModules.isUsable(it) } == com.mochyy.mochymusic.modules.SourceModules.YouTubeId
+            sourceModules.isUsable(com.mochyy.mochymusic.modules.SourceModules.YouTubeId) &&
+            sourceModules.order.value.none { it != com.mochyy.mochymusic.modules.SourceModules.YouTubeId && sourceModules.isUsable(it) }
 
     // an imported file, a download or a song on the linked phone: it starts at once with nothing to fetch
     private fun onThePhone(mediaId: String): Boolean =
@@ -5581,11 +5638,6 @@ class MusicService :
     }
 
     /**
-     * Where [mediaId] plays from: the first provider in the order (Settings → Audio Quality) that
-     * is switched on, hasn't already failed on this song, and has it. Null hands it to YouTube.
-     * With every provider spent, it throws, so the song is skipped rather than retried forever.
-     */
-    /**
      * The providers that failed on [mediaId] lately. They're forgotten after [FailedSourceMemoryMs]:
      * remembered for good, one slow answer from Monochrome sent the song to YouTube every time
      * after, until the app was closed.
@@ -5678,13 +5730,14 @@ class MusicService :
         val skip = recentFailures(mediaId) + listOfNotNull(failedOverride)
         // a fresh lookup: a notice from one that never got to play no longer holds
         if (skip.isEmpty()) decoderNotices.remove(mediaId)
-        // songs that only YouTube has (and the common case of YouTube first) need no lookup
-        val first = sourceModules.order.value.firstOrNull { it !in skip && sourceModules.isUsable(it) }
-        if (first == com.mochyy.mochymusic.modules.SourceModules.YouTubeId) return youTubeRoute(mediaId)
+        // With no eligible modules there is nothing to look up by title and artist.
+        val eligibleModules = sourceModules.order.value.any { it != youtubeId && it !in skip && sourceModules.isUsable(it) }
+        if (!eligibleModules && youtubeId !in skip && sourceModules.isUsable(youtubeId)) return youTubeRoute(mediaId)
         val track = trackQueryOf(mediaId, mediaItem.metadata)
         val route = sourceModules.route(track, skip) { id, passed ->
             if (!decoderNotices.containsKey(mediaId)) noteMissingDecoder(mediaId, passed.codec?.uppercase(), passed.sampleRateHz, from = id)
         }
+        if (com.mochyy.mochymusic.utils.OfflineMode.isOn) return null
         return when (route) {
             is com.mochyy.mochymusic.modules.SourceModules.Route.Module -> moduleStream(mediaId, route.module, route.stream, route.selectedQuality)
             com.mochyy.mochymusic.modules.SourceModules.Route.YouTube -> youTubeRoute(mediaId)
@@ -6278,6 +6331,9 @@ class MusicService :
 
         /** how long a provider that failed on a song is passed over for it (Force playback) */
         const val FailedSourceMemoryMs = 10L * 60 * 1000
+        private const val BufferProgressSampleMs = 1_000L
+        private const val ModuleNoBufferProgressMs = 5_000L
+        private const val ModuleBufferWaitMs = 12_000L
         const val PERSISTENT_QUEUE_FILE = "persistent_queue.data"
         const val PERSISTENT_AUTOMIX_FILE = "persistent_automix.data"
         const val PERSISTENT_MANUAL_QUEUE_FILE = "persistent_manual_queue.data"

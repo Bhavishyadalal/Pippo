@@ -118,6 +118,7 @@
     <string name="web_mix_atmos">Atmos</string>
     <string name="web_mix_atmos_detail">The Dolby Atmos mix when the service has one. It isn\'t lossless, and a phone that can\'t decode it gets stereo.</string>
     <string name="quality_provider_footnote">Tap YouTube Music to turn it on or off, or a module to open its page. Drag a handle to change the order: each song plays from the first one that\'s on and has it. Modules you\'ve switched off aren\'t listed here.</string>
+    <string name="quality_provider_automatic_footnote">Enabled modules look for the track together. Pippo gives lossless priority when Data Saver is off and tries another source if playback stalls. Drag to set the order for closely matched results. YouTube Music is the fallback when enabled.</string>
     <string name="quality_download_footnote">How songs downloaded from YouTube are saved, from now on. Downloads already made stay as they are.</string>
     <string name="quality_download_order">Download order</string>
     <string name="quality_download_order_youtube">Downloads what the others can\'t</string>

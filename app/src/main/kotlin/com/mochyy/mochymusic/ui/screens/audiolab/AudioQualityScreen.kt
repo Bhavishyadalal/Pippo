@@ -2,8 +2,6 @@
 
 package com.mochyy.mochymusic.ui.screens.audiolab
 
-import android.content.Context
-import android.net.ConnectivityManager
 import androidx.annotation.StringRes
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -28,7 +26,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -37,7 +34,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -48,7 +44,6 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.compose.runtime.collectAsState
 import com.mochyy.mochymusic.module.AccountState
 import com.mochyy.mochymusic.module.ModuleFeature
-import com.mochyy.mochymusic.module.jiosaavn.JioSaavnModule
 import com.mochyy.mochymusic.module.applemusic.AppleMusicModule
 import com.mochyy.mochymusic.module.monochrome.MonochromeModule
 import com.mochyy.mochymusic.modules.SourceModules
@@ -67,18 +62,14 @@ private class QualityOption(
     val quality: AudioQuality,
     @StringRes val title: Int,
     @StringRes val description: Int,
-    @StringRes val format: Int,
 )
 
 private val YouTubeOptions = listOf(
-    QualityOption(AudioQuality.AUTO, R.string.aq_quality_auto, R.string.aq_desc_auto, R.string.aq_fmt_adaptive),
-    QualityOption(AudioQuality.HIGH, R.string.aq_quality_high, R.string.aq_desc_high, R.string.aq_fmt_high),
-    QualityOption(AudioQuality.MEDIUM, R.string.aq_quality_medium, R.string.aq_desc_medium, R.string.aq_fmt_medium),
-    QualityOption(AudioQuality.LOW, R.string.aq_quality_low, R.string.aq_desc_low, R.string.aq_fmt_low),
+    QualityOption(AudioQuality.AUTO, R.string.aq_quality_auto, R.string.aq_desc_auto),
+    QualityOption(AudioQuality.HIGH, R.string.aq_quality_high, R.string.aq_desc_high),
+    QualityOption(AudioQuality.MEDIUM, R.string.aq_quality_medium, R.string.aq_desc_medium),
+    QualityOption(AudioQuality.LOW, R.string.aq_quality_low, R.string.aq_desc_low),
 )
-
-/** what the picture shows: the quality of whichever provider plays first */
-private class Effective(val quality: AudioQuality, val title: String, val format: String)
 
 @Composable
 fun AudioQualityScreen(navController: NavController, modules: ModulesViewModel = hiltViewModel()) {
@@ -94,7 +85,6 @@ fun AudioQualityScreen(navController: NavController, modules: ModulesViewModel =
     val order by modules.order.collectAsState()
     val downloadOrder by modules.downloadOrder.collectAsState()
     val youTubeOn by modules.youTubeEnabled.collectAsState()
-    val context = LocalContext.current
     val statusSignIn = stringResource(R.string.aq_status_sign_in)
     val statusSignInAgain = stringResource(R.string.aq_status_sign_in_again)
     val statusOn = stringResource(R.string.aq_status_on)
@@ -108,48 +98,27 @@ fun AudioQualityScreen(navController: NavController, modules: ModulesViewModel =
             else -> statusOffTap
         }
     }
-    val metered = remember { (context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager)?.isActiveNetworkMetered == true }
-
     val usable = { id: String ->
         if (id == SourceModules.YouTubeId) youTubeOn
-        else entries.any { it.module.info.id == id && it.enabled && it.account is AccountState.SignedIn }
+        else entries.any { it.id == id && it.enabled && (it.module.signIn == null || it.account is AccountState.SignedIn) }
     }
     // a module that's switched off isn't part of this page at all, only youtube and the modules that are on show up
     val shownModules = entries.filter { it.enabled && it.adds(ModuleFeature.AudioSource) }
     val shownOrder = order.filter { id -> id == SourceModules.YouTubeId || shownModules.any { it.id == id } }
     val shownDownloadOrder = downloadOrder.filter { id -> id == SourceModules.YouTubeId || shownModules.any { it.id == id } }
-    // the first provider in the order that's on plays everything it has
-    val first = order.firstOrNull(usable)
-    val effective = when (first) {
-        null -> Effective(AudioQuality.LOW, stringResource(R.string.aq_nothing_on), stringResource(R.string.aq_turn_provider_on))
-        MonochromeModule.Id -> Effective(AudioQuality.LOSSLESS, "Monochrome", "FLAC · lossless")
-        AppleMusicModule.Id -> {
-            val pick = entries.firstOrNull { it.module.info.id == first }?.picks?.get(AppleMusicModule.ChoiceQuality)
-            if (pick == AppleMusicModule.OptionHe64) Effective(AudioQuality.MEDIUM, "Apple Music", "HE-AAC 64")
-            else Effective(AudioQuality.HIGH, "Apple Music", "AAC 256")
+    val subtitle = when {
+        shownModules.any { usable(it.id) } -> stringResource(R.string.aq_automatic_provider)
+        youTubeOn -> {
+            val option = YouTubeOptions.first { it.quality == quality }
+            stringResource(R.string.aq_youtube_tier, stringResource(option.title))
         }
-        JioSaavnModule.Id -> {
-            val pick = entries.firstOrNull { it.id == first }?.picks?.get(JioSaavnModule.ChoiceQuality) ?: JioSaavnModule.Option320
-            Effective(if (pick == JioSaavnModule.Option96) AudioQuality.MEDIUM else AudioQuality.HIGH, "JioSaavn", "AAC $pick")
-        }
-        SourceModules.YouTubeId -> {
-            val tier = if (quality == AudioQuality.AUTO) (if (metered) AudioQuality.MEDIUM else AudioQuality.HIGH) else quality
-            val option = YouTubeOptions.first { it.quality == tier }
-            Effective(tier, stringResource(R.string.aq_youtube_tier, stringResource(option.title)), stringResource(option.format))
-        }
-        // a module added from a link: its name, and the stream it picked when it offers a choice
-        else -> {
-            val entry = entries.firstOrNull { it.id == first }
-            val choice = entry?.module?.choices?.firstOrNull { it.id == "quality" }
-            val picked = choice?.options?.firstOrNull { it.id == entry.picks[choice.id] } ?: choice?.options?.firstOrNull()
-            Effective(AudioQuality.HIGH, entry?.module?.info?.name ?: first, picked?.label ?: stringResource(R.string.quality_module_stream))
-        }
+        else -> stringResource(R.string.aq_turn_provider_on)
     }
 
     AudioLabPage(
         title = LabTitle(stringResource(R.string.aq_title_first), stringResource(R.string.aq_title_second), firstSize = 40.sp, secondSize = 64.sp),
         onBack = { navController.navigateUp() },
-        subtitle = "${effective.title} · ${effective.format}",
+        subtitle = subtitle,
     ) {
         LabSheetTitle(stringResource(R.string.aq_section_streaming))
         LabGroup {
@@ -170,13 +139,13 @@ fun AudioQualityScreen(navController: NavController, modules: ModulesViewModel =
             // each module's own qualities, under its name
             shownModules.forEach { entry ->
                 val id = entry.module.info.id
-                val active = entry.enabled && entry.account is AccountState.SignedIn
+                val active = usable(id)
                 Spacer(Modifier.height(6.dp))
                 ProviderCaption(logo = providerLogo(id), name = entry.module.info.name, status = moduleStatus(entry), on = active)
                 val qualityChoice = entry.module.choices.firstOrNull { it.id == "quality" }
                 if (qualityChoice != null) {
                     val picked = entry.picks[qualityChoice.id]?.takeIf { p -> qualityChoice.options.any { it.id == p } }
-                        ?: qualityChoice.options.first().id
+                        ?: qualityChoice.options.firstOrNull()?.id
                     qualityChoice.options.forEach { option ->
                         QualityRow(option.label, option.description, selected = picked == option.id, enabled = active) {
                             modules.setPick(id, qualityChoice.id, option.id)
@@ -236,7 +205,7 @@ fun AudioQualityScreen(navController: NavController, modules: ModulesViewModel =
             },
             onReorder = modules::setVisibleOrder,
         )
-        Footnote(stringResource(R.string.quality_provider_footnote))
+        Footnote(stringResource(R.string.quality_provider_automatic_footnote))
 
         Spacer(Modifier.height(24.dp))
         LabSheetTitle(stringResource(R.string.quality_download_order))
