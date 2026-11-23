@@ -5,6 +5,8 @@ import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import com.mochyy.mochymusic.constants.TransportEffect
+import com.mochyy.mochymusic.constants.TransportFadeDefaultEnabled
+import com.mochyy.mochymusic.constants.TransportFadeDefaultSeconds
 import com.mochyy.mochymusic.crossmix.CrossmixRole
 import com.mochyy.mochymusic.crossmix.CrossmixStyle
 import com.mochyy.mochymusic.playback.audio.CrossmixTransitionAudioProcessor
@@ -67,8 +69,8 @@ class TransportTransitions(
         suspend fun getReady(mediaId: String) {}
     }
 
-    @Volatile var enabled = true
-    @Volatile var lengthMs = 2_000f
+    @Volatile var enabled = TransportFadeDefaultEnabled
+    @Volatile var lengthMs = TransportFadeDefaultSeconds * 1_000f
     @Volatile var effect = TransportEffect.OFF
 
     // the buttons' meaning while a fade runs (the player only catches up once it's over); null follows the player
@@ -153,7 +155,7 @@ class TransportTransitions(
             if (player.playbackState == Player.STATE_IDLE) player.prepare()
             return
         }
-        if (!shouldFade(player)) {
+        if (!shouldFade(player) || !scope.isActive) {
             stopFade()
             startPlayer(player)
             return
