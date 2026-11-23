@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.sp
 import com.mochyy.mochymusic.R
 import com.mochyy.mochymusic.constants.TransportEffect
 import com.mochyy.mochymusic.constants.TransportEffectKey
+import com.mochyy.mochymusic.constants.TransportFadeDefaultEnabled
 import com.mochyy.mochymusic.constants.TransportFadeDefaultSeconds
 import com.mochyy.mochymusic.constants.SkipBlendKey
 import com.mochyy.mochymusic.constants.SkipBlendAheadKey
@@ -44,6 +45,7 @@ import com.mochyy.mochymusic.constants.TransportFadeEnabledKey
 import com.mochyy.mochymusic.constants.TransportFadeMaxSeconds
 import com.mochyy.mochymusic.constants.TransportFadeMinSeconds
 import com.mochyy.mochymusic.constants.TransportFadeSecondsKey
+import com.mochyy.mochymusic.constants.transportFadeSeconds
 import com.mochyy.mochymusic.ui.screens.audiolab.LabCard
 import com.mochyy.mochymusic.ui.screens.audiolab.LabCollapsible
 import com.mochyy.mochymusic.ui.screens.audiolab.LabSelect
@@ -70,13 +72,13 @@ private val EffectRed = LabColors.Nodes[9]
 // the pause, play, forward and backward fades: a picture of the curve, the switch, its length and the layered effect
 @Composable
 fun TransportFadeSection() {
-    val (enabled, onEnabledChange) = rememberPreference(TransportFadeEnabledKey, defaultValue = true)
+    val (enabled, onEnabledChange) = rememberPreference(TransportFadeEnabledKey, defaultValue = TransportFadeDefaultEnabled)
     val (storedSeconds, onSecondsChange) = rememberPreference(TransportFadeSecondsKey, defaultValue = TransportFadeDefaultSeconds)
     val (effect, onEffectChange) = rememberEnumPreference(TransportEffectKey, defaultValue = TransportEffect.OFF)
     val (blendSkips, onBlendSkipsChange) = rememberPreference(SkipBlendKey, defaultValue = false)
     val (blendAhead, onBlendAheadChange) = rememberPreference(SkipBlendAheadKey, defaultValue = 1)
     val dataSaving = rememberDataSaverActive()
-    val seconds = storedSeconds.coerceIn(TransportFadeMinSeconds, TransportFadeMaxSeconds)
+    val seconds = transportFadeSeconds(storedSeconds)
 
     TransitionHeading(stringResource(R.string.transition_transport_heading), Modifier.padding(top = 28.dp))
 

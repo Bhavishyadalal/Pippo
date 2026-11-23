@@ -21,6 +21,7 @@ import com.mochyy.mochymusic.constants.DefaultPlayerStyle
 import com.mochyy.mochymusic.constants.PlayerStyleKey
 import com.mochyy.mochymusic.constants.SkipSilenceKey
 import com.mochyy.mochymusic.constants.StudioForVideosKey
+import com.mochyy.mochymusic.constants.TransportFadeDefaultEnabled
 import com.mochyy.mochymusic.constants.TransportFadeEnabledKey
 import com.mochyy.mochymusic.constants.VideoQuality
 import com.mochyy.mochymusic.constants.VideoQualityKey
@@ -114,7 +115,11 @@ internal class LinkSettings(context: Context) {
                 }
             },
         ),
-        LinkSetting.Switch("transportFade", R.string.link_section_playback, R.string.link_setting_transport_fade, read = { prefs, _ -> prefs[TransportFadeEnabledKey] ?: true }, write = preference(TransportFadeEnabledKey)),
+        LinkSetting.Switch(
+            "transportFade", R.string.link_section_playback, R.string.link_setting_transport_fade,
+            read = { prefs, _ -> prefs[TransportFadeEnabledKey] ?: TransportFadeDefaultEnabled },
+            write = preference(TransportFadeEnabledKey),
+        ),
         LinkSetting.Switch("skipSilence", R.string.link_section_playback, R.string.link_setting_skip_silence, read = { prefs, _ -> prefs[SkipSilenceKey] ?: false }, write = preference(SkipSilenceKey)),
         LinkSetting.Switch("normalize", R.string.link_section_playback, R.string.link_setting_normalize, read = { prefs, _ -> prefs[AudioNormalizationKey] ?: true }, write = preference(AudioNormalizationKey)),
         LinkSetting.Switch("autoplay", R.string.link_section_playback, R.string.link_setting_autoplay, read = { prefs, _ -> prefs[InfiniteQueueKey] ?: true }, write = preference(InfiniteQueueKey)),

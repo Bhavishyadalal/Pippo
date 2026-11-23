@@ -12,6 +12,7 @@ import com.mochyy.mochymusic.constants.MusicHapticsEnabledKey
 import com.mochyy.mochymusic.constants.SkipSilenceKey
 import com.mochyy.mochymusic.constants.TransportEffect
 import com.mochyy.mochymusic.constants.TransportEffectKey
+import com.mochyy.mochymusic.constants.activeTransportEffect
 import com.mochyy.mochymusic.constants.transitionModeOf
 import com.mochyy.mochymusic.eq.AudioLabStore
 import com.mochyy.mochymusic.eq.EqSettings
@@ -20,7 +21,6 @@ import com.mochyy.mochymusic.eq.PlaybackSettings
 import com.mochyy.mochymusic.eq.ReverbSettings
 import com.mochyy.mochymusic.eq.SpatialSettings
 import com.mochyy.mochymusic.eq.VolumeSettings
-import com.mochyy.mochymusic.extensions.toEnum
 import kotlinx.serialization.Serializable
 
 /** each of these changes the sound on mochy's side, and an output that takes the song untouched can't, so songs play the normal way while one is on */
@@ -44,7 +44,7 @@ fun passBlockersOf(prefs: Preferences, lab: LabSound, playerVolume: Float): Set<
     if (playerVolume < 0.999f || (lab.volume.enabled && lab.volume.limit < 0.999f)) add(PassBlocker.VOLUME)
     if (prefs[AudioNormalizationKey] ?: true) add(PassBlocker.NORMALIZATION)
     if (!lab.playback.isNormal) add(PassBlocker.SPEED)
-    if (transitionModeOf(prefs) != CrossmixMode.OFF || prefs[TransportEffectKey].toEnum(TransportEffect.OFF) != TransportEffect.OFF) {
+    if (transitionModeOf(prefs) != CrossmixMode.OFF || activeTransportEffect(prefs) != TransportEffect.OFF) {
         add(PassBlocker.TRANSITIONS)
     }
     if ((prefs[SkipSilenceKey] ?: false) || (prefs[MusicHapticsEnabledKey] ?: false)) add(PassBlocker.SILENCE_OR_HAPTICS)
