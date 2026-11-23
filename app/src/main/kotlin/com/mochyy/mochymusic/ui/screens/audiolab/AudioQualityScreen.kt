@@ -51,6 +51,8 @@ import com.mochyy.mochymusic.viewmodels.ModulesViewModel
 import com.mochyy.mochymusic.R
 import com.mochyy.mochymusic.constants.AudioQuality
 import com.mochyy.mochymusic.constants.AudioQualityKey
+import com.mochyy.mochymusic.constants.DownloadQuality
+import com.mochyy.mochymusic.constants.DownloadQualityKey
 import com.mochyy.mochymusic.eq.audio.AudioTap
 import com.mochyy.mochymusic.ui.theme.InterFontFamily
 import com.mochyy.mochymusic.utils.rememberEnumPreference
@@ -75,10 +77,10 @@ private val YouTubeOptions = listOf(
 fun AudioQualityScreen(navController: NavController, modules: ModulesViewModel = hiltViewModel()) {
     val (stored, onQuality) = rememberEnumPreference(AudioQualityKey, defaultValue = AudioQuality.AUTO)
     val (downloadQuality, onDownloadQuality) = rememberEnumPreference(
-        com.mochyy.mochymusic.constants.DownloadQualityKey,
-        defaultValue = com.mochyy.mochymusic.constants.DownloadQuality.HIGH,
+        DownloadQualityKey,
+        defaultValue = DownloadQuality.HIGH,
     )
-    val losslessDownloads = downloadQuality == com.mochyy.mochymusic.constants.DownloadQuality.LOSSLESS
+    val losslessDownloads = downloadQuality == DownloadQuality.LOSSLESS
     // the tiers Monochrome used to serve from here belong to its module now
     val quality = if (stored.usesMonochrome) AudioQuality.HIGH else stored
     val entries by modules.entries.collectAsState()
@@ -160,26 +162,13 @@ fun AudioQualityScreen(navController: NavController, modules: ModulesViewModel =
             }
         }
 
-        // Lossless uses the download order among compatible modules. The other options tune YouTube.
         Spacer(Modifier.height(24.dp))
         LabSheetTitle(stringResource(R.string.aq_section_download))
-        LabGroup {
-            com.mochyy.mochymusic.constants.DownloadQuality.entries.forEach { option ->
-                val (titleRes, descRes) = when (option) {
-                    com.mochyy.mochymusic.constants.DownloadQuality.LOSSLESS -> R.string.aq_quality_lossless to R.string.aq_dl_desc_lossless
-                    com.mochyy.mochymusic.constants.DownloadQuality.HIGH -> R.string.aq_quality_high to R.string.aq_dl_desc_high
-                    com.mochyy.mochymusic.constants.DownloadQuality.MEDIUM -> R.string.aq_quality_medium to R.string.aq_dl_desc_medium
-                    com.mochyy.mochymusic.constants.DownloadQuality.LOW -> R.string.aq_quality_low to R.string.aq_dl_desc_low
-                }
-                QualityRow(stringResource(titleRes), stringResource(descRes), selected = downloadQuality == option, enabled = true) {
-                    onDownloadQuality(option)
-                }
-            }
+        DownloadQualityGroup(downloadQuality, onDownloadQuality)
+        Footnote(stringResource(R.string.download_settings_quality_note))
+        LabTextAction(stringResource(R.string.download_settings_title), R.drawable.download) {
+            navController.navigate(com.mochyy.mochymusic.ui.screens.settings.storage.DownloadSettingsRoute)
         }
-        Footnote(stringResource(
-            if (losslessDownloads)
-                R.string.quality_download_lossless_footnote else R.string.quality_download_footnote,
-        ))
 
         Spacer(Modifier.height(24.dp))
         LabSheetTitle(stringResource(R.string.aq_section_provider))
@@ -231,6 +220,26 @@ fun AudioQualityScreen(navController: NavController, modules: ModulesViewModel =
             onReorder = modules::setVisibleDownloadOrder,
         )
         if (!losslessDownloads) Footnote(stringResource(R.string.quality_download_order_footnote))
+    }
+}
+
+@Composable
+internal fun DownloadQualityGroup(
+    quality: DownloadQuality,
+    onQuality: (DownloadQuality) -> Unit,
+) {
+    LabGroup {
+        DownloadQuality.entries.forEach { option ->
+            val (title, description) = when (option) {
+                DownloadQuality.LOSSLESS -> R.string.aq_quality_lossless to R.string.aq_dl_desc_lossless
+                DownloadQuality.HIGH -> R.string.aq_quality_high to R.string.download_settings_high_detail
+                DownloadQuality.MEDIUM -> R.string.aq_quality_medium to R.string.download_settings_medium_detail
+                DownloadQuality.LOW -> R.string.aq_quality_low to R.string.download_settings_low_detail
+            }
+            QualityRow(stringResource(title), stringResource(description), selected = quality == option, enabled = true) {
+                onQuality(option)
+            }
+        }
     }
 }
 

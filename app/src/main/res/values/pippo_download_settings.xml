@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="download_settings_title">Downloads</string>
+    <string name="download_settings_quality">Download quality</string>
+    <string name="download_settings_provider">Download provider</string>
+    <string name="download_settings_folder">Download folder</string>
+    <string name="download_settings_automatic">Automatic</string>
+    <string name="download_settings_search_order">Automatic follows your download order in Audio Lab.</string>
+    <string name="download_settings_provider_note">New downloads use only the selected provider. The track must be available there as a downloadable file.</string>
+    <string name="download_settings_provider_unavailable">%1$s · unavailable</string>
+    <string name="download_settings_source_unavailable">This provider is unavailable for the selected quality. Choose another provider or Automatic.</string>
+    <string name="download_settings_provider_failed">A download could not find a compatible file with your provider choice. Select another provider and try again.</string>
+    <string name="download_settings_quality_note">Modules use the selected tier when they offer it. Lossless always requires a complete FLAC or ALAC file.</string>
+    <string name="download_settings_high_detail">Higher quality compressed audio</string>
+    <string name="download_settings_medium_detail">Standard quality with smaller files</string>
+    <string name="download_settings_low_detail">Smallest files for limited storage</string>
+    <string name="download_settings_app_storage">Pippo storage</string>
+    <string name="download_settings_default_folder_note">Choose a folder to also save downloads as audio files you can open in Files.</string>
+    <string name="download_settings_folder_note">Completed downloads are saved as audio files in this folder. Pippo keeps an offline copy for playback.</string>
+    <string name="download_settings_change_folder">Change folder</string>
+    <string name="download_settings_choose_folder">Choose folder</string>
+    <string name="download_settings_use_app_storage">Save only in Pippo</string>
+    <string name="download_settings_copy_existing">Copy existing downloads</string>
+    <string name="download_settings_copy_progress">Saving audio files…</string>
+    <string name="download_settings_copy_error">Some files could not be saved. Check folder access and tap Copy existing downloads to retry.</string>
+    <string name="download_settings_folder_error">Pippo needs permission to read and write in this folder. Choose it again or select another folder.</string>
+    <string name="download_settings_picked_folder">Selected folder</string>
+</resources>

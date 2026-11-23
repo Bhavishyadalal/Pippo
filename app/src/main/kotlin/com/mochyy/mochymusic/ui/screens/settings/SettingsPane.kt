@@ -32,6 +32,7 @@ import com.mochyy.mochymusic.ui.screens.settings.integrations.ScrobbleServiceRou
 import com.mochyy.mochymusic.ui.screens.settings.integrations.discord.DiscordRoute
 import com.mochyy.mochymusic.ui.screens.settings.modules.ModulesRoute
 import com.mochyy.mochymusic.ui.screens.settings.storage.StorageRoute
+import com.mochyy.mochymusic.ui.screens.settings.storage.DownloadSettingsRoute
 import com.mochyy.mochymusic.ui.theme.InterFontFamily
 
 // the settings list's own route; on a wide screen it stays at the left while its pages open beside it
@@ -51,6 +52,7 @@ val SettingsPaneRoutes = setOf(
     "customisation_settings",
     "gesture_settings",
     StorageRoute,
+    DownloadSettingsRoute,
     IntegrationsRoute,
     DiscordRoute,
     ScrobbleServiceRoute,

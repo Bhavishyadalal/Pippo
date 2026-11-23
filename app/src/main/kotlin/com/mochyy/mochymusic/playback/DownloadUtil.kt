@@ -26,11 +26,13 @@ import com.music.innertube.YouTube
 import com.mochyy.mochymusic.constants.AudioQuality
 import com.mochyy.mochymusic.constants.DownloadQuality
 import com.mochyy.mochymusic.constants.DownloadQualityKey
+import com.mochyy.mochymusic.constants.DownloadProviderKey
+import com.mochyy.mochymusic.constants.DownloadFolderKey
 import com.mochyy.mochymusic.constants.IpVersionKey
 import com.mochyy.mochymusic.constants.OfflineModeKey
+import com.mochyy.mochymusic.extensions.toEnum
 import com.mochyy.mochymusic.module.TrackQuery
 import com.mochyy.mochymusic.modules.SourceModules
-import com.mochyy.mochymusic.modules.isLosslessDownload
 import com.mochyy.mochymusic.utils.dataStore
 import com.music.innertube.models.IpVersion
 import okhttp3.Dns
@@ -95,8 +97,9 @@ constructor(
     private val lyricsHelper: LyricsHelper,
 ) {
     private val connectivityManager = context.getSystemService<ConnectivityManager>()!!
-    private val downloadQuality by enumPreference(context, DownloadQualityKey, DownloadQuality.HIGH)
     private val ipVersion by enumPreference(context, IpVersionKey, IpVersion.AUTO)
+    private data class DownloadSelection(val quality: DownloadQuality, val providerId: String?)
+    private val selections = java.util.concurrent.ConcurrentHashMap<String, DownloadSelection>()
     private data class YouTubeDownload(
         val url: String,
         val expiresAt: Long,
@@ -115,7 +118,6 @@ constructor(
         val providerId: String,
         val url: String,
         val headers: Map<String, String>,
-        val lossless: Boolean,
     )
 
     private val moduleDownloads = java.util.concurrent.ConcurrentHashMap<String, ModuleDownload>()
@@ -128,6 +130,8 @@ constructor(
     val downloads = MutableStateFlow<Map<String, Download>>(emptyMap())
 
     private class NoLosslessDownload : java.io.IOException("No downloadable FLAC or ALAC stream")
+    private class SelectedDownloadUnavailable(val lossless: Boolean) :
+        java.io.IOException("The selected download provider has no compatible file for this song")
     private val repairLock = Mutex()
     private val fileOperationLock = Mutex()
     private var locationChangePending = false
@@ -137,6 +141,8 @@ constructor(
     private val pendingDownloadRequests = mutableSetOf<String>()
     private val unavailableLossless = MutableStateFlow<Set<String>>(emptySet())
     internal val losslessFailures = unavailableLossless.asStateFlow()
+    private val _providerFailures = MutableStateFlow<Set<String>>(emptySet())
+    internal val providerFailures = _providerFailures.asStateFlow()
 
     private val _batch = MutableStateFlow(TransferBatch())
 
@@ -170,16 +176,23 @@ constructor(
             ),
         ) { dataSpec ->
             val mediaId = dataSpec.key ?: error("No media id")
-            val quality = downloadQuality
+            val selection = selections.getOrPut(mediaId) {
+                val prefs = runBlocking(Dispatchers.IO) { context.dataStore.data.first() }
+                DownloadSelection(
+                    prefs[DownloadQualityKey].toEnum(DownloadQuality.HIGH),
+                    prefs[DownloadProviderKey]?.takeIf(String::isNotBlank),
+                )
+            }
+            val quality = selection.quality
             val lossless = quality == DownloadQuality.LOSSLESS
 
             // a tv copying a song its linked phone already has takes the phone's file, the very same song and much quicker
-            if (!lossless) com.mochyy.mochymusic.link.PhoneFiles.streamUrl(mediaId)?.let {
+            if (!lossless && selection.providerId == null) com.mochyy.mochymusic.link.PhoneFiles.streamUrl(mediaId)?.let {
                 rememberDownloadStream(mediaId, "phone:$it", dataSpec.position)
                 return@Factory dataSpec.withUri(it.toUri())
             }
 
-            moduleDownload(mediaId, lossless)?.let { found ->
+            moduleDownload(mediaId, selection)?.let { found ->
                 rememberDownloadStream(mediaId, "module:${found.providerId}:${found.url}", dataSpec.position)
                 return@Factory dataSpec.buildUpon()
                     .setUri(found.url.toUri())
@@ -187,6 +200,9 @@ constructor(
                     .build()
             }
 
+            if (selection.providerId != null && (lossless || selection.providerId != SourceModules.YouTubeId)) {
+                throw SelectedDownloadUnavailable(lossless)
+            }
             if (lossless) throw NoLosslessDownload()
 
             // only while it still works. This used to keep the url's lifetime instead of when it ends,
@@ -286,9 +302,12 @@ constructor(
                         val id = download.request.id
                         if (download.state != Download.STATE_REMOVING) pendingDownloadRequests.remove(id)
                         downloads.update { it + (id to download) }
-                        val unavailable = download.state == Download.STATE_FAILED &&
-                            generateSequence<Throwable>(finalException) { it.cause }.any { it is NoLosslessDownload }
-                        unavailableLossless.update { if (unavailable) it + id else it - id }
+                        val causes = generateSequence<Throwable>(finalException) { it.cause }
+                        val providerFailed = download.state == Download.STATE_FAILED && causes.any { it is SelectedDownloadUnavailable }
+                        val losslessFailed = download.state == Download.STATE_FAILED &&
+                            causes.any { it is NoLosslessDownload || it is SelectedDownloadUnavailable && it.lossless }
+                        unavailableLossless.update { if (losslessFailed) it + id else it - id }
+                        _providerFailures.update { if (providerFailed) it + id else it - id }
 
                         scope.launch {
                             val completed = repairLock.withLock {
@@ -300,10 +319,12 @@ constructor(
                                         songUrlCache.remove(id)
                                         moduleDownloads.remove(id)
                                         failedProviders.remove(id)
+                                        selections.remove(id)
                                     }
                                     Download.STATE_FAILED -> {
                                         database.updateDownloadedInfo(id, false, null)
                                         forgetStream(id)
+                                        selections.remove(id)
                                         // Release builds keep this log so a failure has a diagnostic reason.
                                         android.util.Log.w(LOG_TAG, "Download of $id failed", finalException)
                                     }
@@ -313,7 +334,14 @@ constructor(
                                 }
                                 download.state == Download.STATE_COMPLETED
                             }
-                            if (completed) saveLyrics(id)
+                            if (completed) {
+                                runCatching {
+                                    context.dataStore.data.first()[DownloadFolderKey]?.let { folder ->
+                                        DownloadFolderWorker.enqueue(context, id, folder)
+                                    }
+                                }.onFailure { android.util.Log.w(LOG_TAG, "Couldn't schedule folder copy of $id", it) }
+                                saveLyrics(id)
+                            }
                         }
                     }
 
@@ -322,9 +350,11 @@ constructor(
                         pendingDownloadRequests.remove(id)
                         downloads.update { it - id }
                         unavailableLossless.update { it - id }
+                        _providerFailures.update { it - id }
                         songUrlCache.remove(id)
                         moduleDownloads.remove(id)
                         failedProviders.remove(id)
+                        selections.remove(id)
                         scope.launch {
                             repairLock.withLock {
                                 if (downloads.value[id] == null) database.updateDownloadedInfo(id, false, null)
@@ -428,8 +458,9 @@ constructor(
     }
 
     /** the first module in the download order with a whole file of [mediaId]; null when youtube comes first or nothing else has it */
-    private fun moduleDownload(mediaId: String, lossless: Boolean): ModuleDownload? {
-        moduleDownloads[mediaId]?.takeIf { !lossless || it.lossless }?.let { return it }
+    private fun moduleDownload(mediaId: String, selection: DownloadSelection): ModuleDownload? {
+        if (selection.providerId == SourceModules.YouTubeId) return null
+        moduleDownloads[mediaId]?.let { return it }
         val song = runBlocking(Dispatchers.IO) { database.song(mediaId).first() } ?: return null
         val track = TrackQuery(
             title = song.song.title,
@@ -437,7 +468,10 @@ constructor(
             album = song.song.albumName ?: song.album?.title,
             durationMs = song.song.duration.takeIf { it > 0 }?.times(1000L),
         )
-        val route = runBlocking(Dispatchers.IO) { sourceModules.downloadRoute(track, failedProviders[mediaId].orEmpty(), lossless) }
+        val failed = if (selection.providerId == null) failedProviders[mediaId].orEmpty() else emptySet()
+        val route = runBlocking(Dispatchers.IO) {
+            sourceModules.downloadRoute(track, failed, selection.quality, selection.providerId)
+        }
         val (module, stream) = route as? SourceModules.Route.Module ?: return null
         val (mimeType, codecs) = savedFormatOf(stream.codec)
 
@@ -458,7 +492,7 @@ constructor(
                 ),
             )
         }
-        return ModuleDownload(module.info.id, stream.url, stream.headers, stream.isLosslessDownload).also { moduleDownloads[mediaId] = it }
+        return ModuleDownload(module.info.id, stream.url, stream.headers).also { moduleDownloads[mediaId] = it }
     }
 
     // the saved file as the format badges read it, a mime type and a codec, from the codec the module named

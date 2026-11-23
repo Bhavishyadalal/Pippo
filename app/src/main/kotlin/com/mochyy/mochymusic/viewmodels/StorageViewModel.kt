@@ -14,6 +14,7 @@ import com.mochyy.mochymusic.db.MusicDatabase
 import com.mochyy.mochymusic.db.entities.Song
 import com.mochyy.mochymusic.playback.CachedSongs
 import com.mochyy.mochymusic.playback.DownloadUtil
+import com.mochyy.mochymusic.playback.DownloadFolderWorker
 import com.mochyy.mochymusic.playback.ExoDownloadService
 import com.mochyy.mochymusic.playback.DownloadExporter
 import com.mochyy.mochymusic.playback.ExportChoice
@@ -98,6 +99,7 @@ class StorageViewModel @Inject constructor(
 
     val moveStep: StateFlow<MoveStep> = mover.step
     val exportStep: StateFlow<ExportStep> = exporter.step
+    val downloadProviderFailures = downloadUtil.providerFailures
 
     private val _usage = MutableStateFlow<StorageUsage?>(null)
     val usage: StateFlow<StorageUsage?> = _usage.asStateFlow()
@@ -164,6 +166,15 @@ class StorageViewModel @Inject constructor(
     fun export(tree: android.net.Uri, choice: ExportChoice) = exporter.start(tree, choice)
 
     fun clearExport() = exporter.clear()
+
+    fun copyDownloadsToFolder(folder: String) {
+        if (folder.isBlank()) return
+        viewModelScope.launch(Dispatchers.IO) {
+            downloadUtil.downloads.value.values
+                .filter { it.state == Download.STATE_COMPLETED }
+                .forEach { DownloadFolderWorker.enqueue(context, it.request.id, folder) }
+        }
+    }
 
     private fun runBusy(block: suspend () -> Unit) {
         if (_busy.value) return
