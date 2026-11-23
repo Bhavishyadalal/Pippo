@@ -5,6 +5,7 @@ package com.mochyy.mochymusic.modules
 import android.content.Context
 import android.os.SystemClock
 import androidx.core.content.edit
+import com.mochyy.mochymusic.constants.DownloadQuality
 import com.mochyy.mochymusic.module.AccountState
 import com.mochyy.mochymusic.module.ModuleFeature
 import com.mochyy.mochymusic.module.ResolveResult
@@ -240,28 +241,37 @@ class SourceModules @Inject constructor(
     }.getOrNull()
 
     /** The first compatible whole file from the download order. */
-    suspend fun downloadRoute(track: TrackQuery?, skip: Set<String>, lossless: Boolean = false): Route =
+    suspend fun downloadRoute(
+        track: TrackQuery?,
+        skip: Set<String>,
+        quality: DownloadQuality,
+        providerId: String?,
+    ): Route =
         walk(
-            _downloadOrder.value,
+            if (providerId == null) _downloadOrder.value else listOf(providerId),
             track,
-            if (lossless) skip + YouTubeId else skip,
+            if (quality == DownloadQuality.LOSSLESS) skip + YouTubeId else skip,
             ::isUsableForDownload,
             { id, module ->
                 val selected = picks(id)
-                if (!lossless) {
-                    selected
-                } else {
-                    val quality = module.choices.firstOrNull { it.id.contains("quality", ignoreCase = true) }
-                    val option = quality?.options?.firstOrNull { option ->
-                        val name = "${option.id} ${option.label}".lowercase()
-                        ("lossless" in name || "flac" in name || "alac" in name) && "lossy" !in name
+                val choice = qualityChoice(module)
+                val option = choice?.options?.firstOrNull { option ->
+                    val tier = option.id.lowercase()
+                    when (quality) {
+                        DownloadQuality.HIGH -> tier in setOf("high", "320", "256")
+                        DownloadQuality.MEDIUM -> tier in setOf("medium", "160", "128")
+                        DownloadQuality.LOW -> tier in setOf("low", "96", "64")
+                        DownloadQuality.LOSSLESS -> {
+                            val name = "$tier ${option.label.lowercase()}"
+                            ("lossless" in name || "flac" in name || "alac" in name) && "lossy" !in name
+                        }
                     }
-                    if (quality != null && option != null) selected + (quality.id to option.id) else selected
                 }
+                if (choice != null && option != null) selected + (choice.id to option.id) else selected
             },
         ) { id, stream ->
             (stream.format == StreamFormat.Progressive && stream.drm == null &&
-                (!lossless || stream.isLosslessDownload) && DeviceDecoders.canPlay(stream)).also { savable ->
+                (quality != DownloadQuality.LOSSLESS || stream.isLosslessDownload) && DeviceDecoders.canPlay(stream)).also { savable ->
                 if (!savable) android.util.Log.i(Tag, "$id: ${track?.title}: can't download a ${stream.format} ${stream.codec} stream at the requested quality")
             }
         }

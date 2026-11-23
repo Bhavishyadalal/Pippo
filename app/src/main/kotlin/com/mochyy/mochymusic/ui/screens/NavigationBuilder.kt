@@ -461,6 +461,10 @@ fun NavGraphBuilder.navigationBuilder(
         com.mochyy.mochymusic.ui.screens.settings.storage.StorageScreen(navController = navController)
     }
 
+    composable(com.mochyy.mochymusic.ui.screens.settings.storage.DownloadSettingsRoute) {
+        com.mochyy.mochymusic.ui.screens.settings.storage.DownloadSettingsScreen(navController)
+    }
+
     composable("experimental_settings") {
         com.mochyy.mochymusic.ui.screens.settings.ExperimentalSettingsScreen(navController = navController)
     }
