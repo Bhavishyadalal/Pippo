@@ -230,18 +230,33 @@ internal fun DownloadQualityGroup(
 ) {
     LabGroup {
         DownloadQuality.entries.forEach { option ->
-            val (title, description) = when (option) {
-                DownloadQuality.LOSSLESS -> R.string.aq_quality_lossless to R.string.aq_dl_desc_lossless
-                DownloadQuality.HIGH -> R.string.aq_quality_high to R.string.download_settings_high_detail
-                DownloadQuality.MEDIUM -> R.string.aq_quality_medium to R.string.download_settings_medium_detail
-                DownloadQuality.LOW -> R.string.aq_quality_low to R.string.download_settings_low_detail
-            }
-            QualityRow(stringResource(title), stringResource(description), selected = quality == option, enabled = true) {
+            QualityRow(
+                stringResource(option.downloadTitleRes),
+                stringResource(option.downloadDetailRes),
+                selected = quality == option,
+                enabled = true,
+            ) {
                 onQuality(option)
             }
         }
     }
 }
+
+internal val DownloadQuality.downloadTitleRes: Int
+    get() = when (this) {
+        DownloadQuality.LOSSLESS -> R.string.aq_quality_lossless
+        DownloadQuality.HIGH -> R.string.aq_quality_high
+        DownloadQuality.MEDIUM -> R.string.aq_quality_medium
+        DownloadQuality.LOW -> R.string.aq_quality_low
+    }
+
+internal val DownloadQuality.downloadDetailRes: Int
+    get() = when (this) {
+        DownloadQuality.LOSSLESS -> R.string.aq_dl_desc_lossless
+        DownloadQuality.HIGH -> R.string.download_settings_high_detail
+        DownloadQuality.MEDIUM -> R.string.download_settings_medium_detail
+        DownloadQuality.LOW -> R.string.download_settings_low_detail
+    }
 
 @Composable
 private fun Footnote(text: String) {

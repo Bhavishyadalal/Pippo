@@ -5,6 +5,7 @@
     <string name="download_settings_provider">Download provider</string>
     <string name="download_settings_folder">Download folder</string>
     <string name="download_settings_automatic">Automatic</string>
+    <string name="download_settings_use_automatic">Use Automatic</string>
     <string name="download_settings_search_order">Automatic follows your download order in Audio Lab.</string>
     <string name="download_settings_provider_note">New downloads use only the selected provider. The track must be available there as a downloadable file.</string>
     <string name="download_settings_provider_unavailable">%1$s · unavailable</string>
