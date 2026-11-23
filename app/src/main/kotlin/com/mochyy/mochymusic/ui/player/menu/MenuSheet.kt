@@ -59,6 +59,7 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Velocity
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.first
@@ -195,6 +196,8 @@ fun MenuSheetSurface(
     dismissEnabled: Boolean = true,
     revealProvider: ((Float) -> Unit)? = null,
     dragFromContent: Boolean = true,
+    showDragHandle: Boolean = true,
+    swipeDismissDistance: Dp? = null,
     content: @Composable ColumnScope.(dragHandle: Modifier) -> Unit,
 ) {
     val surface = MenuSurface
@@ -390,11 +393,14 @@ fun MenuSheetSurface(
         )
 
         fun settle(velocity: Float) {
+            if (closing) return
             val current = offsetPx.floatValue
+            val dismissAfter = swipeDismissDistance?.let { with(density) { it.toPx() } }
             val target = when {
                 !dismissEnabled -> restingOffsetPx
                 velocity > FlingThreshold -> if (current > restingOffsetPx * 0.6f) closedOffsetPx else restingOffsetPx
                 velocity < -FlingThreshold -> 0f
+                dismissAfter != null && current - restingOffsetPx >= dismissAfter -> closedOffsetPx
                 else -> listOf(0f, restingOffsetPx, closedOffsetPx).minBy { kotlin.math.abs(it - current) }
             }
             if (target >= closedOffsetPx && dismissEnabled) {
@@ -528,25 +534,27 @@ fun MenuSheetSurface(
                     }
                 },
                 orientation = Orientation.Vertical,
+                enabled = !closing,
                 onDragStopped = { velocity -> settle(velocity) },
             )
 
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-
-                    .height(38.dp)
-                    .then(dragHandle),
-                contentAlignment = Alignment.Center,
-            ) {
+            if (showDragHandle) {
                 Box(
                     modifier = Modifier
-                        .padding(top = 12.dp)
-                        .width(64.dp)
-                        .height(4.dp)
-                        .clip(CircleShape)
-                        .background(Color.White.copy(alpha = 0.5f))
-                )
+                        .fillMaxWidth()
+                        .height(38.dp)
+                        .then(dragHandle),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .padding(top = 12.dp)
+                            .width(64.dp)
+                            .height(4.dp)
+                            .clip(CircleShape)
+                            .background(Color.White.copy(alpha = 0.5f))
+                    )
+                }
             }
 
             CompositionLocalProvider(LocalMenuSheetClose provides closeSheet) {

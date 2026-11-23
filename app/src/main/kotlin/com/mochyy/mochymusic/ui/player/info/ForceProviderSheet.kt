@@ -3,6 +3,7 @@
 package com.mochyy.mochymusic.ui.player.info
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
@@ -25,6 +26,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -34,6 +36,8 @@ import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -41,11 +45,14 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -63,6 +70,7 @@ import com.mochyy.mochymusic.module.StreamOption
 import com.mochyy.mochymusic.modules.SourceModules
 import com.mochyy.mochymusic.playback.ProviderSwitch
 import com.mochyy.mochymusic.playback.ProviderSwitchState
+import com.mochyy.mochymusic.ui.player.menu.LocalMenuSheetClose
 import com.mochyy.mochymusic.ui.player.menu.MenuRowSurface
 import com.mochyy.mochymusic.ui.player.menu.MenuSheetSurface
 import com.mochyy.mochymusic.utils.rememberPreference
@@ -72,6 +80,7 @@ import com.mochyy.mochymusic.ui.component.pressBounce
 import com.mochyy.mochymusic.ui.theme.PippoColors
 import com.mochyy.mochymusic.ui.theme.PippoCorners
 import com.mochyy.mochymusic.ui.theme.PippoMotion
+import com.mochyy.mochymusic.ui.utils.silverSweep
 
 private val YouTubeQualities = listOf(AudioQuality.AUTO, AudioQuality.HIGH, AudioQuality.MEDIUM, AudioQuality.LOW)
 
@@ -100,18 +109,25 @@ fun ForceProviderSheet(currentProviderId: String?, currentOption: String? = null
     LaunchedEffect(Unit) { modules.refresh() }
     DisposableEffect(Unit) { onDispose { service.providerSwitch.acknowledge() } }
 
-    MenuSheetSurface(onDismiss = onDismiss, wrapHeight = true, dragFromContent = false) { _ ->
+    MenuSheetSurface(
+        onDismiss = onDismiss,
+        fullDetent = 0.74f,
+        wrapHeight = true,
+        dragFromContent = false,
+        showDragHandle = false,
+        swipeDismissDistance = 56.dp,
+    ) { dragHandle ->
+        ProviderSheetHeader(dragHandle)
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).navigationBarsPadding(),
+            modifier = Modifier.fillMaxWidth().navigationBarsPadding().verticalScroll(rememberScrollState()),
         ) {
             InfoColumn(modifier = Modifier.widthIn(max = 600.dp)) {
-                InfoSheetTitle(stringResource(R.string.pc_force_title))
-                Spacer(Modifier.height(4.dp))
                 Text(
                     text = stringResource(R.string.pc_force_switch_hint),
-                    color = InfoMuted,
+                    color = PippoColors.SecondaryText,
                     fontSize = 13.sp,
+                    lineHeight = 18.sp,
                 )
                 Spacer(Modifier.height(16.dp))
                 SwitchStatus(state, nameOf = modules::nameOf, onCancel = service.providerSwitch::cancel)
@@ -121,28 +137,71 @@ fun ForceProviderSheet(currentProviderId: String?, currentOption: String? = null
                     val available = enabled && modules.isUsable(id)
                     val choice = module?.let(modules::qualityChoice)
                     val picked = choice?.let { c -> modules.picks(id)[c.id] ?: c.options.firstOrNull()?.id }
-                    ProviderChoiceRow(
-                        providerId = id,
-                        name = modules.nameOf(id),
-                        isCurrent = id == currentProviderId,
-                        enabled = enabled,
-                        available = available,
-                        attempt = attempts[id],
-                        onEnabledChange = { service.setPlaybackProviderEnabled(id, it) },
-                        options = when {
-                            choice != null -> choice.options
-                            id == SourceModules.YouTubeId -> YouTubeQualities.map { StreamOption(it.name, stringResource(qualityLabelRes(it)), "") }
-                            else -> emptyList()
-                        },
-                        selectedOption = currentOption?.takeIf { id == currentProviderId }
-                            ?: if (id == SourceModules.YouTubeId) youTubeQuality else picked,
-                        onPick = { option ->
-                            val requested = option?.let { (choice?.id ?: SourceModules.QualityChoice) to it }
-                            service.providerSwitch.force(id, requested)
-                        },
-                    )
-                    Spacer(Modifier.height(8.dp))
+                    key(id) {
+                        ProviderChoiceRow(
+                            providerId = id,
+                            name = modules.nameOf(id),
+                            isCurrent = id == currentProviderId,
+                            enabled = enabled,
+                            available = available,
+                            attempt = attempts[id],
+                            onEnabledChange = { service.setPlaybackProviderEnabled(id, it) },
+                            options = when {
+                                choice != null -> choice.options
+                                id == SourceModules.YouTubeId -> YouTubeQualities.map {
+                                    StreamOption(it.name, stringResource(qualityLabelRes(it)), "")
+                                }
+                                else -> emptyList()
+                            },
+                            selectedOption = currentOption?.takeIf { id == currentProviderId }
+                                ?: if (id == SourceModules.YouTubeId) youTubeQuality else picked,
+                            onPick = { option ->
+                                val requested = option?.let { (choice?.id ?: SourceModules.QualityChoice) to it }
+                                service.providerSwitch.force(id, requested)
+                            },
+                        )
+                        Spacer(Modifier.height(8.dp))
+                    }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProviderSheetHeader(dragHandle: Modifier) {
+    val close = LocalMenuSheetClose.current
+    val title = stringResource(R.string.pc_force_title)
+    Column(
+        modifier = Modifier.fillMaxWidth().then(dragHandle),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Box(Modifier.fillMaxWidth().height(24.dp), contentAlignment = Alignment.Center) {
+            Box(
+                Modifier.width(36.dp).height(4.dp).clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.48f)),
+            )
+        }
+        Row(
+            modifier = Modifier.widthIn(max = 600.dp).fillMaxWidth()
+                .padding(start = InfoSidePadding, end = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = title,
+                modifier = Modifier.weight(1f).silverSweep(title),
+                color = Color.White,
+                fontSize = 24.sp,
+                lineHeight = 28.sp,
+                fontWeight = FontWeight.Bold,
+            )
+            IconButton(onClick = close) {
+                Icon(
+                    painter = painterResource(R.drawable.close),
+                    contentDescription = stringResource(R.string.dismiss),
+                    tint = PippoColors.SecondaryText,
+                    modifier = Modifier.size(18.dp),
+                )
             }
         }
     }
@@ -154,7 +213,7 @@ private fun SwitchStatus(state: ProviderSwitchState, nameOf: (String) -> String,
     val accent = when (state) {
         is ProviderSwitchState.Failed -> PippoColors.Error
         is ProviderSwitchState.Done -> PippoColors.Sage
-        else -> PippoColors.Accent
+        else -> Color(0xFFCFD4DB)
     }
     AnimatedVisibility(
         visible = state !is ProviderSwitchState.Idle,
@@ -227,13 +286,28 @@ private fun ProviderChoiceRow(
 ) {
     val shape = RoundedCornerShape(PippoCorners.Card)
     val rowPress = remember { MutableInteractionSource() }
-    val statusColor = if (enabled && isCurrent) PippoColors.Sage else PippoColors.SecondaryText
+    val active = enabled && isCurrent
+    val statusColor by animateColorAsState(
+        if (active) PippoColors.Sage else PippoColors.SecondaryText,
+        tween(PippoMotion.StateChange),
+        label = "providerStatus",
+    )
+    val cardColor by animateColorAsState(
+        if (active) lerp(MenuRowSurface, PippoColors.Sage, 0.055f) else MenuRowSurface,
+        tween(PippoMotion.StateChange),
+        label = "providerCard",
+    )
+    val outlineColor by animateColorAsState(
+        if (active) PippoColors.Sage.copy(alpha = 0.28f) else Color.White.copy(alpha = 0.075f),
+        tween(PippoMotion.StateChange),
+        label = "providerOutline",
+    )
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(shape)
-            .background(MenuRowSurface)
-            .border(1.dp, if (enabled && isCurrent) PippoColors.Sage.copy(alpha = 0.26f) else Color.White.copy(alpha = 0.07f), shape)
+            .background(cardColor)
+            .border(1.dp, outlineColor, shape)
             .padding(horizontal = 14.dp, vertical = 12.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -299,16 +373,16 @@ private fun ProviderChoiceRow(
             }
         }
         if (available && options.size > 1) {
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(4.dp))
             FlowRow(
                 modifier = Modifier.fillMaxWidth().selectableGroup(),
-                horizontalArrangement = Arrangement.spacedBy(7.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 options.forEach { option ->
                     QualityChip(
                         label = option.label,
                         selected = option.id == selectedOption,
+                        active = active,
                         onClick = { onPick(option.id) },
                     )
                 }
@@ -318,23 +392,40 @@ private fun ProviderChoiceRow(
 }
 
 @Composable
-private fun QualityChip(label: String, selected: Boolean, onClick: () -> Unit) {
+private fun QualityChip(label: String, selected: Boolean, active: Boolean, onClick: () -> Unit) {
     val press = remember { MutableInteractionSource() }
-    val shape = PippoCorners.Pill
+    val shape = RoundedCornerShape(9.dp)
+    val fill by animateColorAsState(
+        if (selected) Color.White.copy(alpha = if (active) 0.17f else 0.09f) else Color.Transparent,
+        tween(PippoMotion.Feedback),
+        label = "qualityFill",
+    )
+    val outline by animateColorAsState(
+        if (selected) Color.White.copy(alpha = if (active) 0.42f else 0.20f) else Color.Transparent,
+        tween(PippoMotion.Feedback),
+        label = "qualityOutline",
+    )
+    val textColor by animateColorAsState(
+        if (selected) Color.White else PippoColors.SecondaryText,
+        tween(PippoMotion.Feedback),
+        label = "qualityText",
+    )
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier
-            .sizeIn(minWidth = 48.dp, minHeight = 44.dp)
+            .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
             .pressBounce(press, pressedScale = 0.95f)
             .clip(shape)
-            .background(if (selected) PippoColors.Accent else Color.White.copy(alpha = 0.045f))
-            .border(1.dp, if (selected) Color.Transparent else Color.White.copy(alpha = 0.17f), shape)
             .selectable(selected, interactionSource = press, indication = RemoteFocus, role = Role.RadioButton, onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 7.dp),
+            .padding(vertical = 6.dp),
     ) {
         Text(
             text = label,
-            color = if (selected) PippoColors.OnAccent else PippoColors.Text,
+            modifier = Modifier
+                .background(fill, shape)
+                .border(1.dp, outline, shape)
+                .padding(horizontal = 10.dp, vertical = 7.dp),
+            color = textColor,
             fontSize = 12.sp,
             lineHeight = 16.sp,
             fontWeight = FontWeight.SemiBold,
