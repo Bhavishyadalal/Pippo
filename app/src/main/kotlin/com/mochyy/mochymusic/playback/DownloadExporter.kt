@@ -282,8 +282,11 @@ class DownloadExporter @Inject constructor(
             expected += span.length
         }
         if (spans.isEmpty() || (length > 0 && expected != length)) return null
-        val files = spans.mapNotNull { it.file }
-        if (files.size != spans.size) return null
+        val files = spans.map { span ->
+            val file = span.file ?: return null
+            if (file.length() != span.length) return null
+            file
+        }
         return CachedAudio(files, extensionOf(files.first()))
     }
 
@@ -297,6 +300,7 @@ class DownloadExporter @Inject constructor(
             at(0, "fLaC") -> "flac"
             // ogg holding opus is an .opus file, anything else in ogg stays .ogg
             at(0, "OggS") -> if (read >= 36 && (28..read - 8).any { at(it, "OpusHead") }) "opus" else "ogg"
+            at(0, "ADIF") || (head[0] == 0xFF.toByte() && (head[1].toInt() and 0xF6) == 0xF0) -> "aac"
             at(0, "ID3") || (head[0] == 0xFF.toByte() && (head[1].toInt() and 0xE0) == 0xE0) -> "mp3"
             at(0, "RIFF") -> "wav"
             head[0] == 0x1A.toByte() && head[1] == 0x45.toByte() && head[2] == 0xDF.toByte() && head[3] == 0xA3.toByte() -> "webm"

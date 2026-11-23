@@ -10,7 +10,7 @@
     <string name="download_settings_provider_note">New downloads use only the selected provider. The track must be available there as a downloadable file.</string>
     <string name="download_settings_provider_unavailable">%1$s · unavailable</string>
     <string name="download_settings_source_unavailable">This provider is unavailable for the selected quality. Choose another provider or Automatic.</string>
-    <string name="download_settings_provider_failed">A download could not find a compatible file with your provider choice. Select another provider and try again.</string>
+    <string name="download_settings_provider_failed">A download failed with this provider and quality. Retry the download or choose another provider.</string>
     <string name="download_settings_quality_note">Modules use the selected tier when they offer it. Lossless always requires a complete FLAC or ALAC file.</string>
     <string name="download_settings_high_detail">Higher quality compressed audio</string>
     <string name="download_settings_medium_detail">Standard quality with smaller files</string>
