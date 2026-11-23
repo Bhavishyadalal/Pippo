@@ -1146,7 +1146,7 @@ private fun PlayerSheet(
                     onCoveredChange = { styleQueueCovered = it },
                 )
                 // the ipod, the full video mode and the bedside each have their own close, a bar over them would just be in the way
-                if (!onTv && playerStyle != PlayerStyle.IPOD && playerStyle != PlayerStyle.VIDEO && !playerStyle.isBedside) PlayerHandle(
+                if (!onTv && !showProviderSwitch && playerStyle != PlayerStyle.IPOD && playerStyle != PlayerStyle.VIDEO && !playerStyle.isBedside) PlayerHandle(
                     state = handleState,
                     sheet = state,
                     statusBarTop = statusBarTopInset,
@@ -1224,7 +1224,7 @@ private fun PlayerSheet(
                         },
                 )
                 // a tv closes its player with the back button, it has no handle to drag
-                if (!onTv) PlayerHandle(
+                if (!onTv && !showProviderSwitch) PlayerHandle(
                     state = handleState,
                     sheet = state,
                     statusBarTop = 0.dp,
@@ -1804,7 +1804,7 @@ private fun PlayerSheet(
             EditTiles(studioParts)
 
             // over everything on the player, pages included; a tv closes it with the back button instead
-            if (!onTv) PlayerHandle(
+            if (!onTv && !showProviderSwitch) PlayerHandle(
                 state = handleState,
                 sheet = state,
                 statusBarTop = statusBarTopInset,
