@@ -308,8 +308,16 @@ constructor(
                         val losslessFailed = download.state == Download.STATE_FAILED &&
                             (providerFailure?.quality == DownloadQuality.LOSSLESS || causes.any { it is NoLosslessDownload })
                         unavailableLossless.update { if (losslessFailed) it + id else it - id }
-                        _providerFailures.update {
-                            if (providerFailure == null) it - id else it + (id to (providerFailure.providerId to providerFailure.quality))
+                        val failedSelection = if (download.state == Download.STATE_FAILED && finalException != null) {
+                            selections[id]?.let { selection -> selection.providerId?.let { it to selection.quality } }
+                                ?: providerFailure?.let { it.providerId to it.quality }
+                        } else null
+                        _providerFailures.update { failures ->
+                            when {
+                                failedSelection != null -> failures + (id to failedSelection)
+                                download.state == Download.STATE_FAILED -> failures
+                                else -> failures - id
+                            }
                         }
 
                         scope.launch {
