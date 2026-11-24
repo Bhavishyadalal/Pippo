@@ -27,7 +27,7 @@ import kotlin.math.PI
 import kotlin.math.sin
 
 // how tall the speaker's cone is; both ends of the volume line draw the same speaker at this size
-internal val SpeakerHeight = 11.dp
+internal val SpeakerHeight = 15.dp
 
 // the quiet speaker's width with room for its slash, and the loud one's out to its third wave, in speaker heights
 internal const val QuietSpeakerWidth = 0.72f
