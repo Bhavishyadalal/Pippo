@@ -41,6 +41,11 @@ import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -52,7 +57,7 @@ import com.mochyy.mochymusic.ui.player.studio.PlayerMenuAction
 import kotlin.math.roundToInt
 
 /** the bar's own height, from the volume line to the bottom of its buttons */
-internal val PlayerVolumeBarHeight = 76.dp
+internal val PlayerVolumeBarHeight = 84.dp
 
 /** the room under the bar, above where the navigation bar comes back */
 private val VolumeBarBottomGap = 10.dp
@@ -107,13 +112,19 @@ internal fun PlayerVolumeBar(
         ) {
             VolumeBarButtons.forEach { action ->
                 val on = isActive(action)
+                val label = stringResource(action.labelRes)
                 Box(contentAlignment = Alignment.Center, modifier = Modifier.weight(1f)) {
                     PressScaleActionButton(
-                        icon = action.icon,
+                        icon = if (action == PlayerMenuAction.LYRICS) R.drawable.pippo_player_lyrics else R.drawable.pippo_player_queue,
                         tint = if (on) Color.White else Color.White.copy(alpha = 0.85f),
                         containerColor = if (on) Color.White.copy(alpha = 0.32f) else Color.White.copy(alpha = 0.15f),
                         onClick = { onAction(action) },
+                        modifier = Modifier.semantics {
+                            contentDescription = label
+                            role = Role.Button
+                        },
                         hasShadow = false,
+                        size = 48.dp,
                     )
                 }
             }
