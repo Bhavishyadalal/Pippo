@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pippo_playback_read_ahead">Playback read-ahead</string>
+    <string name="pippo_playback_read_ahead_summary">Cache the playing song and prepare the next three.</string>
+    <string name="pippo_playback_read_ahead_detail">While playback is steady, Pippo caches supported streams and prepares the start of the next three songs. Temporary audio is cleared after five more songs play in the same session. Data Saver pauses read-ahead.</string>
+</resources>

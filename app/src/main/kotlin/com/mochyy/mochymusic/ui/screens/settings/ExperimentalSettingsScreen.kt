@@ -67,6 +67,10 @@ fun ExperimentalSettingsScreen(navController: NavController) {
     val crossmixTools = crossmixTestItems(isVisible = crossmixTestTools)
     val (sourceBanner, onSourceBannerChange) = rememberPreference(ShowStreamSourceToastKey, defaultValue = false)
     val (forcePlayback, onForcePlaybackChange) = rememberPreference(ForcePlaybackKey, defaultValue = false)
+    val (readAhead, onReadAheadChange) = rememberPreference(
+        com.mochyy.mochymusic.constants.PlaybackReadAheadKey,
+        defaultValue = false,
+    )
     val (streamBackend, onStreamBackendChange) = rememberEnumPreference(
         com.mochyy.mochymusic.constants.StreamBackendKey,
         defaultValue = com.mochyy.mochymusic.constants.StreamBackend.INNERTUBEX,
@@ -184,6 +188,18 @@ fun ExperimentalSettingsScreen(navController: NavController) {
                             trailingContent = {
                                 AppSwitch(checked = forcePlayback, onCheckedChange = onForcePlaybackChange)
                             }
+                        )
+                    )
+                    add(
+                        SettingsItem(
+                            title = { Text(stringResource(R.string.pippo_playback_read_ahead)) },
+                            highlightKey = "Playback read-ahead",
+                            descriptionText = stringResource(R.string.pippo_playback_read_ahead_summary),
+                            detail = stringResource(R.string.pippo_playback_read_ahead_detail),
+                            icon = painterResource(R.drawable.download),
+                            iconShape = androidx.compose.foundation.shape.CircleShape,
+                            onClick = { onReadAheadChange(!readAhead) },
+                            trailingContent = { AppSwitch(checked = readAhead, onCheckedChange = onReadAheadChange) },
                         )
                     )
                     add(

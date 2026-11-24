@@ -1421,7 +1421,7 @@ private fun CoverPicture(thumbnailUrl: String?, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val imageRequest = remember(thumbnailUrl) {
         ImageRequest.Builder(context)
-            .data(thumbnailUrl?.resize(1200, 1200))
+            .data(thumbnailUrl?.let { com.mochyy.mochymusic.playback.PlaybackReadAhead.artworkUrl(it) })
             .allowHardware(true)
             .size(CoilSize(1200, 1200))
             .precision(Precision.INEXACT)

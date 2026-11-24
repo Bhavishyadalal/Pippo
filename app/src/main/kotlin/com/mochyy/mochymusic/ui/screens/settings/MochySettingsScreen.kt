@@ -281,6 +281,7 @@ private val SettingsIndex = listOf(
     SettingsEntry("Repeat initial setup", "Experimental", "experimental_settings", "onboarding wizard setup"),
     SettingsEntry("Show where songs play from", "Experimental", "experimental_settings", "source banner toast apple music monochrome youtube"),
     SettingsEntry("Force playback", "Experimental", "experimental_settings", "fallback skip error stream failed youtube"),
+    SettingsEntry("Playback read-ahead", "Experimental", "experimental_settings", "buffer cache preload slow connection next songs"),
 )
 
 internal val BubbleColor = Color(0xFF1C1C1E)
