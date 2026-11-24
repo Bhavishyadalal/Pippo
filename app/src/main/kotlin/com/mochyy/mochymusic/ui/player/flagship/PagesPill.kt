@@ -33,6 +33,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
@@ -65,7 +66,7 @@ import com.mochyy.mochymusic.ui.component.RemoteFocus
 // the page's clip starts as the pill's round ends and squares off as it fills the screen, no outline
 internal val FlagshipPillLook = PlayerCardLook(PillHeight / 2, 0f, 0f, 0f, 0f, 0.dp)
 
-internal val PillIconSize = 12.5.dp
+internal val PillIconSize = 23.dp
 
 // the half whose page is open, a touch brighter
 private val PillLit = Color.White.copy(alpha = 0.2f)
@@ -146,7 +147,8 @@ internal fun PagesPill(
                 val lyricsPath = Path()
                 val queuePath = Path()
                 val lineWidth = 1.dp.toPx()
-                val lineHeight = 15.5.dp.toPx()
+                val lineHeight = 22.dp.toPx()
+                val outline = Stroke(width = 1.dp.toPx())
                 onDrawBehind {
                     val split = split()
                     val half = size.width / 2f
@@ -156,9 +158,22 @@ internal fun PagesPill(
                     val toEnd = if (startOnLeft) half else -half
                     val startRect = Rect(if (startOnLeft) 0f else half, 0f, if (startOnLeft) half else size.width, size.height)
                     val endRect = startRect.translate(toEnd, 0f)
-                    pillHalf(lyricsPath, startRect.translate(toEnd * lyricsSlide(), 0f), startOnLeft, inner, shown(PlayerPage.LYRICS), lyricsLit)
-                    pillHalf(queuePath, endRect, !startOnLeft, inner, shown(PlayerPage.QUEUE), queueLit)
-                    val line = 0.38f * (1f - split)
+                    val lyricsShown = shown(PlayerPage.LYRICS)
+                    val queueShown = shown(PlayerPage.QUEUE)
+                    pillHalf(lyricsPath, startRect.translate(toEnd * lyricsSlide(), 0f), startOnLeft, inner, lyricsShown, lyricsLit, outline, split)
+                    pillHalf(queuePath, endRect, !startOnLeft, inner, queueShown, queueLit, outline, split)
+                    val joined = (1f - split) * minOf(lyricsShown, queueShown)
+                    if (joined > 0.002f && size.minDimension > outline.width) {
+                        val inset = outline.width / 2f
+                        drawRoundRect(
+                            color = Color.White.copy(alpha = 0.14f * joined),
+                            topLeft = Offset(inset, inset),
+                            size = Size(size.width - outline.width, size.height - outline.width),
+                            cornerRadius = CornerRadius(size.height / 2f - inset),
+                            style = outline,
+                        )
+                    }
+                    val line = 0.19f * joined
                     if (line > 0.002f) {
                         drawRect(
                             color = Color.White.copy(alpha = line),
@@ -170,7 +185,7 @@ internal fun PagesPill(
             },
     ) {
         PillHalf(
-            painter = painterResource(R.drawable.flagship_lyrics),
+            painter = painterResource(R.drawable.pippo_player_lyrics),
             description = lyricsLabel,
             enabled = openPage == PlayerPage.NONE,
             shown = { shown(PlayerPage.LYRICS) },
@@ -182,7 +197,7 @@ internal fun PagesPill(
             },
         )
         PillHalf(
-            painter = painterResource(R.drawable.flagship_queue),
+            painter = painterResource(R.drawable.pippo_player_queue),
             description = if (openPage == PlayerPage.QUEUE) lyricsLabel else queueLabel,
             enabled = true,
             shown = { shown(PlayerPage.QUEUE) },
@@ -204,12 +219,15 @@ internal fun PagesPill(
 private fun PlayerPage.pillIndex(): Int = if (this == PlayerPage.QUEUE) 1 else 0
 
 // one half of the pages pill, small and faint while it's still coming back
-private fun DrawScope.pillHalf(path: Path, rect: Rect, onLeft: Boolean, inner: Float, shown: Float, lit: Boolean) {
+private fun DrawScope.pillHalf(
+    path: Path, rect: Rect, onLeft: Boolean, inner: Float, shown: Float, lit: Boolean, outline: Stroke, split: Float,
+) {
     if (shown <= 0.002f) return
     path.setPillHalf(rect, size.height / 2f, inner, onLeft)
     val grow = 0.7f + 0.3f * shown
     scale(grow, grow, rect.center) {
         drawPath(path, PillFill.copy(alpha = PillFill.alpha * shown))
+        if (split > 0.002f) drawPath(path, Color.White.copy(alpha = 0.14f * shown * split), style = outline)
         if (lit) drawPath(path, PillLit.copy(alpha = PillLit.alpha * shown))
     }
 }
@@ -271,8 +289,8 @@ internal fun FlagshipPillMorphSurface(
         }
     }
     if (!active) return
-    val lyricsIcon = painterResource(R.drawable.flagship_lyrics)
-    val queueIcon = painterResource(R.drawable.flagship_queue)
+    val lyricsIcon = painterResource(R.drawable.pippo_player_lyrics)
+    val queueIcon = painterResource(R.drawable.pippo_player_queue)
     Spacer(
         modifier = modifier
             .fillMaxSize()

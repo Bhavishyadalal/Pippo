@@ -5,10 +5,12 @@ import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.awaitHorizontalTouchSlopOrCancellation
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.horizontalDrag
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -54,6 +56,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.painter.Painter
@@ -74,7 +77,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.mochyy.mochymusic.LocalPlayerConnection
 import com.mochyy.mochymusic.R
@@ -90,41 +92,42 @@ import kotlinx.coroutines.launch
 import kotlin.math.abs
 import com.mochyy.mochymusic.ui.component.RemoteFocus
 
-// the volume's row, the room under it and the pills' row (the pill is drawn smaller inside, the rest is touch room)
-private val VolumeRowHeight = 28.dp
-private val PillGap = 15.dp
-private val PillTouchHeight = 41.dp
+private val VolumeRowHeight = 48.dp
+private val PillGap = 6.dp
 
-// the pills as the design has them: 294 by 67 of its 1172 units across
-internal val PillHeight = 23.dp
-internal val PillWidth = 99.dp
+internal val PillHeight = 48.dp
+internal val PillWidth = 112.dp
 
 // the bar from the top of the volume line to the bottom of its pills' touch room
-internal val FlagshipBarHeight = VolumeRowHeight + PillGap + PillTouchHeight
+internal val FlagshipBarHeight = VolumeRowHeight + PillGap + PillHeight
 
 // the room under the bar, above where the navigation bar comes back
 private val FlagshipBarBottomGap = 8.dp
 
-// the caller pads the bar 26dp in, this brings everything in to the design's edges
-private val BarInset = 18.dp
+private val BarInset = 5.dp
 
 // barely there, so the picture behind shows through
-internal val PillFill = Color.White.copy(alpha = 0.1f)
+internal val PillFill = Color.White.copy(alpha = 0.14f)
+private val OutputShape = RoundedCornerShape(50)
+private val OutputFill = Brush.verticalGradient(
+    listOf(Color.White.copy(alpha = 0.18f), Color.White.copy(alpha = 0.09f)),
+)
+private val VolumeShape = RoundedCornerShape(19.dp)
 
 // the volume line at rest and while it's held, and how far past its end it can be stretched
-private val TrackThin = 6.5.dp
-private val TrackThick = 12.dp
-private val StretchMax = 26.dp
-private val SpeakerGap = 10.dp
+private val TrackThin = 5.dp
+private val TrackThick = 8.dp
+private val StretchMax = 10.dp
+private val SpeakerGap = 12.dp
+private val VolumeInset = 15.dp
 
 // no bounce, about a third of a second, quick enough that a held volume key never lags behind
 private val VolumeGlide = spring<Float>(dampingRatio = 1f, stiffness = 400f)
 
 private val PillText get() = TextStyle(
     fontFamily = InterFontFamily,
-    fontWeight = FontWeight.Bold,
-    fontSize = 9.5.sp,
-    letterSpacing = (-0.03).em,
+    fontWeight = FontWeight.SemiBold,
+    fontSize = 12.sp,
     color = Color.White,
 )
 
@@ -159,14 +162,14 @@ internal fun FlagshipBottomBar(
             .height(FlagshipBarHeight)
             .padding(horizontal = BarInset),
     ) {
-        AppleVolume(listening = !preview)
+        FlagshipVolumeSlider(listening = !preview)
         Spacer(Modifier.height(PillGap))
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(PillTouchHeight),
+                .height(PillHeight),
         ) {
             OutputPill(onClick = { onAction(PlayerMenuAction.OUTPUT) }, modifier = Modifier.weight(1f, fill = false))
             Spacer(Modifier.width(12.dp))
@@ -180,9 +183,9 @@ internal fun FlagshipBottomBar(
     }
 }
 
-// the volume the way the iphone does it: a thin line that swells under the finger, stretches past its ends and springs back
+// The track fills and stretches during a drag, while the container and touch area stay put.
 @Composable
-private fun AppleVolume(listening: Boolean) {
+private fun FlagshipVolumeSlider(listening: Boolean) {
     val volume = rememberMusicVolume(listening)
     val scope = rememberCoroutineScope()
     // read while drawing only, so a drag redraws the line at the screen's own rate and recomposes nothing
@@ -206,7 +209,10 @@ private fun AppleVolume(listening: Boolean) {
         modifier = Modifier
             .fillMaxWidth()
             .height(VolumeRowHeight)
-            .pointerInput(volume) {
+            .background(Color.Black.copy(alpha = 0.21f), VolumeShape)
+            .border(1.dp, Color.White.copy(alpha = 0.12f), VolumeShape)
+            .pointerInput(volume, listening) {
+                if (!listening) return@pointerInput
                 val reach = StretchMax.toPx()
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
@@ -218,7 +224,8 @@ private fun AppleVolume(listening: Boolean) {
                     } ?: return@awaitEachGesture
                     settle[0]?.cancel()
                     scope.launch { held.animateTo(1f, spring(dampingRatio = 0.7f, stiffness = 500f)) }
-                    val track = (size.width - speakersWidth(SpeakerHeight.toPx()) - SpeakerGap.toPx() * 2f).coerceAtLeast(1f)
+                    val track = (size.width - speakersWidth(SpeakerHeight.toPx()) -
+                        (VolumeInset.toPx() + SpeakerGap.toPx()) * 2f).coerceAtLeast(1f)
                     // grab the line where it's drawn, even if it's still gliding after a key press
                     val start = line.value
                     fun follow() {
@@ -251,13 +258,27 @@ private fun AppleVolume(listening: Boolean) {
                     scope.launch { held.animateTo(0f, spring(dampingRatio = 0.8f, stiffness = 380f)) }
                 }
             }
+            .pointerInput(volume, listening) {
+                if (!listening) return@pointerInput
+                detectTapGestures { position ->
+                    val inset = VolumeInset.toPx() + SpeakerGap.toPx()
+                    val start = inset + QuietSpeakerWidth * SpeakerHeight.toPx()
+                    val end = size.width - inset - LoudSpeakerWidth * SpeakerHeight.toPx()
+                    if (end > start) {
+                        volume.drag(((position.x - start) / (end - start)).coerceIn(0f, 1f))
+                        volume.release()
+                    }
+                }
+            }
             .semantics {
                 contentDescription = description
                 progressBarRangeInfo = ProgressBarRangeInfo(volume.shown, 0f..1f)
-                setProgress { target ->
-                    volume.drag(target.coerceIn(0f, 1f))
-                    volume.release()
-                    true
+                if (listening) {
+                    setProgress { target ->
+                        volume.drag(target.coerceIn(0f, 1f))
+                        volume.release()
+                        true
+                    }
                 }
             }
             .drawWithCache {
@@ -265,6 +286,7 @@ private fun AppleVolume(listening: Boolean) {
                 val quietPx = QuietSpeakerWidth * iconPx
                 val loudPx = LoudSpeakerWidth * iconPx
                 val gapPx = SpeakerGap.toPx()
+                val insetPx = VolumeInset.toPx()
                 val reach = StretchMax.toPx()
                 val body = speakerBody(iconPx)
                 val stroke = waveStroke(iconPx)
@@ -273,26 +295,30 @@ private fun AppleVolume(listening: Boolean) {
                     val s = stretch.floatValue
                     val pull = (abs(s) / reach).coerceIn(0f, 1f)
                     val cy = size.height / 2f
-                    val left = quietPx + gapPx + minOf(s, 0f)
-                    val right = size.width - loudPx - gapPx + maxOf(s, 0f)
-                    // a little thinner the further it's stretched, like a band pulled tight
+                    val left = insetPx + quietPx + gapPx + minOf(s, 0f)
+                    val right = size.width - insetPx - loudPx - gapPx + maxOf(s, 0f)
+                    val trackWidth = (right - left).coerceAtLeast(0f)
                     val thickness = (TrackThin.toPx() + (TrackThick.toPx() - TrackThin.toPx()) * h) * (1f - 0.18f * pull)
                     val radius = CornerRadius(thickness / 2f)
                     val top = cy - thickness / 2f
-                    drawRoundRect(Color.White.copy(alpha = 0.22f + 0.08f * h), Offset(left, top), Size(right - left, thickness), radius)
+                    drawRoundRect(Color.White.copy(alpha = 0.26f + 0.08f * h), Offset(left, top), Size(trackWidth, thickness), radius)
                     val level = if (volume.isDragging) volume.shown else line.value
-                    val filled = (right - left) * level.coerceIn(0f, 1f)
+                    val filled = trackWidth * level.coerceIn(0f, 1f)
                     if (filled > 0.5f) {
-                        drawRoundRect(Color.White, Offset(left, top), Size(filled.coerceAtLeast(thickness), thickness), radius)
+                        drawRoundRect(Color.White, Offset(left, top), Size(filled.coerceIn(minOf(thickness, trackWidth), trackWidth), thickness), radius)
+                    }
+                    if (trackWidth > thickness) {
+                        val handleX = (left + filled).coerceIn(left + thickness / 2f, right - thickness / 2f)
+                        drawCircle(Color.White, radius = (4.5f + 0.8f * h).dp.toPx(), center = Offset(handleX, cy))
                     }
                     val alpha = 0.6f + 0.4f * h.coerceAtMost(1f)
                     drawQuietSpeaker(
-                        body, x = minOf(s, 0f) * 0.55f, cy, iconPx,
+                        body, x = insetPx + minOf(s, 0f) * 0.55f, cy, iconPx,
                         grow = 1f + 0.1f * h + 0.12f * if (s < 0f) pull else 0f,
                         alpha = alpha, mute = speakers.mute.value,
                     )
                     drawLoudSpeaker(
-                        body, stroke, x = size.width - loudPx + maxOf(s, 0f) * 0.55f, cy, iconPx,
+                        body, stroke, x = size.width - insetPx - loudPx + maxOf(s, 0f) * 0.55f, cy, iconPx,
                         grow = 1f + 0.1f * h + 0.12f * if (s > 0f) pull else 0f,
                         alpha = alpha, level = level, echo = speakers.echo.value,
                     )
@@ -315,14 +341,14 @@ private fun OutputPill(onClick: () -> Unit, modifier: Modifier = Modifier) {
     val active = devices.firstOrNull { it.isActive }
 
     val label = when {
-        isCasting -> castingTo ?: stringResource(R.string.flagship_output_speaker)
+        isCasting -> castingTo?.takeIf { it.isNotBlank() } ?: stringResource(PlayerMenuAction.OUTPUT.labelRes)
         active == null -> stringResource(R.string.flagship_output_speaker)
         active.name.isNotBlank() -> active.name
         else -> stringResource(active.kind.labelRes())
     }
     val painter: Painter = when {
         isCasting -> rememberVectorPainter(Icons.Rounded.Cast)
-        active == null || active.kind == AudioOutputs.Kind.PHONE -> painterResource(R.drawable.flagship_output_phone)
+        active == null || active.kind == AudioOutputs.Kind.PHONE -> painterResource(R.drawable.pippo_player_speaker)
         else -> rememberVectorPainter(active.kind.icon())
     }
     val description = stringResource(R.string.flagship_output_change)
@@ -331,26 +357,42 @@ private fun OutputPill(onClick: () -> Unit, modifier: Modifier = Modifier) {
         contentAlignment = Alignment.CenterStart,
         modifier = modifier
             .fillMaxHeight()
-            .clickable(interactionSource = source, indication = RemoteFocus, onClick = onClick)
-            .semantics {
-                contentDescription = description
-                role = Role.Button
-            },
+            .clickable(
+                interactionSource = source,
+                indication = RemoteFocus,
+                onClickLabel = description,
+                role = Role.Button,
+                onClick = onClick,
+            ),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier
-                .widthIn(min = PillWidth, max = 200.dp)
+                .widthIn(max = 224.dp)
                 .height(PillHeight)
                 .pressShrink(source)
-                .clip(RoundedCornerShape(50))
-                .background(PillFill)
-                .padding(horizontal = 11.dp),
+                .clip(OutputShape)
+                .background(OutputFill)
+                .border(1.dp, Color.White.copy(alpha = 0.14f), OutputShape)
+                .padding(start = 8.dp, end = 10.dp),
         ) {
-            Icon(painter = painter, contentDescription = null, tint = Color.White, modifier = Modifier.size(11.5.dp))
-            Spacer(Modifier.width(5.dp))
-            Text(text = label, style = PillText, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Box(Modifier.size(32.dp).background(Color.White.copy(alpha = 0.11f), OutputShape), contentAlignment = Alignment.Center) {
+                Icon(painter = painter, contentDescription = null, tint = Color.White, modifier = Modifier.size(19.dp))
+            }
+            Text(
+                text = label,
+                style = PillText,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, fill = false),
+            )
+            Icon(
+                painter = painterResource(R.drawable.navigate_next),
+                contentDescription = null,
+                tint = Color.White.copy(alpha = 0.72f),
+                modifier = Modifier.size(16.dp),
+            )
         }
     }
 }
@@ -360,7 +402,7 @@ private fun OutputPill(onClick: () -> Unit, modifier: Modifier = Modifier) {
 internal fun Modifier.pressShrink(source: MutableInteractionSource): Modifier {
     val pressed by source.collectIsPressedAsState()
     val scale = animateFloatAsState(
-        targetValue = if (pressed) 0.9f else 1f,
+        targetValue = if (pressed) 0.94f else 1f,
         animationSpec = spring(dampingRatio = 0.5f, stiffness = 700f),
         label = "flagshipPillPress",
     )
