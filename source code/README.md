@@ -27,3 +27,9 @@ The ZIP contains the complete tracked source from the [stable snapshot](https://
 [Download the JioSaavn integration ZIP](https://raw.githubusercontent.com/Bhavishyadalal/Pippo/main/source%20code/Pippo-JioSaavn-integration.zip). It contains the resolver, module API, recording matcher, offline fixtures, and Pippo playback and download wiring from the [stable snapshot](https://github.com/Bhavishyadalal/Pippo/tree/9a68abbc686d8d54b957a0118c937add5c625955).
 
 **SHA-256** `396782de684ec666e156ece32ec71a1d3c07d61ce0128981ff73c257adf6227f`
+
+## Amber Classic and Studio for desktop
+
+[Download both updated Amber editions](https://raw.githubusercontent.com/Bhavishyadalal/Pippo/main/source%20code/Amber_Both_UI_Versions_Music_Sources.zip) with music source settings, playback source and quality badges, and Home and queue recommendations. The ZIP contains both source packages and Windows rebuild instructions.
+
+**SHA-256** `49442ccbd8c82eedf46c825f35dc5f4efdca79215a9ea0223a424e0dcbbc0d39`
