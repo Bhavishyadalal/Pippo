@@ -471,6 +471,7 @@ val UpdatePromptSnoozedAtKey = longPreferencesKey("update_prompt_snoozed_at")
 val ShowStreamSourceToastKey = booleanPreferencesKey("show_stream_source_toast")
 /** A song a source module or Monochrome can't play falls back to YouTube, and one nothing can play is skipped. */
 val ForcePlaybackKey = booleanPreferencesKey("forcePlayback")
+val PlaybackReadAheadKey = booleanPreferencesKey("playbackReadAhead")
 
 val ShowLikedPlaylistKey = booleanPreferencesKey("show_liked_playlist")
 val ShowDownloadedPlaylistKey = booleanPreferencesKey("show_downloaded_playlist")
