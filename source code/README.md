@@ -21,3 +21,9 @@ This archive includes the [stable snapshot](https://github.com/Bhavishyadalal/Pi
 The ZIP contains the complete tracked source from the [stable snapshot](https://github.com/Bhavishyadalal/Pippo/tree/258d02e1ec9db2ec6493f49e7f1817455ba1b26a), including Android build files, assets, all Markdown documentation, and the original license and notices. Start with the bundled `README.md` for build instructions.
 
 **SHA-256** `b7ff42b02fc5e5ada27e833f5da270e18e7af8588c13e91b9b539a3d6cabad86`
+
+## JioSaavn integration reference
+
+[Download the JioSaavn integration ZIP](https://raw.githubusercontent.com/Bhavishyadalal/Pippo/main/source%20code/Pippo-JioSaavn-integration.zip). It contains the resolver, module API, recording matcher, offline fixtures, and Pippo playback and download wiring from the [stable snapshot](https://github.com/Bhavishyadalal/Pippo/tree/9a68abbc686d8d54b957a0118c937add5c625955).
+
+**SHA-256** `396782de684ec666e156ece32ec71a1d3c07d61ce0128981ff73c257adf6227f`
