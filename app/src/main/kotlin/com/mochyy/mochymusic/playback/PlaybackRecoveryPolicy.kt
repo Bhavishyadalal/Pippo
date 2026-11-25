@@ -18,3 +18,10 @@ internal fun mayResumeRecovery(expectedId: String?, currentId: String?, wantsPla
 
 /** A disappearing DAC must not leave a handover waiting for its playback head forever. */
 internal fun finishOutputDrain(ended: Boolean, elapsedMs: Long): Boolean = ended || elapsedMs >= 3_000L
+
+/** Bluetooth uses the normal PCM path; avoid offload handovers on wireless outputs. */
+internal fun shouldUseAudioOffload(enabled: Boolean, transitions: Boolean, effects: Boolean, bluetooth: Boolean): Boolean =
+    enabled && !transitions && !effects && !bluetooth
+
+internal fun needsOutputRecovery(stalled: Int, wrongRoute: Int, missing: Int): Boolean =
+    stalled >= 3 || wrongRoute >= 3 || missing >= 4

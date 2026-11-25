@@ -74,6 +74,14 @@ class CrossmixClockSink(
         super.flush()
     }
 
+    override fun reset() {
+        lastTimestampUs = Long.MIN_VALUE
+        spectrum?.flush()
+        appliedCurve = null
+        appliedReplayGain = Float.NaN
+        super.reset()
+    }
+
     override fun setOutputStreamOffsetUs(outputStreamOffsetUs: Long) {
         processor.onStreamOffset(outputStreamOffsetUs)
         spectrum?.onStreamOffset(outputStreamOffsetUs)

@@ -152,6 +152,14 @@ class PrecisionSink(
         pending = null
         pendingSource = null
         resampler?.reset()
+        resampler = null
+        inputFormat = null
+        handedFormat = null
+        outputChannels = null
+        bufferSize = 0
+        processing = false
+        configuredAllowed = false
+        configuredTarget = null
         super.reset()
     }
 

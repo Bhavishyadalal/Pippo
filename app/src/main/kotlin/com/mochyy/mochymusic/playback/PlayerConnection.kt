@@ -27,6 +27,7 @@ import com.mochyy.mochymusic.extensions.getQueueWindows
 import com.mochyy.mochymusic.extensions.isAutoplay
 import com.mochyy.mochymusic.extensions.isManualQueued
 import com.mochyy.mochymusic.extensions.withAutoplay
+import com.mochyy.mochymusic.extensions.withManualQueued
 import com.mochyy.mochymusic.extensions.metadata
 import com.mochyy.mochymusic.models.MediaMetadata
 import com.mochyy.mochymusic.songedit.SongEdits
@@ -516,9 +517,19 @@ class PlayerConnection(
         val index = mediaIndexOf(uid)
         if (index == C.INDEX_UNSET || index == player.currentMediaItemIndex) return
         try {
-            val item = player.getMediaItemAt(index).withAutoplay(false)
-            player.removeMediaItem(index)
-            service.playNext(listOf(item))
+            val current = player.currentMediaItemIndex
+            if (current == C.INDEX_UNSET) return
+            val item = player.getMediaItemAt(index).withAutoplay(false).withManualQueued(true)
+            player.replaceMediaItem(index, item)
+            if (player.shuffleModeEnabled) {
+                val order = playOrder()
+                if (!order.remove(index)) return
+                order.add(order.indexOf(current) + 1, index)
+                player.setShuffleOrder(DefaultShuffleOrder(order.toIntArray(), System.currentTimeMillis()))
+            } else {
+                val next = if (index < current) current else current + 1
+                if (index != next) player.moveMediaItem(index, next)
+            }
         } catch (e: Exception) {
             Timber.tag(TAG).e(e, "Error in playQueueItemNext")
         }

@@ -540,6 +540,8 @@ class MusicService :
     }
 
     private var lastAudioRoute: AudioRouteIdentity? = null
+    private val bluetoothOutput = MutableStateFlow(false)
+    private var useAudioOffload = false
     private var lastPreferredRouteId: Int? = null
     private var externalRouteWasMissing = false
     private var outputRouteGeneration = 0L
@@ -594,6 +596,7 @@ class MusicService :
             (preferenceChanged && (previous?.external == true || route.external))
         externalRouteWasMissing = false
         lastAudioRoute = route
+        bluetoothOutput.value = route.bluetooth
         if (changed) {
             outputRouteGeneration++
             outputMonitorJob?.cancel()
@@ -640,7 +643,7 @@ class MusicService :
             !transport.isFading && !isCrossfading && !crossmixDirector.isTransitioning
 
     private fun watchPlatformOutput(target: Player) {
-        if (target !== player) return
+        if (destroying || target !== player) return
         val deck = player
         if (!target.isPlaying) {
             outputMonitorJob?.cancel()
@@ -680,7 +683,8 @@ class MusicService :
                     continue
                 }
                 val sample = monitor.sample()
-                missingOutput = if (sample == null || (hasPreferredRoute && sample.deviceId == null)) missingOutput + 1 else 0
+                missingOutput = if (sample == null || sample.playState != android.media.AudioTrack.PLAYSTATE_PLAYING ||
+                    ((hasPreferredRoute || route.bluetooth) && sample.deviceId == null)) missingOutput + 1 else 0
                 val prior = previous
                 val sameTrack = sample != null && prior?.track === sample.track
                 val framesAdvanced = prior?.frames != sample?.frames
@@ -690,7 +694,8 @@ class MusicService :
                     if (sameTrack) wrongRoute + 1 else 1
                 } else 0
                 previous = sample
-                if (stalled < 3 && wrongRoute < 3 && missingOutput < 4) continue
+                if (!needsOutputRecovery(stalled, wrongRoute, missingOutput)) continue
+                Timber.tag(TAG).w("Audio output unhealthy: stalled=$stalled wrongRoute=$wrongRoute missing=$missingOutput expected=${route.id} actual=$actualRouteId state=${sample?.playState}")
 
                 val preferred = audioOutputs.preferredDevice()
                 // A device change may be queued on Android's routing callback. Let it take
@@ -1393,12 +1398,14 @@ class MusicService :
             dataStore.data.map { it[AudioOffload] ?: false },
             dataStore.data.map { transitionModeOf(it) != CrossmixMode.OFF },
             audioLab.shapesSound,
-        ) { offloadPref, transitions, shapesSound ->
-             offloadPref && !transitions && !shapesSound
+            bluetoothOutput,
+        ) { offloadPref, transitions, shapesSound, bluetooth ->
+             shouldUseAudioOffload(offloadPref, transitions, shapesSound, bluetooth)
         }.distinctUntilChanged()
         .collectLatest(scope) { useOffload ->
-             player.setOffloadEnabled(useOffload)
-             secondaryPlayer?.setOffloadEnabled(useOffload)
+             useAudioOffload = useOffload
+             (playerCrossmixProcessors.keys.filterIsInstance<ExoPlayer>() + listOf(player)).distinct()
+                 .forEach { it.setOffloadEnabled(useOffload) }
         }
 
         // Discord needs the artist's picture (from the library) and the codec (from the decoder),
@@ -1681,8 +1688,7 @@ class MusicService :
         player.addAnalyticsListener(inspector)
         player.setPreferredAudioDevice(audioOutputs.preferredDevice())
 
-        val transitions = transitionModeOf(prefs) != CrossmixMode.OFF
-        player.setOffloadEnabled(!transitions && prefs[AudioOffload] == true)
+        player.setOffloadEnabled(useAudioOffload && !bluetoothOutput.value)
         player.skipSilenceEnabled = skipSilence
         player.addAnalyticsListener(PlaybackStatsListener(false, this))
         if (publish) _playerFlow.value = player
@@ -3309,6 +3315,8 @@ class MusicService :
         audioOutputRecoveryAttempts = 0
         outputMonitorJob?.cancel()
         outputMonitorJob = null
+        routeRefreshJob?.cancel()
+        routeRefreshJob = null
         providerOccurrence++
         providerSwitch.onMediaChanged()
         // A recovery belongs to the old item; it must not prepare or skip a newly selected song.
@@ -3707,7 +3715,8 @@ class MusicService :
         }
 
         if (events.containsAny(Player.EVENT_IS_PLAYING_CHANGED, Player.EVENT_MEDIA_ITEM_TRANSITION,
-                Player.EVENT_POSITION_DISCONTINUITY, Player.EVENT_TRACKS_CHANGED)) {
+                Player.EVENT_POSITION_DISCONTINUITY, Player.EVENT_TRACKS_CHANGED,
+                Player.EVENT_PLAYBACK_STATE_CHANGED, Player.EVENT_PLAYBACK_SUPPRESSION_REASON_CHANGED)) {
             watchPlatformOutput(player)
         }
 
@@ -5077,6 +5086,7 @@ class MusicService :
         mediaSession.release()
         player.removeListener(this)
         player.removeListener(sleepTimer)
+        playerCrossmixProcessors.remove(player)
         playerSilenceProcessors.remove(player)
         playerReplayGain.remove(player)
         unregisterEqualizer(player)
@@ -5819,6 +5829,8 @@ class MusicService :
     }
 
     private fun unregisterEqualizer(player: Player) {
+        platformOutputs.remove(player)?.release()
+        playerReplayGain.remove(player)
         playerEqProcessors.remove(player)?.let { equalizerService.removeAudioProcessor(it) }
     }
 

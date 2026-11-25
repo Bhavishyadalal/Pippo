@@ -12,6 +12,7 @@ import androidx.room.RenameColumn
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
+import androidx.room.withTransaction
 import androidx.room.migration.AutoMigrationSpec
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
@@ -67,10 +68,10 @@ class MusicDatabase(
      * the moment one of them was written (or edited) without it.
      */
     suspend fun pinToSpeedDial(item: com.mochyy.mochymusic.db.entities.SpeedDialItem) {
-        if (speedDialDao.count() >= SpeedDialDao.MaxPinned) {
-            speedDialDao.oldest()?.let { speedDialDao.delete(it.id) }
+        delegate.withTransaction {
+            speedDialDao.insert(item)
+            speedDialDao.trimToLimit(SpeedDialDao.MaxPinned, item.id)
         }
-        speedDialDao.insert(item)
     }
 
     val openHelper: SupportSQLiteOpenHelper
@@ -93,15 +94,7 @@ class MusicDatabase(
         }
 
     suspend fun withTransaction(block: suspend MusicDatabase.() -> Unit) =
-        with(delegate) {
-            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                runInTransaction {
-                    kotlinx.coroutines.runBlocking {
-                        block(this@MusicDatabase)
-                    }
-                }
-            }
-        }
+        delegate.withTransaction { block(this@MusicDatabase) }
 
     fun close() = delegate.close()
 }
@@ -158,7 +151,7 @@ abstract class InternalDatabase : RoomDatabase() {
                 Room
                     .databaseBuilder(context, InternalDatabase::class.java, DB_NAME)
                     .addMigrations(*AllMigrations)
-                    .fallbackToDestructiveMigration(dropAllTables = true)
+                    // Missing migrations must fail without erasing the user's library.
                     .setJournalMode(RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING)
                     .setTransactionExecutor(java.util.concurrent.Executors.newFixedThreadPool(4))
                     .setQueryExecutor(java.util.concurrent.Executors.newFixedThreadPool(4))

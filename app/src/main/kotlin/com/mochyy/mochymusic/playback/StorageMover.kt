@@ -12,6 +12,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -119,6 +121,7 @@ class StorageMover @Inject constructor(
                     file.inputStream().use { input ->
                         out.outputStream().use { output ->
                             while (true) {
+                                currentCoroutineContext().ensureActive()
                                 val read = input.read(buffer)
                                 if (read < 0) break
                                 output.write(buffer, 0, read)
@@ -133,6 +136,7 @@ class StorageMover @Inject constructor(
                     }
                     if (out.length() != file.length()) throw IOException("${file.name} came out a different size")
                 }
+                currentCoroutineContext().ensureActive()
                 if (target.exists()) {
                     val backup = createTemporaryDirectory(parent, "download-backup")
                     val saved = File(backup, target.name)

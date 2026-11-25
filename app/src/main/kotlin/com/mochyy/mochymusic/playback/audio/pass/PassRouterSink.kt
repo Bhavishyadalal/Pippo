@@ -204,6 +204,11 @@ class PassRouterSink(
         pendingConfigure = false
         configuredSource = null
         lastFormat = null
+        lastChannels = null
+        lastBufferSize = 0
+        decidedAt = -1
+        retiringAtMs = 0L
+        playing = false
         normal.reset()
         exclusive.reset()
         active = normal

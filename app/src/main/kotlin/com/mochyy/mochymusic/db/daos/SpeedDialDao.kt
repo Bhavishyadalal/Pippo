@@ -21,6 +21,9 @@ interface SpeedDialDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(item: SpeedDialItem)
 
+    @Query("DELETE FROM speed_dial_item WHERE id IN (SELECT id FROM speed_dial_item ORDER BY CASE WHEN id = :keepId THEN 0 ELSE 1 END, createDate DESC, id ASC LIMIT -1 OFFSET :limit)")
+    suspend fun trimToLimit(limit: Int, keepId: String)
+
     @Query("DELETE FROM speed_dial_item WHERE id = :id")
     suspend fun delete(id: String)
 

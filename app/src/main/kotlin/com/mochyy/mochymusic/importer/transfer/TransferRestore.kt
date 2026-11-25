@@ -5,6 +5,13 @@ package com.mochyy.mochymusic.importer.transfer
 import android.app.Application
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
+import android.database.sqlite.SQLiteDatabase
+import com.mochyy.mochymusic.db.MusicDatabaseVersion
+import java.util.zip.ZipInputStream
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import androidx.datastore.preferences.core.PreferencesSerializer
 import android.os.Build
 import android.util.Log
 import androidx.datastore.preferences.core.edit
@@ -26,6 +33,64 @@ object TransferRestore {
     private const val StagingName = "transfer_staging"
     private const val NoteName = "transfer_restored.json"
     internal const val ReadyMarker = "ready.json"
+    private const val LegacySettings = "legacy-settings.preferences_pb"
+
+    /** Unpack and validate old two-entry backups without touching live data. */
+    internal suspend fun stageLegacy(context: Context, source: Uri, settingsName: String) {
+        val staging = stagingDir(context)
+        check(!File(staging, ReadyMarker).exists()) { "Another restore is pending" }
+        val temporary = File(context.dataDir, "legacy-restore-" + java.util.UUID.randomUUID())
+        check(temporary.mkdirs())
+        try {
+            val library = File(temporary, TransferArchive.LibraryEntry)
+            val settings = File(temporary, LegacySettings)
+            check(library.parentFile?.mkdirs() == true)
+            val raw = requireNotNull(context.contentResolver.openInputStream(source))
+            ZipInputStream(raw.buffered()).use { zip ->
+                val buffer = ByteArray(128 * 1024)
+                while (true) {
+                    currentCoroutineContext().ensureActive()
+                    val entry = zip.nextEntry ?: break
+                    val target = when (entry.name) {
+                        InternalDatabase.DB_NAME -> library
+                        settingsName -> settings
+                        else -> null
+                    }
+                    if (target == null || entry.isDirectory) continue
+                    check(!target.exists()) { "Duplicate backup entry" }
+                    target.outputStream().use { output ->
+                        while (true) {
+                            currentCoroutineContext().ensureActive()
+                            val read = zip.read(buffer)
+                            if (read < 0) break
+                            output.write(buffer, 0, read)
+                        }
+                    }
+                    zip.closeEntry()
+                }
+            }
+            check(library.isFile && library.length() > 0L) { "Missing library" }
+            SQLiteDatabase.openDatabase(library.path, null, SQLiteDatabase.OPEN_READWRITE).use { db ->
+                check(TransferImporter.hasMigrationPath(db.version, MusicDatabaseVersion)) { "Unsupported backup database version" }
+                db.rawQuery("PRAGMA quick_check", null).use { cursor ->
+                    check(cursor.moveToFirst() && cursor.getString(0).equals("ok", ignoreCase = true)) { "Damaged backup" }
+                }
+                db.rawQuery("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'song'", null).use {
+                    check(it.moveToFirst()) { "Not a Pippo library" }
+                }
+                foldIntoOneFile(db)
+            }
+            listOf("-wal", "-shm", "-journal").forEach { File(library.path + it).delete() }
+            if (settings.exists()) settings.inputStream().use { PreferencesSerializer.readFrom(it) }
+            currentCoroutineContext().ensureActive()
+            File(temporary, ReadyMarker).writeText(JSONObject().put("legacy", true).toString())
+            check(!File(staging, ReadyMarker).exists()) { "Another restore is pending" }
+            check(!staging.exists() || staging.deleteRecursively())
+            check(temporary.renameTo(staging)) { "Couldn't stage backup" }
+        } finally {
+            temporary.deleteRecursively()
+        }
+    }
 
     /** where an unpacked import waits for the next start, next to the data so moving it in is a rename */
     fun stagingDir(context: Context): File = File(context.dataDir, StagingName)
@@ -49,7 +114,7 @@ object TransferRestore {
         var committed = false
         try {
             val note = JSONObject(ready.readText())
-            prepareFiles(app, staging, transaction)
+            prepareFiles(app, staging, transaction, legacy = note.optBoolean("legacy"))
             transaction.install()
             restorePrefs(app, File(staging, TransferArchive.PrefsPrefix))
             File(staging, TransferArchive.SettingsEntry).takeIf { it.exists() }?.let { settings ->
@@ -115,7 +180,7 @@ object TransferRestore {
         }
     }
 
-    private fun prepareFiles(context: Context, staging: File, transaction: RestoreFileTransaction) {
+    private fun prepareFiles(context: Context, staging: File, transaction: RestoreFileTransaction, legacy: Boolean) {
         val library = File(staging, TransferArchive.LibraryEntry)
         check(library.isFile && library.length() > 0L) { "The staged library is missing" }
         for (item in File(staging, TransferArchive.FilesPrefix).listFiles().orEmpty()) {
@@ -133,7 +198,15 @@ object TransferRestore {
             database(TransferArchive.MediaDatabaseName, it)
         }
         transaction.preserve(File(context.dataDir, "shared_prefs"))
-        transaction.preserve(File(context.filesDir, "datastore"))
+        val legacySettings = File(staging, LegacySettings)
+        if (legacy && legacySettings.isFile) {
+            transaction.replace(File(context.filesDir, "datastore/settings.preferences_pb"), legacySettings)
+        } else {
+            transaction.preserve(File(context.filesDir, "datastore"))
+        }
+        if (legacy) {
+            transaction.replace(File(context.filesDir, MusicService.PERSISTENT_QUEUE_FILE), null)
+        }
         transaction.preserve(context.noBackupFilesDir)
     }
 

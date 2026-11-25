@@ -237,7 +237,10 @@ class SourceModules @Inject constructor(
         val picks = picksFor()
         module.resolve(track, picks) to streamQuality(module, picks)
     }.onFailure {
-        if (it !is CancellationException) android.util.Log.w(Tag, "${module.info.id} failed for ${track.title}", it)
+        if (it is CancellationException) {
+            // A cancelled parent must stop resolving; a provider's own timeout can still fall back.
+            currentCoroutineContext().ensureActive()
+        } else android.util.Log.w(Tag, "${module.info.id} failed for ${track.title}", it)
     }.getOrNull()
 
     /** The first compatible whole file from the download order. */

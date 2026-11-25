@@ -50,7 +50,7 @@ object AppModule {
         // The one list in MusicDatabase.kt. This copy used to be its own, stopped at 35 -> 36, and
         // every later version reached the phone as "no migration path" -> all tables dropped.
         .addMigrations(*com.mochyy.mochymusic.db.AllMigrations)
-        .fallbackToDestructiveMigration(dropAllTables = true)
+        // Preserve the library even if an unsupported upgrade needs a migration.
         .setJournalMode(androidx.room.RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING)
         .setTransactionExecutor(java.util.concurrent.Executors.newFixedThreadPool(4))
         .setQueryExecutor(java.util.concurrent.Executors.newFixedThreadPool(4))

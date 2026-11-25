@@ -22,6 +22,19 @@ class PlaybackRecoveryPolicyTest {
         assertTrue(finishOutputDrain(false, 60000))
         assertTrue(finishOutputDrain(true, 0))
     }
+    @Test fun bluetoothOffloadAndEffectsAreIncompatible() {
+        assertTrue(shouldUseAudioOffload(true, false, false, false))
+        assertFalse(shouldUseAudioOffload(true, false, false, true))
+        assertFalse(shouldUseAudioOffload(true, true, false, false))
+        assertFalse(shouldUseAudioOffload(true, false, true, false))
+        assertFalse(shouldUseAudioOffload(false, false, false, false))
+    }
+    @Test fun outputRecoveryRequiresRepeatedUnhealthySamples() {
+        assertFalse(needsOutputRecovery(2, 2, 3))
+        assertTrue(needsOutputRecovery(3, 0, 0))
+        assertTrue(needsOutputRecovery(0, 3, 0))
+        assertTrue(needsOutputRecovery(0, 0, 4))
+    }
     @Test fun stalePausedAndCastRecoveryCannotResume() {
         assertTrue(mayResumeRecovery("song", "song", true, false))
         assertFalse(mayResumeRecovery("old", "new", true, false))
