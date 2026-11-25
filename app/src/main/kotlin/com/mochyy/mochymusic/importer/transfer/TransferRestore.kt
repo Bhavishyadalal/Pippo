@@ -12,6 +12,8 @@ import java.util.zip.ZipInputStream
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import androidx.datastore.preferences.core.PreferencesSerializer
+import okio.buffer
+import okio.source
 import android.os.Build
 import android.util.Log
 import androidx.datastore.preferences.core.edit
@@ -81,7 +83,7 @@ object TransferRestore {
                 foldIntoOneFile(db)
             }
             listOf("-wal", "-shm", "-journal").forEach { File(library.path + it).delete() }
-            if (settings.exists()) settings.inputStream().use { PreferencesSerializer.readFrom(it) }
+            if (settings.exists()) settings.source().buffer().use { PreferencesSerializer.readFrom(it) }
             currentCoroutineContext().ensureActive()
             File(temporary, ReadyMarker).writeText(JSONObject().put("legacy", true).toString())
             check(!File(staging, ReadyMarker).exists()) { "Another restore is pending" }
