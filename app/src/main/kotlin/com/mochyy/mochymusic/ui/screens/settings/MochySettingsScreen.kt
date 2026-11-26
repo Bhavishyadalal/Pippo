@@ -148,6 +148,7 @@ private val LocalizedSettingsTitles = mapOf(
     "Open with your finger" to R.string.customise_swipe_up_follows,
 )
 private val LocalizedSettingsPages = mapOf(
+    "Experimental" to R.string.experimental_settings_title,
     "Downloads" to R.string.download_settings_title,
     "App behaviour" to R.string.settings_app_behaviour,
     "Playback" to R.string.settings_playback_category,
@@ -272,6 +273,7 @@ private val SettingsIndex = listOf(
     SettingsEntry("Remove all downloads", "Storage", "storage_settings", "delete clear downloads offline space"),
 
     // Experimental
+    SettingsEntry("Experimental", "Experimental", "experimental_settings", "advanced experimental settings features force playback read ahead prefetch diagnostics", R.string.experimental_settings_title),
     SettingsEntry("Device integration", "Import & sync", com.mochyy.mochymusic.ui.screens.devices.DeviceIntegrationRoute, "tv television android tv google tv phone tablet car head unit pair link sync stream downloads big screen remote control devices"),
     SettingsEntry("Import & sync", "Experimental", "experimental_settings", "import spotify apple music deezer tidal tunemymusic csv youtube sync export backup transfer"),
     SettingsEntry("Big disc cover styles", "Experimental", "experimental_settings", "disc vinyl cover"),
@@ -280,8 +282,8 @@ private val SettingsIndex = listOf(
     SettingsEntry("Playback diagnostics", "Experimental", "experimental_settings", "logs potoken stream client debug"),
     SettingsEntry("Repeat initial setup", "Experimental", "experimental_settings", "onboarding wizard setup"),
     SettingsEntry("Show where songs play from", "Experimental", "experimental_settings", "source banner toast apple music monochrome youtube"),
-    SettingsEntry("Force playback", "Experimental", "experimental_settings", "fallback skip error stream failed youtube"),
-    SettingsEntry("Playback read-ahead", "Experimental", "experimental_settings", "buffer cache preload slow connection next songs"),
+    SettingsEntry("Force playback", "Experimental", "experimental_settings", "fallback skip error stream failed youtube", R.string.experimental_force_playback_title),
+    SettingsEntry("Playback read-ahead", "Experimental", "experimental_settings", "buffer cache preload slow connection next songs", R.string.pippo_playback_read_ahead),
 )
 
 internal val BubbleColor = Color(0xFF1C1C1E)
@@ -553,6 +555,13 @@ fun MochySettingsScreen(navController: NavController, pane: SettingsPane? = null
 
                         // pages the modules that are on bring to settings, right under modules
                         com.mochyy.mochymusic.ui.screens.settings.modules.ModuleSettingsPages(open = open, selected = selected)
+
+                        CategoryBubble(
+                            title = stringResource(R.string.experimental_settings_title),
+                            iconRes = R.drawable.biotech,
+                            selected = selected == "experimental_settings",
+                            onClick = { open("experimental_settings") },
+                        )
                     }
                 }
             }
