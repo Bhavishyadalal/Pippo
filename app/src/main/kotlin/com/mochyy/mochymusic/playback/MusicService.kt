@@ -1054,7 +1054,7 @@ class MusicService :
         val youtube = SourceModules.YouTubeId
         if (!dataStore.get(ForcePlaybackKey, false) || youtube in skip || !sourceModules.isUsable(youtube) ||
             !canHedgeStreamLookup() || YouTube.cookie != null ||
-            mediaId in bypassCacheForQualityChange || mediaId in forcedRoutes ||
+            mediaId in bypassCacheForQualityChange || forcedRoutes.containsKey(mediaId) ||
             handoffFor(mediaId) != null || cachedYouTube(mediaId) != null
         ) return sourceModules.route(track, skip, onUndecodable)
         val key = warmYouTubeKey(mediaId)
@@ -1074,7 +1074,7 @@ class MusicService :
                 modules.onAwait { it }
                 fallback.onAwait { data ->
                     if (data == null || !sourceModules.isUsable(youtube) || !canHedgeStreamLookup() ||
-                        !dataStore.get(ForcePlaybackKey, false) || handoffFor(mediaId) != null || mediaId in forcedRoutes ||
+                        !dataStore.get(ForcePlaybackKey, false) || handoffFor(mediaId) != null || forcedRoutes.containsKey(mediaId) ||
                         !rememberWarmYouTube(key, data)
                     ) modules.await()
                     else {
@@ -4563,7 +4563,7 @@ class MusicService :
         val previous = runCatching { runBlocking(Dispatchers.IO) { database.format(mediaId).first() } }.getOrNull()
         val storedIdentity = playerCache.getContentMetadata(mediaId).get("pippo.youtube.identity.v1", "")
         val sameFile = when {
-            storedIdentity.isNotEmpty() -> storedIdentity == identity
+            !storedIdentity.isNullOrEmpty() -> storedIdentity == identity
             previous != null && previous.itag != itag -> false
             cachedLength > 0 && freshLength > 0 -> cachedLength == freshLength
             previous != null -> previous.itag == itag &&
@@ -4695,7 +4695,7 @@ class MusicService :
             val diskQuality = if (offline) "" else playerCache.getContentMetadata(mediaId).get("pippo.youtube.quality.v1", "")
             val changedQuality = currentKey != null &&
                 ((previousLookup != null && qualitySignature(previousLookup.key) != qualitySignature(currentKey)) ||
-                    (diskQuality.isNotEmpty() && diskQuality != qualitySignature(currentKey)))
+                    (!diskQuality.isNullOrEmpty() && diskQuality != qualitySignature(currentKey)))
             val shouldBypassCache = !offline && (bypassCacheForQualityChange.contains(mediaId) || changedQuality)
 
             val scheme = dataSpec.uri.scheme
