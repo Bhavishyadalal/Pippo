@@ -29,8 +29,8 @@ extensions.configure<ApplicationExtension> {
         applicationId = "com.bhavishyadalal.pippo"
         minSdk = 24
         targetSdk = 37
-        versionCode = 75
-        versionName = "0.1.3-beta"
+        versionCode = 76
+        versionName = "0.1.4-beta"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true

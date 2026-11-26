@@ -10,6 +10,7 @@ import com.mochyy.mochymusic.module.AccountState
 import com.mochyy.mochymusic.module.ModuleFeature
 import com.mochyy.mochymusic.module.ResolveResult
 import com.mochyy.mochymusic.module.SourceModule
+import com.mochyy.mochymusic.module.ServerListModule
 import com.mochyy.mochymusic.module.SourceStream
 import com.mochyy.mochymusic.module.StreamFormat
 import com.mochyy.mochymusic.module.TrackMatcher
@@ -47,6 +48,10 @@ class SourceModules @Inject constructor(
     // where modules look songs up, apart from whoever asked, so a call that won't stop never keeps a song waiting
     private val resolveScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val lastStallAt = ConcurrentHashMap<String, Long>()
+    private data class ModuleLookup(
+        val module: SourceModule, val track: TrackQuery, val picks: Map<String, String>, val servers: List<String>,
+    )
+    private val sharedLookups = SharedLookups<ModuleLookup, ResolveResult>(resolveScope)
 
     fun notePlaybackStall(id: String) {
         lastStallAt[id] = SystemClock.elapsedRealtime()
@@ -235,7 +240,16 @@ class SourceModules @Inject constructor(
         picksFor: () -> Map<String, String>,
     ): Pair<ResolveResult, String?>? = runCatching {
         val picks = picksFor()
-        module.resolve(track, picks) to streamQuality(module, picks)
+        // Account-backed sessions and explicit/manual lookups keep their existing isolation.
+        val result = if (module.signIn == null) {
+            val snapshot = picks.toMap()
+            val servers = (module as? ServerListModule)?.servers?.map { it.url }.orEmpty()
+            sharedLookups.get(ModuleLookup(module, track, snapshot, servers)) {
+                withTimeoutOrNull(ModuleTimeoutMs) { module.resolve(track, snapshot) }
+                    ?: ResolveResult.Unavailable("Provider lookup timed out")
+            }
+        } else module.resolve(track, picks)
+        result to streamQuality(module, picks)
     }.onFailure {
         if (it is CancellationException) {
             // A cancelled parent must stop resolving; a provider's own timeout can still fall back.

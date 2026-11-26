@@ -35,6 +35,13 @@ class PlaybackRecoveryPolicyTest {
         assertTrue(needsOutputRecovery(0, 3, 0))
         assertTrue(needsOutputRecovery(0, 0, 4))
     }
+    @Test fun routeFloatRequiresVerifiedWirelessSupport() {
+        assertFalse(permitsRouteFloat(true, false, true, true))
+        assertFalse(permitsRouteFloat(false, true, false, true))
+        assertTrue(permitsRouteFloat(false, true, true, true))
+        assertTrue(permitsRouteFloat(false, false, false, true))
+        assertFalse(permitsRouteFloat(false, false, true, false))
+    }
     @Test fun stalePausedAndCastRecoveryCannotResume() {
         assertTrue(mayResumeRecovery("song", "song", true, false))
         assertFalse(mayResumeRecovery("old", "new", true, false))

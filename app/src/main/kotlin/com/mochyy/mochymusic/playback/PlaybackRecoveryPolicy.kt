@@ -25,3 +25,7 @@ internal fun shouldUseAudioOffload(enabled: Boolean, transitions: Boolean, effec
 
 internal fun needsOutputRecovery(stalled: Int, wrongRoute: Int, missing: Int): Boolean =
     stalled >= 3 || wrongRoute >= 3 || missing >= 4
+
+/** Use PCM16 on unverified wireless routes and phone speakers; leave USB/wired policy intact. */
+internal fun permitsRouteFloat(phone: Boolean, bluetooth: Boolean, advertisesFloat: Boolean, known: Boolean): Boolean =
+    known && !phone && (!bluetooth || advertisesFloat)

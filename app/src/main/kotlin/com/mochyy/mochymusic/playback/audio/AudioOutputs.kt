@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import timber.log.Timber
+import com.mochyy.mochymusic.playback.permitsRouteFloat
 
 /** where the music comes out: picked device, usb dac first, the dac's own mixer on android 14+ (why: docs/notes/audio-output.md) */
 class AudioOutputs(private val context: Context) {
@@ -75,8 +76,12 @@ class AudioOutputs(private val context: Context) {
         }
 
     // the service works this out from every effect and transition; the sink reads it on the playback thread
-    @Volatile
-    var floatAllowed: Boolean = false
+    @Volatile private var requestedFloat = false
+    @Volatile private var routeAllowsFloat = true
+
+    var floatAllowed: Boolean
+        get() = requestedFloat && routeAllowsFloat
+        set(value) { requestedFloat = value }
 
     /** the hi-fi resampler switch: songs are brought to the output's own rate here instead of in android's mixer */
     @Volatile
@@ -151,7 +156,12 @@ class AudioOutputs(private val context: Context) {
     fun activeDevice(): AudioDeviceInfo? {
         preferredDevice()?.let { return it }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            runCatching { audioManager.getAudioDevicesForAttributes(MediaAttributes).firstOrNull() }.getOrNull()?.let { return it }
+            runCatching {
+                // Keep Android's route order, but never treat a telephony-only SCO
+                // device as a music sink.
+                audioManager.getAudioDevicesForAttributes(MediaAttributes)
+                    .firstOrNull { kindOf(it.type) != null }
+            }.getOrNull()?.let { return it }
         }
         // android's own order, the same answer it would give: a headset beats a cable beats the speaker
         val outputs = outputs()
@@ -200,6 +210,10 @@ class AudioOutputs(private val context: Context) {
         val preferred = preferredDevice()
         val active = activeDevice()
         val activeKind = active?.let { kindOf(it.type) }
+        // BitChord's route-aware PCM policy highlights that advertised output support
+        // matters independently of the source codec. Preserve USB/wired Hi-Fi behavior.
+        routeAllowsFloat = permitsRouteFloat(activeKind == Kind.PHONE, activeKind == Kind.BLUETOOTH,
+            active?.encodings?.contains(AudioFormat.ENCODING_PCM_FLOAT) == true, active != null)
         fixedOutputRate = systemMixerRate.takeIf { resampler && (activeKind == Kind.PHONE || activeKind == Kind.WIRED) }
         _devices.value = outputs()
             .mapNotNull { info -> kindOf(info.type)?.let { info to it } }

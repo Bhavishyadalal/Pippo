@@ -271,6 +271,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.async
+import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -720,8 +721,12 @@ class MusicService :
 
                 outputReopenAttempt = attempt
                 Timber.tag(TAG).w("Reopening audio output after a stalled or mismatched route")
+                val resume = target.playWhenReady
                 target.stop()
+                if (player !== target || providerOccurrence != occurrence ||
+                    transport.pauseGeneration != pauseGeneration || outputRouteGeneration != generation) return@launch
                 target.seekTo(index, position)
+                target.playWhenReady = resume
                 target.prepare()
                 return@launch
             }
@@ -958,6 +963,99 @@ class MusicService :
     private var silenceSkipJob: Job? = null
 
     private val songUrlCache = java.util.concurrent.ConcurrentHashMap<String, Pair<String, Long>>()
+    private data class WarmYouTubeKey(
+        val mediaId: String, val quality: AudioQuality, val studio: Boolean,
+        val network: android.net.Network?, val metered: Boolean, val account: Int?,
+        val dataSaver: Boolean, val ip: IpVersion,
+    )
+    private data class WarmYouTube(val key: WarmYouTubeKey, val data: YTPlayerUtils.PlaybackData, val expires: Long)
+    private val warmYouTube = java.util.concurrent.ConcurrentHashMap<String, WarmYouTube>()
+    private val sharedYouTube = com.mochyy.mochymusic.modules.SharedLookups<WarmYouTubeKey, Result<YTPlayerUtils.PlaybackData>>(
+        CoroutineScope(scope.coroutineContext + Dispatchers.IO), maxPending = 16,
+    )
+
+    private fun warmYouTubeKey(id: String) = WarmYouTubeKey(
+        id, audioQuality, studioForVideos, connectivityManager.activeNetwork,
+        connectivityManager.isActiveNetworkMetered, YouTube.cookie?.hashCode(),
+        DataSaver.isActive(this), ipVersion,
+    )
+
+    private suspend fun fetchYouTube(key: WarmYouTubeKey): Result<YTPlayerUtils.PlaybackData> =
+        withContext(Dispatchers.IO) {
+            YTPlayerUtils.playerResponseForPlayback(key.mediaId, audioQuality = key.quality,
+                connectivityManager = connectivityManager, preferStudio = key.studio)
+        }
+
+    private suspend fun lookupYouTube(key: WarmYouTubeKey): Result<YTPlayerUtils.PlaybackData> = try {
+        if (key.account != null || key.mediaId in bypassCacheForQualityChange) fetchYouTube(key)
+        else sharedYouTube.get(key) { fetchYouTube(key) }
+    } catch (error: Exception) {
+        currentCoroutineContext().ensureActive()
+        Result.failure(error)
+    }
+
+    private fun takeWarmYouTube(key: WarmYouTubeKey): YTPlayerUtils.PlaybackData? =
+        warmYouTube.remove(key.mediaId)?.takeIf {
+            it.key == key && it.expires > android.os.SystemClock.elapsedRealtime() &&
+                key.mediaId !in bypassCacheForQualityChange
+        }?.data
+
+    private fun rememberWarmYouTube(key: WarmYouTubeKey, data: YTPlayerUtils.PlaybackData): Boolean {
+        if (key != warmYouTubeKey(key.mediaId) || key.mediaId in bypassCacheForQualityChange ||
+            data.streamExpiresInSeconds <= 30) return false
+        if (warmYouTube.size >= 16) warmYouTube.clear()
+        warmYouTube[key.mediaId] = WarmYouTube(key, data, android.os.SystemClock.elapsedRealtime() + 15_000L)
+        return true
+    }
+
+    private fun canHedgeStreamLookup(): Boolean =
+        !com.mochyy.mochymusic.utils.OfflineMode.isOn &&
+            !dataStore.get(OfflineModeKey, false) && connectivityObserver.isCurrentlyConnected() &&
+            !DataSaver.isActive(this)
+
+    /** In Force playback mode only, a healthy fallback can finish a slow module lookup.
+     * The normal data source still owns format/cache bookkeeping. Never race manual routes. */
+    private suspend fun raceAutomaticRoute(
+        mediaId: String, track: com.mochyy.mochymusic.module.TrackQuery?, skip: Set<String>,
+        onUndecodable: (String, com.mochyy.mochymusic.module.SourceStream) -> Unit,
+    ): SourceModules.Route {
+        val youtube = SourceModules.YouTubeId
+        if (!dataStore.get(ForcePlaybackKey, false) || youtube in skip || !sourceModules.isUsable(youtube) ||
+            !canHedgeStreamLookup() || YouTube.cookie != null ||
+            mediaId in bypassCacheForQualityChange || mediaId in forcedRoutes ||
+            handoffFor(mediaId) != null || songUrlCache[mediaId]?.second?.let { it > System.currentTimeMillis() } == true
+        ) return sourceModules.route(track, skip, onUndecodable)
+        val key = warmYouTubeKey(mediaId)
+        val modules = scope.async(Dispatchers.IO) { sourceModules.route(track, skip, onUndecodable) }
+        val fallback = scope.async(Dispatchers.IO) {
+            delay(1_500L)
+            if (!canHedgeStreamLookup() || key != warmYouTubeKey(mediaId) || !sourceModules.isUsable(youtube)) return@async null
+            try {
+                lookupYouTube(key).getOrNull()
+            } catch (error: Exception) {
+                currentCoroutineContext().ensureActive()
+                null
+            }
+        }
+        return try {
+            select<SourceModules.Route> {
+                modules.onAwait { it }
+                fallback.onAwait { data ->
+                    if (data == null || !sourceModules.isUsable(youtube) || !canHedgeStreamLookup() ||
+                        !dataStore.get(ForcePlaybackKey, false) || handoffFor(mediaId) != null || mediaId in forcedRoutes ||
+                        !rememberWarmYouTube(key, data)
+                    ) modules.await()
+                    else {
+                        Timber.tag(TAG).d("Fast fallback ready for %s", mediaId)
+                        SourceModules.Route.YouTube
+                    }
+                }
+            }
+        } finally {
+            modules.cancel()
+            fallback.cancel()
+        }
+    }
 
     /**
      * Headers that must accompany the stream request for each track, keyed by media id.
@@ -1219,6 +1317,7 @@ class MusicService :
                     val mediaId = entry.mediaId
                     val youtubeId = com.mochyy.mochymusic.modules.SourceModules.YouTubeId
                     songUrlCache.remove(mediaId)
+                    warmYouTube.remove(mediaId)
                     // This setting only changes YouTube streaming. Keep downloads, a module
                     // stream, or an explicit per-song quality choice playing on its own route.
                     if (isFullyDownloaded(mediaId) || handoffFor(mediaId) != null ||
@@ -1262,6 +1361,7 @@ class MusicService :
                     val wasPlaying = player.isPlaying
 
                     songUrlCache.remove(mediaId)
+                    warmYouTube.remove(mediaId)
 
                     player.stop()
                     player.seekTo(currentIndex, currentPosition)
@@ -1489,7 +1589,7 @@ class MusicService :
             }
 
         val readAheadPreferences = dataStore.data.map {
-            listOf(it[PlaybackReadAheadKey] ?: false, it[OfflineModeKey] ?: false,
+            listOf(it[PlaybackReadAheadKey] ?: true, it[OfflineModeKey] ?: false,
                 it[DataSaverKey] ?: false, it[DataSaverMobileOnlyKey] ?: true)
         }.distinctUntilChanged()
         combine(readAheadPreferences, connectivityObserver.networkStatus) { preferences, connected -> preferences to connected }
@@ -1987,6 +2087,7 @@ class MusicService :
         if (retryCount > 3) {
             Timber.tag(TAG).d("Retry count > 3, attempting to refresh stream URL")
             songUrlCache.remove(mediaId)
+            warmYouTube.remove(mediaId)
             target.seekTo(target.currentMediaItemIndex, target.currentPosition)
         }
         target.prepare()
@@ -2021,6 +2122,7 @@ class MusicService :
                 return@launch
             }
             songUrlCache.remove(mediaId)
+            warmYouTube.remove(mediaId)
             // Reconsider sources that were passed over after a transient failure.
             failedSources.remove(mediaId)
             failedSourcesAt.remove(mediaId)
@@ -3506,7 +3608,7 @@ class MusicService :
                 } else if (bufferedMs - lastBufferedMs >= 250L) {
                     lastBufferedMs = bufferedMs
                     lastProgressAt = now
-                    if (position > 0 && dataStore.get(PlaybackReadAheadKey, false)) {
+                    if (position > 0 && readAheadCanUseNetwork() && dataStore.get(PlaybackReadAheadKey, true)) {
                         // A slow transfer that is still delivering audio can finish buffering
                         // without restarting the same provider. A stopped transfer still recovers.
                         deadline = maxOf(deadline, minOf(now + ModuleNoBufferProgressMs, recoveryStartedAt + 45_000L))
@@ -3515,7 +3617,7 @@ class MusicService :
                 if (stream != null &&
                     (now - lastProgressAt >= ModuleNoBufferProgressMs ||
                         (now - sampleStartedAt >= ModuleBufferWaitMs &&
-                            (position <= 0 || !dataStore.get(PlaybackReadAheadKey, false)))) &&
+                            (position <= 0 || !readAheadCanUseNetwork() || !dataStore.get(PlaybackReadAheadKey, true)))) &&
                     !com.mochyy.mochymusic.utils.OfflineMode.isOn && connectivityObserver.isCurrentlyConnected() &&
                     providerSwitch.state.value !is ProviderSwitchState.Working &&
                     providerSwitch.state.value !is ProviderSwitchState.Starting &&
@@ -3557,6 +3659,7 @@ class MusicService :
             bufferingRecoveredOccurrence = occurrence
             val position = target.contentPosition.coerceAtLeast(0L)
             songUrlCache.remove(mediaId)
+            warmYouTube.remove(mediaId)
             bufferingRecoveryJob = null
             target.stop()
             target.seekTo(index, position)
@@ -4213,6 +4316,7 @@ class MusicService :
             delay(RETRY_DELAY_MS)
             if (!stillCurrent()) return@launch
             songUrlCache.remove(mediaId)
+            warmYouTube.remove(mediaId)
             if (discardBytes && !fromDevice) {
                 withContext(Dispatchers.IO) {
                     runCatching { playerCache.removeResource(cacheKey) }
@@ -4543,12 +4647,8 @@ class MusicService :
 
             Timber.tag("MusicService").i("FETCHING STREAM: $mediaId | quality=$audioQuality")
             val playbackData = runBlocking(Dispatchers.IO) {
-                YTPlayerUtils.playerResponseForPlayback(
-                    mediaId,
-                    audioQuality = audioQuality,
-                    connectivityManager = connectivityManager,
-                    preferStudio = studioForVideos,
-                )
+                val key = warmYouTubeKey(mediaId)
+                takeWarmYouTube(key)?.let { Result.success(it) } ?: lookupYouTube(key)
             }.getOrElse { throwable ->
                 if (throwable is PlaybackException && throwable.errorCode != PlaybackException.ERROR_CODE_REMOTE_ERROR) {
                     throw throwable
@@ -4720,6 +4820,7 @@ class MusicService :
         Timber.tag(TAG).i("Playback: $mediaId stalled or failed from $failed, trying another provider")
         resolvedStreamSources.remove(mediaId)
         songUrlCache.remove(mediaId)
+        warmYouTube.remove(mediaId)
         val index = player.currentMediaItemIndex
         val position = player.currentPosition
         val wasPlaying = player.playWhenReady
@@ -5365,7 +5466,7 @@ class MusicService :
     // with "blend skips" on, the songs either side get their first seconds fetched ahead, so a skip either way starts at once
     private fun prefetchNeighbours() {
         prefetchJob?.cancel()
-        if (dataStore.get(PlaybackReadAheadKey, false) && readAheadCanUseNetwork()) return
+        if (dataStore.get(PlaybackReadAheadKey, true) && readAheadCanUseNetwork()) return
         if (!skipBlend || player.mediaItemCount == 0 || !canFetchAhead()) return
         // data saver keeps it to the next one, the extra songs are only worth it on a connection that doesn't count
         val ahead = if (com.mochyy.mochymusic.utils.DataSaver.isActive(this)) 1 else blendAhead
@@ -5390,6 +5491,7 @@ class MusicService :
     private fun readAheadCanUseNetwork() =
         !com.mochyy.mochymusic.utils.OfflineMode.isOn &&
             !dataStore.get(OfflineModeKey, false) && connectivityObserver.networkStatus.value &&
+            !connectivityManager.isActiveNetworkMetered &&
             (!dataStore.get(DataSaverKey, false) || !DataSaver.isActive(this))
 
     private fun schedulePlaybackReadAhead() {
@@ -5419,8 +5521,11 @@ class MusicService :
             }
         }
 
-        val enabled = dataStore.get(PlaybackReadAheadKey, false)
-        if (!enabled) warmedModules.clear()
+        val enabled = dataStore.get(PlaybackReadAheadKey, true)
+        if (!enabled || !online) {
+            warmedModules.clear()
+            if (!enabled) warmYouTube.clear()
+        }
         if (!enabled || !playing || current == null) {
             readAheadPlan = null
             readAheadJob?.cancel()
@@ -5448,7 +5553,7 @@ class MusicService :
                 return@launch
             }
             prefetchJob?.cancel()
-            delay(PrefetchDelayMs)
+            delay(1_500L)
             if (!readAheadCanUseNetwork()) {
                 readAheadPlan = null
                 return@launch
@@ -5458,17 +5563,14 @@ class MusicService :
             val budget = if (cacheMiB == -1) PlaybackReadAhead.CurrentBytes
                 else minOf(PlaybackReadAhead.CurrentBytes, cacheMiB * 1024L * 1024 / 2)
             if (budget < PlaybackReadAhead.UpcomingBytes) return@launch
-            fun allowed() = readAheadCanUseNetwork() && dataStore.get(PlaybackReadAheadKey, false)
+            fun allowed() = readAheadCanUseNetwork() && dataStore.get(PlaybackReadAheadKey, true)
             withContext(Dispatchers.IO) {
-                withTimeoutOrNull(CurrentReadAheadSliceMs) {
-                    knownReadAheadFile(current.mediaId)?.let { file ->
-                        playbackReadAhead.fill(file, budget, readToEnd = true, allowRead = ::allowed)
-                    }
-                }
-                for (item in upcoming) {
+                // Give the next song first use of the read-ahead budget.
+                // The currently audible track already has Media3's normal buffering.
+                for ((index, item) in upcoming.withIndex()) {
                     if (!allowed()) break
                     try {
-                        withTimeoutOrNull(UpcomingReadAheadSliceMs) { warmUpcomingTrack(item, ::allowed) }
+                        withTimeoutOrNull(UpcomingReadAheadSliceMs) { warmUpcomingTrack(item, ::allowed, cacheBytes = index == 0) }
                     } catch (error: Exception) {
                         ensureActive()
                         Timber.tag(TAG).d(error, "Couldn't prepare upcoming audio for %s", item.mediaId)
@@ -5504,7 +5606,7 @@ class MusicService :
         return PlaybackReadAhead.File(mediaId, mediaId, url.toUri(), songStreamHeaders[mediaId].orEmpty())
     }
 
-    private suspend fun warmUpcomingTrack(item: MediaItem, allowed: () -> Boolean) {
+    private suspend fun warmUpcomingTrack(item: MediaItem, allowed: () -> Boolean, cacheBytes: Boolean = true) {
         val id = item.mediaId
         if (onThePhone(id) || forcedRoutes[id] != null || handoffFor(id) != null ||
             id in bypassCacheForQualityChange
@@ -5513,23 +5615,44 @@ class MusicService :
         val order = sourceModules.order.value.filter { it !in skip && sourceModules.isUsable(it) }
         if (order.isEmpty()) return
         val warmed = warmedModules[id]
-        if (warmed != null && warmed.order == order && warmed.expiresAt > System.currentTimeMillis()) return
+        if (warmed != null && warmed.order == order && warmed.expiresAt > System.currentTimeMillis() &&
+            warmed.picks == sourceModules.playbackPicks(warmed.route.module.info.id, warmed.route.module)
+        ) return
+        val requestedPicks = order.mapNotNull { provider ->
+            sourceModules.module(provider)?.let { provider to sourceModules.playbackPicks(provider, it) }
+        }.toMap()
         when (val route = sourceModules.route(trackQueryOf(id, item.metadata), skip)) {
             is SourceModules.Route.Module -> {
                 val stream = route.stream
                 val uri = stream.url.toUri()
-                if (stream.format != StreamFormat.Progressive || stream.drm != null ||
-                    uri.scheme !in setOf("http", "https")
-                ) return
+                if (stream.drm != null || uri.scheme !in setOf("http", "https")) return
                 val picks = sourceModules.playbackPicks(route.module.info.id, route.module)
-                val key = moduleRenditionKey(id, route.module, stream, route.selectedQuality)
-                playbackReadAhead.fill(PlaybackReadAhead.File(id, key, uri, stream.headers), PlaybackReadAhead.UpcomingBytes, allowRead = allowed)
-                if (allowed() && playerCache.isCached(key, 0, 1)) {
+                if (picks != requestedPicks[route.module.info.id] ||
+                    sourceModules.module(route.module.info.id) !== route.module ||
+                    route.selectedQuality != sourceModules.streamQuality(route.module, picks)
+                ) return
+                if (allowed() && id in protectedReadAheadIds && route.module.signIn == null &&
+                    sourceModules.isUsable(route.module.info.id)
+                ) {
+                    // Retain a usable lookup even when byte prefetch loses a cache lock.
                     warmedModules[id] = WarmedModule(route, order, picks, System.currentTimeMillis() + WarmedModuleLifetimeMs)
+                }
+                if (cacheBytes && stream.format == StreamFormat.Progressive && allowed()) {
+                    val key = moduleRenditionKey(id, route.module, stream, route.selectedQuality)
+                    playbackReadAhead.fill(PlaybackReadAhead.File(id, key, uri, stream.headers), PlaybackReadAhead.UpcomingBytes, allowRead = allowed)
                 }
             }
             SourceModules.Route.YouTube -> {
                 // Use the normal YouTube resolver and its rendition checks, in case quality changed.
+                if (!cacheBytes) {
+                    if (allowed() && YouTube.cookie == null && !playerCache.isCached(id, 0, PrefetchBytes) &&
+                        songUrlCache[id]?.second?.let { it > System.currentTimeMillis() } != true
+                    ) {
+                        val key = warmYouTubeKey(id)
+                        lookupYouTube(key).getOrNull()?.let { if (allowed() && id in protectedReadAheadIds) rememberWarmYouTube(key, it) }
+                    }
+                    return
+                }
                 if (allowed() && !playerCache.isCached(id, 0, PrefetchBytes)) {
                     val context = currentCoroutineContext()
                     try {
@@ -5961,13 +6084,13 @@ class MusicService :
         if (!eligibleModules && youtubeId !in skip && sourceModules.isUsable(youtubeId)) return youTubeRoute(mediaId)
         val track = trackQueryOf(mediaId, mediaItem.metadata)
         val warmed = warmedModules.remove(mediaId)?.takeIf {
-            dataStore.get(PlaybackReadAheadKey, false) && !DataSaver.isActive(this) &&
+            dataStore.get(PlaybackReadAheadKey, true) && readAheadCanUseNetwork() &&
                 it.expiresAt > System.currentTimeMillis() &&
                 it.order == sourceModules.order.value.filter { id -> id !in skip && sourceModules.isUsable(id) } &&
                 sourceModules.module(it.route.module.info.id) === it.route.module &&
                 it.picks == sourceModules.playbackPicks(it.route.module.info.id, it.route.module)
         }
-        val route = warmed?.route ?: sourceModules.route(track, skip) { id, passed ->
+        val route = warmed?.route ?: raceAutomaticRoute(mediaId, track, skip) { id, passed ->
             if (!decoderNotices.containsKey(mediaId)) noteMissingDecoder(mediaId, passed.codec?.uppercase(), passed.sampleRateHz, from = id)
         }
         if (com.mochyy.mochymusic.utils.OfflineMode.isOn) return null
@@ -6568,10 +6691,9 @@ class MusicService :
         const val PrefetchBytes = 512L * 1024L
         const val PrefetchDelayMs = 4_000L
         private const val ArtworkAheadDelayMs = 1_500L
-        private const val CurrentReadAheadSliceMs = 8_000L
         private const val UpcomingReadAheadSliceMs = 12_000L
         private const val CurrentReadAheadFinishMs = 90_000L
-        private const val WarmedModuleLifetimeMs = 3 * 60_000L
+        private const val WarmedModuleLifetimeMs = 60_000L
 
         /** how long a provider that failed on a song is passed over for it (Force playback) */
         const val FailedSourceMemoryMs = 10L * 60 * 1000

@@ -69,7 +69,7 @@ fun ExperimentalSettingsScreen(navController: NavController) {
     val (forcePlayback, onForcePlaybackChange) = rememberPreference(ForcePlaybackKey, defaultValue = false)
     val (readAhead, onReadAheadChange) = rememberPreference(
         com.mochyy.mochymusic.constants.PlaybackReadAheadKey,
-        defaultValue = false,
+        defaultValue = true,
     )
     val (streamBackend, onStreamBackendChange) = rememberEnumPreference(
         com.mochyy.mochymusic.constants.StreamBackendKey,
