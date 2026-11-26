@@ -15,17 +15,29 @@ class NetworkConnectivityObserver(context: Context) {
     // Every collector receives the current status; a Channel split updates between consumers.
     val networkStatus = _networkStatus.asStateFlow()
 
+    data class NetworkSnapshot(val handle: Long?, val metered: Boolean, val validated: Boolean)
+    private fun snapshot(): NetworkSnapshot = NetworkSnapshot(
+        runCatching { connectivityManager.activeNetwork?.networkHandle }.getOrNull(),
+        runCatching { connectivityManager.isActiveNetworkMetered }.getOrDefault(true),
+        isCurrentlyConnected(),
+    )
+    private val _networkSnapshot = MutableStateFlow(snapshot())
+    val networkSnapshot = _networkSnapshot.asStateFlow()
+
     private val networkCallback = object : ConnectivityManager.NetworkCallback() {
         override fun onAvailable(network: Network) {
             _networkStatus.value = state.available(network.networkHandle)
+            _networkSnapshot.value = snapshot()
         }
         override fun onCapabilitiesChanged(network: Network, capabilities: NetworkCapabilities) {
             _networkStatus.value = state.capabilities(network.networkHandle,
                 capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET),
                 capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED))
+            _networkSnapshot.value = snapshot()
         }
         override fun onLost(network: Network) {
             _networkStatus.value = state.lost(network.networkHandle)
+            _networkSnapshot.value = snapshot()
         }
     }
 

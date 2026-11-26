@@ -91,9 +91,13 @@ internal class PlaybackReadAhead(
             for (key in keys) {
                 if (!allowed()) return@runInterruptible
                 try {
-                    cache.removeResource(key)
+                    val size = ContentMetadata.getContentLength(cache.getContentMetadata(key))
+                    // A prefetched recording may since have been played in full. Leave
+                    // complete audio to the cache's normal LRU rather than deleting it.
+                    if (size <= 0 || !cache.isCached(key, 0L, size)) cache.removeResource(key)
                 } catch (error: IOException) {
                     Timber.d(error, "Couldn't remove old read-ahead audio for %s", mediaId)
+                    continue
                 }
                 keys.remove(key)
             }

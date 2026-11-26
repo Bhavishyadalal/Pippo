@@ -78,7 +78,10 @@ constructor(
 
     /** Deletes these songs from the cache. They stream again the next time they play. */
     fun remove(songIds: Collection<String>) {
-        scope.launch { delete(songIds) }
+        scope.launch {
+            val ids = songIds.toHashSet()
+            delete(ids + playerCache.keys.filter { moduleCacheMediaId(it)?.let(ids::contains) == true })
+        }
     }
 
     /** Empties the cache, songs only partly cached too. Downloads are kept in their own cache and stay. */
@@ -91,14 +94,22 @@ constructor(
 
     private fun readCache(): Map<String, CacheEntry> = runCatching {
         playerCache.keys.mapNotNull { key ->
+            val moduleId = moduleCacheMediaId(key)
+            if (moduleId != null && !isCompleteModuleCache(playerCache, key)) return@mapNotNull null
+            if (moduleId == null && (key.startsWith("module|") || isResolvedUrlCacheKey(key))) return@mapNotNull null
             val spans = playerCache.getCachedSpans(key)
             if (spans.isEmpty()) return@mapNotNull null
-            key to CacheEntry(
+            (moduleId ?: key) to CacheEntry(
+                key = key,
                 length = ContentMetadata.getContentLength(playerCache.getContentMetadata(key)),
                 cachedBytes = spans.sumOf { it.length },
                 lastUsed = spans.maxOf { it.lastTouchTimestamp },
             )
-        }.toMap()
+        }.groupBy({ it.first }, { it.second }).mapValues { (_, entries) ->
+            entries.maxWithOrNull(compareBy<CacheEntry> {
+                it.length > 0 && it.cachedBytes >= it.length
+            }.thenBy { it.lastUsed })!!
+        }
     }.getOrDefault(emptyMap())
 
     private fun songsWithIds(ids: Set<String>): Flow<List<Song>> {
@@ -121,14 +132,14 @@ constructor(
     private fun isWhole(song: Song, entry: CacheEntry): Boolean {
         val length = entry.length.takeIf { it > 0 } ?: song.format?.contentLength ?: return false
         return entry.cachedBytes >= length &&
-            runCatching { playerCache.isCached(song.id, 0, length) }.getOrDefault(false)
+            runCatching { playerCache.isCached(entry.key, 0, length) }.getOrDefault(false)
     }
 
     /**
      * One song's place in the cache. [cachedBytes] grows while it streams, which is what makes a
      * song show up as soon as its last byte lands. [lastUsed] is when it was last played or cached.
      */
-    private data class CacheEntry(val length: Long, val cachedBytes: Long, val lastUsed: Long)
+    private data class CacheEntry(val key: String, val length: Long, val cachedBytes: Long, val lastUsed: Long)
 
     private companion object {
         const val PollMillis = 2_000L

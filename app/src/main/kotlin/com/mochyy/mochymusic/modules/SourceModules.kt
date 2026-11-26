@@ -141,6 +141,13 @@ class SourceModules @Inject constructor(
     private data class PlaybackAnswer(
         val module: SourceModule,
         val response: Pair<ResolveResult, String?>?,
+        val config: PlaybackConfig,
+    )
+
+    internal data class PlaybackConfig(val picks: Map<String, String>, val servers: List<String>)
+    internal fun playbackConfig(module: SourceModule): PlaybackConfig = PlaybackConfig(
+        playbackPicks(module.info.id, module).toMap(),
+        (module as? ServerListModule)?.servers?.map { it.url }.orEmpty(),
     )
 
     /** Ask every enabled audio module together, using its selected quality. */
@@ -164,15 +171,16 @@ class SourceModules @Inject constructor(
             val id = module.info.id
             id.takeIf { lastStallAt[id]?.let { startedAt - it < StallMemoryMs } == true }
         }
-        val providerPositions = sources.mapIndexed { index, source -> source.info.id to index }.toMap()
         val preferLossless = !DataSaver.isActive(context)
         fun priority(stream: SourceStream) = if (preferLossless && stream.isLosslessPlayback) 1 else 0
         val candidates = mutableListOf<Route.Module>()
         val answers = Channel<PlaybackAnswer>(sources.size)
+        val configs = sources.associate { it.info.id to playbackConfig(it) }
         val jobs = sources.map { module ->
+            val config = configs.getValue(module.info.id)
             resolveScope.launch {
-                val response = resolve(module, track) { playbackPicks(module.info.id, module) }
-                answers.trySend(PlaybackAnswer(module, response))
+                val response = resolve(module, track) { config.picks }
+                answers.trySend(PlaybackAnswer(module, response, config))
             }
         }
         var deadline = startedAt + ModuleTimeoutMs
@@ -192,7 +200,10 @@ class SourceModules @Inject constructor(
                 remaining--
                 val (module, response) = answer
                 val id = module.info.id
-                if (!isUsable(id) || module(id) !== module) continue
+                if (!isUsable(id) || module(id) !== module || playbackConfig(module) != answer.config) {
+                    temporaryFailure = true
+                    continue
+                }
                 if (response == null) {
                     temporaryFailure = true
                     continue
@@ -219,15 +230,19 @@ class SourceModules @Inject constructor(
                 }
             }
             currentCoroutineContext().ensureActive()
-            val winner = candidates.filter { isUsable(it.module.info.id) && module(it.module.info.id) === it.module }
+            val currentPositions = _order.value.withIndex().associate { it.value to it.index }
+            val winner = candidates.filter {
+                isUsable(it.module.info.id) && module(it.module.info.id) === it.module &&
+                    playbackConfig(it.module) == configs[it.module.info.id]
+            }
                 .minWithOrNull(
                     compareByDescending<Route.Module> { priority(it.stream) }
                         .thenBy { it.module.info.id in recentlyStalled }
-                        .thenBy { providerPositions.getValue(it.module.info.id) },
+                        .thenBy { currentPositions[it.module.info.id] ?: Int.MAX_VALUE },
                 )
             if (winner != null) return@withContext winner
             undecodable?.let { (id, stream) -> if (isUsable(id)) onUndecodable(id, stream) }
-            fallback(temporaryFailure)
+            fallback(temporaryFailure || candidates.isNotEmpty())
         } finally {
             jobs.forEach { it.cancel() }
             answers.cancel()

@@ -27,6 +27,37 @@ class SharedLookupsTest {
         assertEquals(2, calls)
     }
 
+    @Test fun abandonedRequestReleasesItsSlot() = runBlocking {
+        val shared = SharedLookups<String, Int>(this, maxPending = 1)
+        val started = CompletableDeferred<Unit>()
+        val stopped = CompletableDeferred<Unit>()
+        val request = async {
+            shared.get("old") {
+                started.complete(Unit)
+                try {
+                    CompletableDeferred<Int>().await()
+                } finally {
+                    stopped.complete(Unit)
+                }
+            }
+        }
+        started.await()
+        request.cancelAndJoin()
+        stopped.await()
+        assertEquals(5, shared.get("new") { 5 })
+    }
+
+    @Test fun fullTableDoesNotRejectIndependentRequest() = runBlocking {
+        val shared = SharedLookups<String, Int>(this, maxPending = 1)
+        val gate = CompletableDeferred<Int>()
+        val started = CompletableDeferred<Unit>()
+        val first = async { shared.get("a") { started.complete(Unit); gate.await() } }
+        started.await()
+        assertEquals(8, shared.get("b") { 8 })
+        gate.complete(1)
+        assertEquals(1, first.await())
+    }
+
     @Test fun differentKeysDoNotShareResponses() = runBlocking {
         val shared = SharedLookups<String, Int>(this)
         assertEquals(1, shared.get("a") { 1 })

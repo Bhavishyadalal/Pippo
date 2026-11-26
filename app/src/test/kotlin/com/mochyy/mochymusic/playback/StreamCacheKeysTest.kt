@@ -24,4 +24,11 @@ class StreamCacheKeysTest {
         assertFalse(isResolvedUrlCacheKey("module|some.source|dQw4w9WgXcQ"))
         assertFalse(isResolvedUrlCacheKey(""))
     }
+
+    @org.junit.Test fun onlyRenditionKeysMapToCatalogIds() {
+        org.junit.Assert.assertEquals("song123", moduleCacheMediaId("module|abc|song123"))
+        org.junit.Assert.assertNull(moduleCacheMediaId("song123"))
+        org.junit.Assert.assertNull(moduleCacheMediaId("module|abc|"))
+        org.junit.Assert.assertNull(moduleCacheMediaId("https://example.test/module|abc|song123"))
+    }
 }

@@ -152,6 +152,12 @@ class AudioOutputs(private val context: Context) {
         return null
     }
 
+    /** A heuristic connected-device guess isn't evidence of a route mismatch. */
+    fun hasReportedMediaRoute(): Boolean =
+        preferredDevice() != null || (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            runCatching { audioManager.getAudioDevicesForAttributes(MediaAttributes).any { kindOf(it.type) != null } }
+                .getOrDefault(false))
+
     /** where the sound is actually going right now */
     fun activeDevice(): AudioDeviceInfo? {
         preferredDevice()?.let { return it }

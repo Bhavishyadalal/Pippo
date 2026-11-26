@@ -10,7 +10,9 @@ import com.mochyy.mochymusic.db.AllMigrations
 import com.mochyy.mochymusic.db.MusicDatabaseVersion
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
@@ -24,7 +26,6 @@ import javax.inject.Singleton
 class TransferImporter @Inject constructor(
     @ApplicationContext private val context: Context,
 ) {
-    private val running = Mutex()
 
     /** what's inside a zip, from its first entry only, failing with a message ready to show */
     suspend fun peek(source: Uri): Result<TransferManifest> = withContext(Dispatchers.IO) {
@@ -33,47 +34,57 @@ class TransferImporter @Inject constructor(
 
     /** unpacks and converts source, onProgress goes from 0 to 1; once it succeeds the app restarts to finish */
     suspend fun stage(source: Uri, onProgress: (Float) -> Unit): Result<TransferManifest> = withContext(Dispatchers.IO) {
-        if (!running.tryLock()) return@withContext Result.failure(TransferException("An import is already running."))
+        if (!TransferRestore.importLock.tryLock()) return@withContext Result.failure(TransferException("An import is already running."))
         try {
-            runCatching { unpackAndConvert(source, onProgress) }
-                .onFailure { TransferRestore.stagingDir(context).deleteRecursively() }
-                .friendly()
+            runCatching { unpackAndConvert(source, onProgress) }.friendly()
         } finally {
-            running.unlock()
+            TransferRestore.importLock.unlock()
         }
     }
 
-    private fun unpackAndConvert(source: Uri, onProgress: (Float) -> Unit): TransferManifest {
+    private suspend fun unpackAndConvert(source: Uri, onProgress: (Float) -> Unit): TransferManifest {
         val manifest = readManifest(source)
         // the zip's contents land next to the data, so they need about as much room as the zip itself
+        val free = context.dataDir.usableSpace
+        check(manifest.bytes in 0..(free - SpareBytes).coerceAtLeast(0)) { "Not enough free space or invalid backup size" }
         val needed = manifest.bytes + SpareBytes
         if (context.dataDir.usableSpace < needed) {
             throw TransferException("Not enough free space. Pippo needs about ${needed / 1_000_000} MB free to import this.")
         }
 
-        val staging = TransferRestore.stagingDir(context).apply { deleteRecursively(); mkdirs() }
-        unpack(source, staging, total = manifest.bytes, onProgress)
+        val destination = TransferRestore.stagingDir(context)
+        TransferRestore.checkCanStage(destination)
+        val staging = File(context.dataDir, "transfer-import-" + java.util.UUID.randomUUID())
+        check(staging.mkdirs())
+        try {
+            unpack(source, staging, total = manifest.bytes, onProgress)
 
-        val library = File(staging, TransferArchive.LibraryEntry)
-        if (!library.exists()) throw TransferException("That export has no library inside. Export again from your old app.")
+            val library = File(staging, TransferArchive.LibraryEntry)
+            if (!library.exists()) throw TransferException("That export has no library inside. Export again from your old app.")
 
-        val moveToHere = pathMover(manifest)
-        val missingLocal = convertLibrary(library, File(staging, TransferArchive.LocalSongsEntry), moveToHere)
-        rewriteSettings(File(staging, TransferArchive.SettingsEntry), moveToHere)
-        File(staging, TransferArchive.PrefsPrefix).listFiles().orEmpty().forEach { prefs ->
-            if (prefs.name.removeSuffix(".json") in TransferArchive.PrefsToCarry) rewriteSettings(prefs, moveToHere) else prefs.delete()
+            val moveToHere = pathMover(manifest)
+            val missingLocal = convertLibrary(library, File(staging, TransferArchive.LocalSongsEntry), moveToHere)
+            validateStagedLibrary(context, library)
+            rewriteSettings(File(staging, TransferArchive.SettingsEntry), moveToHere)
+            File(staging, TransferArchive.PrefsPrefix).listFiles().orEmpty().forEach { prefs ->
+                if (prefs.name.removeSuffix(".json") in TransferArchive.PrefsToCarry) rewriteSettings(prefs, moveToHere) else prefs.delete()
+            }
+
+            // written last: without it the next start throws the half-made folder away instead of using it
+            File(staging, TransferRestore.ReadyMarker).writeText(
+                JSONObject()
+                    .put("songs", manifest.songs)
+                    .put("playlists", manifest.playlists)
+                    .put("missingLocal", missingLocal)
+                    .toString()
+            )
+            currentCoroutineContext().ensureActive()
+            TransferRestore.installStaging(staging, destination)
+            onProgress(1f)
+            return manifest
+        } finally {
+            staging.deleteRecursively()
         }
-
-        // written last: without it the next start throws the half-made folder away instead of using it
-        File(staging, TransferRestore.ReadyMarker).writeText(
-            JSONObject()
-                .put("songs", manifest.songs)
-                .put("playlists", manifest.playlists)
-                .put("missingLocal", missingLocal)
-                .toString()
-        )
-        onProgress(1f)
-        return manifest
     }
 
     private fun readManifest(source: Uri): TransferManifest {
@@ -82,7 +93,7 @@ class TransferImporter @Inject constructor(
         val json = ZipInputStream(stream.buffered()).use { zip ->
             val first = zip.nextEntry
             if (first?.name != TransferArchive.ManifestEntry) throw NotAnExport()
-            JSONObject(zip.readBytes().toString(Charsets.UTF_8))
+            JSONObject(readBoundedManifest(zip).toString(Charsets.UTF_8))
         }
         val manifest = TransferManifest.fromJson(json) ?: throw NotAnExport()
         if (manifest.formatVersion > TransferArchive.FormatVersion || manifest.databaseVersion > MusicDatabaseVersion) {
@@ -96,30 +107,43 @@ class TransferImporter @Inject constructor(
     }
 
     // copies the known entries into staging, everything else in the zip is ignored
-    private fun unpack(source: Uri, staging: File, total: Long, onProgress: (Float) -> Unit) {
+    private suspend fun unpack(source: Uri, staging: File, total: Long, onProgress: (Float) -> Unit) {
         val stream = context.contentResolver.openInputStream(source)
             ?: throw TransferException("Couldn't open that file. Try picking it again.")
         val root = staging.canonicalPath + File.separator
         var copied = 0L
+        val budget = ImportByteBudget(context.dataDir.usableSpace, total)
+        val seen = HashSet<String>()
         val buffer = ByteArray(128 * 1024)
         ZipInputStream(stream.buffered(256 * 1024)).use { zip ->
             while (true) {
+                currentCoroutineContext().ensureActive()
                 val entry = zip.nextEntry ?: break
-                if (entry.isDirectory || !isWanted(entry.name)) continue
                 val target = File(staging, entry.name)
-                // a crafted zip could point outside the folder with ../, this keeps every file inside it
-                if (!target.canonicalPath.startsWith(root)) continue
-                target.parentFile?.mkdirs()
-                target.outputStream().buffered(256 * 1024).use { out ->
+                val wanted = !entry.isDirectory && isWanted(entry.name) && target.canonicalPath.startsWith(root)
+                if (wanted) {
+                    check(seen.add(target.canonicalPath)) { "Duplicate backup entry" }
+                    check(target.parentFile?.let { it.isDirectory || it.mkdirs() } == true)
+                }
+                // Count ignored entries too: advancing ZipInputStream otherwise inflates them
+                // without enforcing cancellation or a decompressed byte budget.
+                val out = if (wanted) target.outputStream().buffered(256 * 1024) else null
+                try {
                     while (true) {
+                        currentCoroutineContext().ensureActive()
                         val read = zip.read(buffer)
                         if (read < 0) break
-                        out.write(buffer, 0, read)
-                        copied += read
-                        if (total > 0) onProgress((copied.toDouble() / total).toFloat().coerceIn(0f, 0.97f))
+                        budget.consume(read)
+                        if (out != null) {
+                            out.write(buffer, 0, read)
+                            copied += read
+                            if (total > 0) onProgress((copied.toDouble() / total).toFloat().coerceIn(0f, 0.97f))
+                        }
                     }
+                } finally {
+                    out?.close()
                 }
-                if (entry.time > 0) target.setLastModified(entry.time)
+                if (wanted && entry.time > 0) target.setLastModified(entry.time)
             }
         }
     }
@@ -240,6 +264,7 @@ class TransferImporter @Inject constructor(
 
     private fun Result<TransferManifest>.friendly(): Result<TransferManifest> = recoverCatching { error ->
         throw when (error) {
+            is CancellationException -> error
             is TransferException -> error
             is NotAnExport -> TransferException("That isn't a Pippo export. Pick the .zip you exported from your old app.")
             else -> TransferException("Couldn't import that file. Make sure there's free space and try again.", error)

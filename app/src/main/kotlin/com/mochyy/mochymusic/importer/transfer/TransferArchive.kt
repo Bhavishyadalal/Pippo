@@ -254,3 +254,60 @@ data class TransferManifest(
         }
     }
 }
+
+
+/** Check actual inflated bytes, not untrusted ZIP metadata. Keep free space for the transaction. */
+internal class ImportByteBudget(freeBytes: Long, declaredBytes: Long? = null) {
+    private val reserve = 64L * 1024 * 1024
+    private val limit = minOf(
+        (freeBytes - reserve).coerceAtLeast(0L),
+        declaredBytes?.let { it.coerceIn(0, Long.MAX_VALUE - reserve) + reserve } ?: Long.MAX_VALUE,
+    )
+    private var used = 0L
+    fun consume(count: Int) {
+        require(count >= 0)
+        check(count.toLong() <= limit - used) { "Backup exceeds its safe extraction budget" }
+        used += count
+    }
+}
+
+internal fun readBoundedManifest(input: java.io.InputStream): ByteArray {
+    val out = java.io.ByteArrayOutputStream()
+    val buffer = ByteArray(8192)
+    while (true) {
+        val n = input.read(buffer)
+        if (n < 0) break
+        check(n <= 1024 * 1024 - out.size()) { "Backup manifest is too large" }
+        out.write(buffer, 0, n)
+    }
+    return out.toByteArray()
+}
+
+/** Run actual Room migrations and schema verification against the staged file, never live data. */
+internal fun validateStagedLibrary(context: android.content.Context, library: File) {
+    check(library.isFile && library.length() > 0)
+    check(context.getDatabasePath(library.absolutePath).canonicalFile == library.canonicalFile)
+    check(library.canonicalFile != context.getDatabasePath(com.mochyy.mochymusic.db.InternalDatabase.DB_NAME).canonicalFile)
+    SQLiteDatabase.openDatabase(library.path, null, SQLiteDatabase.OPEN_READWRITE).use { db ->
+        check(TransferImporter.hasMigrationPath(db.version, com.mochyy.mochymusic.db.MusicDatabaseVersion)) {
+            "Unsupported backup database version"
+        }
+        // A current-version database with a forged/obsolete identity hash must still be
+        // checked by Room's generated schema validator.
+        db.execSQL("DROP TABLE IF EXISTS room_master_table")
+        foldIntoOneFile(db)
+    }
+    val staged = androidx.room.Room.databaseBuilder(
+        context, com.mochyy.mochymusic.db.InternalDatabase::class.java, library.absolutePath,
+    ).addMigrations(*com.mochyy.mochymusic.db.AllMigrations)
+        .setJournalMode(androidx.room.RoomDatabase.JournalMode.TRUNCATE)
+        .build()
+    try {
+        val db = staged.openHelper.writableDatabase
+        db.query("PRAGMA quick_check").use { check(it.moveToFirst() && it.getString(0).equals("ok", true)) }
+    } finally {
+        staged.close()
+    }
+    SQLiteDatabase.openDatabase(library.path, null, SQLiteDatabase.OPEN_READWRITE).use { foldIntoOneFile(it) }
+    listOf("-wal", "-shm", "-journal").forEach { File(library.path + it).delete() }
+}

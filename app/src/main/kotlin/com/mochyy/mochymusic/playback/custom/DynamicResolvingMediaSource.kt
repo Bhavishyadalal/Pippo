@@ -37,7 +37,7 @@ import java.io.IOException
 @UnstableApi
 class DynamicResolvingMediaSource(
     private val originalMediaItem: MediaItem,
-    private val mediaSourceFactoryProvider: (androidx.media3.exoplayer.drm.DrmSessionManager?) -> MediaSource.Factory,
+    private val mediaSourceFactoryProvider: (androidx.media3.exoplayer.drm.DrmSessionManager?, CustomStreamResult?) -> MediaSource.Factory,
     private val fetcherAction: suspend (String) -> CustomStreamResult?,
     private val onSourceResolved: (mediaId: String, source: String) -> Unit = { _, _ -> }
 ) : CompositeMediaSource<Void>() {
@@ -91,7 +91,7 @@ class DynamicResolvingMediaSource(
         }
 
         if (result == null) {
-            prepareChild(gen, mediaSourceFactoryProvider(null), originalMediaItem)
+            prepareChild(gen, mediaSourceFactoryProvider(null, null), originalMediaItem)
             return
         }
 
@@ -120,7 +120,7 @@ class DynamicResolvingMediaSource(
             builder.setDrmConfiguration(
                 MediaItem.DrmConfiguration.Builder(C.WIDEVINE_UUID).setMultiSession(true).build()
             )
-            prepareChild(gen, mediaSourceFactoryProvider(drmManager), builder.build())
+            prepareChild(gen, mediaSourceFactoryProvider(drmManager, result), builder.build())
         } else if (!result.decryptionKey.isNullOrBlank()) {
 
             val drmCallback = object : MediaDrmCallback {
@@ -160,7 +160,7 @@ class DynamicResolvingMediaSource(
                 .setUuidAndExoMediaDrmProvider(C.CLEARKEY_UUID, FrameworkMediaDrm.DEFAULT_PROVIDER)
                 .build(drmCallback)
 
-            val localFactory = mediaSourceFactoryProvider(drmManager)
+            val localFactory = mediaSourceFactoryProvider(drmManager, result)
 
             builder.setDrmConfiguration(
                 MediaItem.DrmConfiguration.Builder(C.CLEARKEY_UUID).build()
@@ -168,7 +168,7 @@ class DynamicResolvingMediaSource(
 
             prepareChild(gen, localFactory, builder.build())
         } else {
-            prepareChild(gen, mediaSourceFactoryProvider(null), builder.build())
+            prepareChild(gen, mediaSourceFactoryProvider(null, result), builder.build())
         }
     }
 

@@ -15,4 +15,6 @@ data class CustomStreamResult(
      * stream has one of its own, so it never shares bytes with the song's YouTube stream.
      */
     val cacheKey: String? = null,
+    /** Per-source headers for adaptive manifests and same-origin segment requests. */
+    val requestHeaders: Map<String, String> = emptyMap(),
 )

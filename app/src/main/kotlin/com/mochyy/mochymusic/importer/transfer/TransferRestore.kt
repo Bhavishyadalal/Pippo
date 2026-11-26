@@ -11,6 +11,7 @@ import com.mochyy.mochymusic.db.MusicDatabaseVersion
 import java.util.zip.ZipInputStream
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.sync.Mutex
 import androidx.datastore.preferences.core.PreferencesSerializer
 import okio.buffer
 import okio.source
@@ -36,14 +37,30 @@ object TransferRestore {
     private const val NoteName = "transfer_restored.json"
     internal const val ReadyMarker = "ready.json"
     private const val LegacySettings = "legacy-settings.preferences_pb"
+    internal val importLock = Mutex()
+
+    internal fun checkCanStage(staging: File) {
+        check(!File(staging, ReadyMarker).exists() || File(staging, RestoreFileTransaction.FailedMarker).exists()) {
+            "Another restore is pending"
+        }
+    }
+
+    /** Only replace failed/unfinished staging after the new archive has been validated. */
+    internal fun installStaging(temporary: File, staging: File) {
+        checkCanStage(staging)
+        check(!staging.exists() || staging.deleteRecursively())
+        check(temporary.renameTo(staging)) { "Couldn't stage backup" }
+    }
 
     /** Unpack and validate old two-entry backups without touching live data. */
     internal suspend fun stageLegacy(context: Context, source: Uri, settingsName: String) {
+        check(importLock.tryLock()) { "An import is already running" }
         val staging = stagingDir(context)
-        check(!File(staging, ReadyMarker).exists()) { "Another restore is pending" }
         val temporary = File(context.dataDir, "legacy-restore-" + java.util.UUID.randomUUID())
-        check(temporary.mkdirs())
         try {
+            checkCanStage(staging)
+            check(temporary.mkdirs())
+            val budget = ImportByteBudget(context.dataDir.usableSpace)
             val library = File(temporary, TransferArchive.LibraryEntry)
             val settings = File(temporary, LegacySettings)
             check(library.parentFile?.mkdirs() == true)
@@ -58,15 +75,19 @@ object TransferRestore {
                         settingsName -> settings
                         else -> null
                     }
-                    if (target == null || entry.isDirectory) continue
-                    check(!target.exists()) { "Duplicate backup entry" }
-                    target.outputStream().use { output ->
+                    val wanted = target?.takeUnless { entry.isDirectory }
+                    check(wanted == null || !wanted.exists()) { "Duplicate backup entry" }
+                    val output = wanted?.outputStream()
+                    try {
                         while (true) {
                             currentCoroutineContext().ensureActive()
                             val read = zip.read(buffer)
                             if (read < 0) break
-                            output.write(buffer, 0, read)
+                            budget.consume(read)
+                            output?.write(buffer, 0, read)
                         }
+                    } finally {
+                        output?.close()
                     }
                     zip.closeEntry()
                 }
@@ -83,14 +104,17 @@ object TransferRestore {
                 foldIntoOneFile(db)
             }
             listOf("-wal", "-shm", "-journal").forEach { File(library.path + it).delete() }
-            if (settings.exists()) settings.source().buffer().use { PreferencesSerializer.readFrom(it) }
+            validateStagedLibrary(context, library)
+            if (settings.exists()) {
+                check(settings.length() <= 8L * 1024 * 1024) { "Backup settings are too large" }
+                settings.source().buffer().use { PreferencesSerializer.readFrom(it) }
+            }
             currentCoroutineContext().ensureActive()
             File(temporary, ReadyMarker).writeText(JSONObject().put("legacy", true).toString())
-            check(!File(staging, ReadyMarker).exists()) { "Another restore is pending" }
-            check(!staging.exists() || staging.deleteRecursively())
-            check(temporary.renameTo(staging)) { "Couldn't stage backup" }
+            installStaging(temporary, staging)
         } finally {
             temporary.deleteRecursively()
+            importLock.unlock()
         }
     }
 
@@ -207,7 +231,10 @@ object TransferRestore {
             transaction.preserve(File(context.filesDir, "datastore"))
         }
         if (legacy) {
-            transaction.replace(File(context.filesDir, MusicService.PERSISTENT_QUEUE_FILE), null)
+            listOf(MusicService.PERSISTENT_QUEUE_FILE, MusicService.PERSISTENT_AUTOMIX_FILE,
+                MusicService.PERSISTENT_MANUAL_QUEUE_FILE, MusicService.PERSISTENT_PLAYER_STATE_FILE).forEach {
+                transaction.replace(File(context.filesDir, it), null)
+            }
         }
         transaction.preserve(context.noBackupFilesDir)
     }
